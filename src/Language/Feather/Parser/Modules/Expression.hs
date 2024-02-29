@@ -130,10 +130,15 @@ eFunctionDefinition = eLocated $ do
   body <- indentOrInline eExpression
   return (EDeclaration (name :@: Nothing) (EClosure arguments ret body) Nothing)
 
+-- { l1: e1, l2: 2, ..., ln: en | r } where l1, l2, ..., ln are record labels
+-- and e1, e2, ..., en are record values. Record is a data structure that
+-- stores key-value pairs. It is similar to a map in other languages but values
+-- are heterogeneous. Labels are just identifiers (as variables).
 eRecord :: Parser Expression
 eRecord = eLocated . braces $ do
   fields <-
     (,)
+      -- Parse record fields
       <$> ( ( do
                 name <- identifier
                 _ <- symbol ":"
@@ -142,6 +147,7 @@ eRecord = eLocated . braces $ do
             )
               `sepBy` comma
           )
+      -- Parse optional record extension
       <*> optional (symbol "|" *> eExpression)
 
   return $ case fields of
@@ -154,7 +160,7 @@ eRecord = eLocated . braces $ do
 
 -- Main expression parsing function
 eExpression :: Parser Expression
-eExpression = makeExprParser eTerm (operators ++ [operators'])
+eExpression = makeExprParser eTerm ([postfixOperators] : operators)
   where
     eTerm =
       choice
@@ -180,30 +186,43 @@ eExpression = makeExprParser eTerm (operators ++ [operators'])
     --
     -- MakeUnaryOp lets the parser knowing that this operator may be chained,
     -- in particular for closure calls: x(4)(5)(6)
-    operators' =
-      [ ( Postfix $
-            makeUnaryOp
-              ( do
-                  arguments <- do
-                    _ <- symbol "("
-                    ilevel <- get
+    postfixOperators =
+      Postfix $
+        makeUnaryOp $
+          choice
+            [ do
+                arguments <- do
+                  _ <- symbol "("
+                  ilevel <- get
 
-                    args <-
-                      indentSepBy eExpression comma
-                        <|> (eExpression `sepBy` comma)
+                  -- Parsing function call args either inlined or indented
+                  args <-
+                    indentSepBy eExpression comma
+                      <|> (eExpression `sepBy` comma)
 
-                    _ <- indentSameOrInline ilevel $ symbol ")"
-                    return args
+                  _ <- indentSameOrInline ilevel $ symbol ")"
+                  return args
 
-                  lambdaArg <- optional $ do
-                    _ <- symbol "->"
-                    body <- indentOrInline eExpression
-                    return $ EClosure [] Nothing body
+                -- Optional syntaxic sugar for callback argument
+                lambdaArg <- optional $ do
+                  _ <- symbol "->"
+                  body <- indentOrInline eExpression
+                  return $ EClosure [] Nothing body
 
-                  return \e -> EApplication e (arguments ++ maybeToList lambdaArg)
-              )
-        )
-      ]
+                return \e -> EApplication e (arguments ++ maybeToList lambdaArg),
+              -- Record restriction e \ x where e may be a record and x a label
+              -- to "remove" from the record
+              do
+                _ <- symbol "\\"
+                name <- identifier
+                return $ \e -> ERowRestrict e name,
+              -- Record selection e.x where e may be a record and x a label to
+              -- select from the record
+              do
+                _ <- symbol "."
+                name <- identifier
+                return $ \e -> ERowSelect e name
+            ]
 
 parseProgram :: Parser Program
 parseProgram = many (nonIndented eExpression <* optional indentSc)

@@ -42,15 +42,5 @@ operators =
         binary "/" (EBinary Division)
       ],
       [binary "%" (EBinary Mod)],
-      [prefix "not" (EPrefix Not)],
-      [ Postfix $ makeUnaryOp $ do
-          _ <- symbol "\\"
-          name <- identifier
-          return $ \e -> ERowRestrict e name
-      ],
-      [ Postfix $ makeUnaryOp $ do
-          _ <- symbol "."
-          name <- identifier
-          return $ \e -> ERowSelect e name
-      ]
+      [prefix "not" (EPrefix Not)]
     ]
