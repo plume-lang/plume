@@ -66,10 +66,14 @@ tCon = do
 tId :: Parser ConcreteType
 tId = TId <$> identifier
 
+-- {l1: t1, l2: t2, ..., ln: tn | r} where l1, l2, ..., ln are the record
+-- fields and t1, t2, ..., tn are the record fields types. r type is optional
+-- and it represents the rest of the record fields. This is used to represent
+-- record types.
 tRecord :: Parser ConcreteType
 tRecord = braces $ do
   fields <-
-    sepBy1
+    sepBy
       ( do
           l <- identifier
           _ <- colon
@@ -77,7 +81,7 @@ tRecord = braces $ do
           return (l, t)
       )
       comma
-  r <- optional $ symbol "|" *> tType
+  r <- optional $ symbol "|" *> (tType <|> tRowEmpty)
   let rec = foldl (\acc (l, t) -> TRowExtend l t acc) (fromMaybe TRowEmpty r) fields
   return $ TRecord rec
 
@@ -88,15 +92,16 @@ tRowEmpty = symbol "..." $> TRowEmpty
 tType :: Parser ConcreteType
 tType =
   choice
-    [ -- Try may be used here because function type starts with the same
+    [ tRecord,
+      -- Try may be used here because function type starts with the same
       -- syntax as tuple
-      tRecord,
-      tRowEmpty,
       try tFunction,
       tPrimitive,
       tList,
       tTuple,
       tVar,
+      -- Try may be used here because type application starts with an identifier
+      -- just like type identifier
       try tCon,
       tId
     ]
