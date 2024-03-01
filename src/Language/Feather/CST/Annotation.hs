@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 
 module Language.Feather.CST.Annotation where
@@ -7,18 +8,18 @@ module Language.Feather.CST.Annotation where
 -- That generic type can be anything from a type to a literal to another annotation.
 
 data Annotation t = Annotation
-  { annotationName :: String,
+  { annotationName :: Text,
     annotationValue :: t
   }
   deriving (Eq, Ord, Functor)
 
-pattern (:@:) :: String -> t -> Annotation t
+pattern (:@:) :: Text -> t -> Annotation t
 pattern name :@: value = Annotation name value
 
-instance {-# OVERLAPS #-} (Show t) => Show (Annotation (Maybe t)) where
-  show (Annotation name value) = case value of
+instance {-# OVERLAPS #-} (ToText t) => ToText (Annotation (Maybe t)) where
+  toText (Annotation name value) = case value of
     Nothing -> name
-    Just t -> name ++ ": " ++ show t
+    Just t -> name <> ": " <> toText t
 
-instance (Show t) => Show (Annotation t) where
-  show (Annotation name value) = name ++ ": " ++ show value
+instance (ToText t) => ToText (Annotation t) where
+  toText (Annotation name value) = name <> ": " <> toText value

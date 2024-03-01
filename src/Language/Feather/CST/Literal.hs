@@ -4,7 +4,7 @@ module Language.Feather.CST.Literal where
 -- They are the most primary form of data in the langage, letting the user
 -- express more concrete programs.
 
-type Label = String
+type Label = Text
 
 data Literal
   = LInt Integer
@@ -13,9 +13,9 @@ data Literal
   | LChar Char
   | LFloat Double
 
-instance Show Literal where
-  show (LInt i) = show i
-  show (LBool b) = show b
-  show (LString s) = show s
-  show (LChar c) = show c
-  show (LFloat f) = show f
+instance ToText Literal where
+  toText (LInt i) = show i
+  toText (LBool b) = show b
+  toText (LString s) = show s
+  toText (LChar c) = show c
+  toText (LFloat f) = show f
