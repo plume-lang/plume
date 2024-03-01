@@ -1,13 +1,11 @@
 module Language.Feather.Parser where
 
-import Control.Monad.State
-import Data.Void
 import Language.Feather.CST
 import Language.Feather.Parser.Lexer
 import Language.Feather.Parser.Modules.Expression
 import Text.Megaparsec
 
-type FileContent = String
+type FileContent = Text
 
 type ParsingError = ParseErrorBundle FileContent Void
 

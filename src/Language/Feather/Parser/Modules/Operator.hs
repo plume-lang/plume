@@ -1,16 +1,16 @@
 module Language.Feather.Parser.Modules.Operator where
 
-import Control.Applicative
 import Control.Monad.Combinators.Expr
+import Data.Foldable
 import Language.Feather.CST
 import Language.Feather.Parser.Lexer
 
 -- Useful shortcut functions for defining operators
 
-binary :: String -> (Expression -> Expression -> Expression) -> Operator Parser Expression
+binary :: Text -> (Expression -> Expression -> Expression) -> Operator Parser Expression
 binary name f = InfixL (f <$ symbol name)
 
-prefix, postfix :: String -> (Expression -> Expression) -> Operator Parser Expression
+prefix, postfix :: Text -> (Expression -> Expression) -> Operator Parser Expression
 prefix name f = Prefix (f <$ symbol name)
 postfix name f = Postfix (f <$ symbol name)
 

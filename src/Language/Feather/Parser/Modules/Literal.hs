@@ -1,6 +1,5 @@
 module Language.Feather.Parser.Modules.Literal where
 
-import Data.Functor
 import Language.Feather.CST.Literal
 import Language.Feather.Parser.Lexer
 import Text.Megaparsec

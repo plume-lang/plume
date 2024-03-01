@@ -3,14 +3,12 @@
 module Language.Feather.Parser.Modules.Expression where
 
 import Control.Monad.Combinators.Expr
-import Control.Monad.State
-import Data.Maybe
 import Language.Feather.CST
 import Language.Feather.Parser.Lexer
 import Language.Feather.Parser.Modules.Literal
 import Language.Feather.Parser.Modules.Operator
 import Language.Feather.Parser.Modules.Type
-import Text.Megaparsec
+import Text.Megaparsec hiding (many)
 
 -- Some useful parsing functions
 

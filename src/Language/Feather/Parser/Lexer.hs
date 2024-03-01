@@ -2,14 +2,12 @@
 
 module Language.Feather.Parser.Lexer where
 
-import Control.Monad
-import Control.Monad.State qualified as S
-import Data.Void
-import Text.Megaparsec
+import Data.Text (pack)
+import Text.Megaparsec hiding (State (..), many, some)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 
-type Parser = ParsecT Void String (S.State Int)
+type Parser = ParsecT Void Text (State Int)
 
 lineComment :: Parser ()
 lineComment = L.skipLineComment "//"
@@ -33,7 +31,7 @@ scn = L.space space1 lineComment multilineComment
 sc :: Parser ()
 sc =
   L.space
-    (void (char ' ' <|> char '\t'))
+    (void (char (' ') <|> char '\t'))
     lineComment
     multilineComment
 
@@ -62,10 +60,10 @@ consumeIndents = do
         Nothing -> 0
 
   -- Storing the current processed indent in the state
-  S.modify (const processedIndent)
+  modify (const processedIndent)
   return processedIndent
 
-reservedWords :: [String]
+reservedWords :: [Text]
 reservedWords = ["in", "if", "then", "else", "true", "false"]
 
 -- Tab width for the indent sensitive parser
@@ -75,10 +73,10 @@ tabWidth = 4
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
 
-symbol :: String -> Parser String
+symbol :: Text -> Parser Text
 symbol = lexeme . L.symbol sc
 
-reserved :: String -> Parser String
+reserved :: Text -> Parser Text
 reserved keyword = do
   r <- lexeme (string keyword <* notFollowedBy alphaNumChar)
   -- Guarding parsed result here lets the parser building more security
@@ -98,15 +96,15 @@ angles = between (symbol "<") (symbol ">")
 braces :: Parser a -> Parser a
 braces = between (symbol "{") (symbol "}")
 
-comma :: Parser String
+comma :: Parser Text
 comma = symbol ","
 
-colon :: Parser String
+colon :: Parser Text
 colon = symbol ":"
 
-identifier :: Parser String
+identifier :: Parser Text
 identifier = do
-  r <- lexeme ((:) <$> (letterChar <|> oneOf "_") <*> many (alphaNumChar <|> oneOf "_"))
+  r <- pack <$> lexeme ((:) <$> (letterChar <|> oneOf ("_" :: String)) <*> many (alphaNumChar <|> oneOf ("_" :: String)))
   -- Guarding parsed result and failing when reserved word is parsed
   -- (such as reserved keyword)
   guard (r `notElem` reservedWords)
@@ -126,7 +124,7 @@ howMany1 p = length <$> some p
 -- It returns a list of parsed results with the same indentation level.
 indent :: Parser a -> Parser [a]
 indent p = do
-  ilevel <- S.get
+  ilevel <- get
   level <- eol >> consumeIndents
   if level > ilevel
     then do
@@ -137,7 +135,7 @@ indent p = do
 
 indentSepBy :: Parser a -> Parser b -> Parser [a]
 indentSepBy p sep = do
-  ilevel <- S.get
+  ilevel <- get
   level <- eol >> consumeIndents
   if level > ilevel
     then do

@@ -1,7 +1,6 @@
 module Language.Feather.Parser.Modules.Type where
 
-import Data.Functor
-import Data.Maybe
+import Data.Foldable
 import Language.Feather.CST.Type
 import Language.Feather.Parser.Lexer
 import Text.Megaparsec
