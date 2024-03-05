@@ -72,13 +72,12 @@ prettyExpr _ (EConditionBranch e1' e2' e3') =
     <> anCol Blue "\nelse\n"
     <> indent 2 (prettyExpr 0 e3')
 prettyExpr _ (EClosure as t e) =
-  ppArgs as
-    <> ppRet t
+  ppArgs as t
     <+> "->\n"
     <+> indent 2 (prettyExpr 0 e)
   where
-    ppArgs [x :@: Nothing] = pretty x
-    ppArgs xs = parens (hsep . punctuate comma $ map ansiPretty xs)
+    ppArgs [x :@: Nothing] Nothing = pretty x
+    ppArgs xs ret = parens (hsep . punctuate comma $ map ansiPretty xs) <> ppRet ret
 
     ppRet Nothing = ""
     ppRet (Just t') = ":" <+> prettyTy t'
@@ -146,7 +145,43 @@ prettyTy (TId n) = anCol Magenta $ pretty n
 prettyTy (TApp t ts) = prettyTy t <+> hsep (map prettyTy ts)
 prettyTy (TFunction ts t) = hsep (map prettyTy ts) <+> "->" <+> prettyTy t
 prettyTy (TRecord TRowEmpty) = "{}"
-prettyTy (TRecord r) = braces' $ prettyTy r
+prettyTy (TRecord r) = ppExtend (extract r)
+  where
+    extract :: ConcreteType -> ([(Text, ConcreteType)], ConcreteType)
+    extract (TRowExtend label val r') = ((label, val) : names, rest')
+      where
+        (names, rest') = extract r'
+    extract e = ([], e)
+
+    ppExtend :: ([(Text, ConcreteType)], ConcreteType) -> Doc AnsiStyle
+    ppExtend ([], e) = prettyTy e
+    ppExtend (names, TRowEmpty) =
+      braces' . hsep $
+        punctuate
+          comma
+          ( map
+              ( \(n, v) ->
+                  pretty n <> ": " <> prettyTy v
+              )
+              names
+          )
+    ppExtend (names, e) =
+      "{"
+        <+> ( hsep
+                ( punctuate
+                    comma
+                    ( map
+                        ( \(n, v) ->
+                            pretty n <> ": " <> prettyTy v
+                        )
+                        names
+                    )
+                )
+                <> comma
+                <+> "..."
+                <> prettyTy e
+            )
+        <+> "}"
 prettyTy TRowEmpty = "..."
 prettyTy (TRowExtend l t TRowEmpty) = pretty l <> " : " <> prettyTy t
 prettyTy (TRowExtend l t r) = pretty l <> " : " <> prettyTy t <> " | " <> prettyTy r

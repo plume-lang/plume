@@ -65,27 +65,44 @@ tCon = do
 tId :: Parser ConcreteType
 tId = TId <$> identifier
 
+data TypeRow
+  = TypeField Text ConcreteType
+  | TypeExt ConcreteType
+
+orderTypeRows :: [TypeRow] -> ([(Text, ConcreteType)], Maybe ConcreteType)
+orderTypeRows = foldl' f ([], Nothing)
+  where
+    f (acc, r) (TypeField l t) = (acc ++ [(l, t)], r)
+    f (acc, _) (TypeExt t) = (acc, Just t)
+
+buildFinalRecord :: [(Text, ConcreteType)] -> Maybe ConcreteType -> ConcreteType
+buildFinalRecord fields r =
+  TRecord $
+    foldl'
+      (\acc (l, t) -> TRowExtend l t acc)
+      (fromMaybe TRowEmpty r)
+      fields
+
 -- {l1: t1, l2: t2, ..., ln: tn | r} where l1, l2, ..., ln are the record
 -- fields and t1, t2, ..., tn are the record fields types. r type is optional
 -- and it represents the rest of the record fields. This is used to represent
 -- record types.
 tRecord :: Parser ConcreteType
 tRecord = braces $ do
-  fields <-
-    sepBy
-      ( do
-          l <- identifier
-          _ <- colon
-          t <- tType
-          return (l, t)
-      )
-      comma
-  r <- optional $ symbol "|" *> (tType <|> tRowEmpty)
-  let rec = foldl (\acc (l, t) -> TRowExtend l t acc) (fromMaybe TRowEmpty r) fields
-  return $ TRecord rec
+  (fields, ext) <-
+    orderTypeRows
+      <$> sepBy
+        ( ( do
+              l <- identifier
+              _ <- colon
+              t <- tType
+              return (TypeField l t)
+          )
+            <|> (symbol "..." *> (TypeExt <$> tType))
+        )
+        comma
 
-tRowEmpty :: Parser ConcreteType
-tRowEmpty = symbol "..." $> TRowEmpty
+  return $ buildFinalRecord fields ext
 
 -- Main type parsing function
 tType :: Parser ConcreteType
