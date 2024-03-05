@@ -23,17 +23,25 @@ library
         Language.Feather.Parser.Modules.Expression
         Language.Feather.Parser.Modules.Type
 
+        Prettyprinter.CST
+        Prettyprinter.Annotation
+        Prettyprinter.ANSI
+
+        Print
+
     hs-source-dirs:     src
     default-language:   GHC2021
     default-extensions: OverloadedStrings
-    ghc-options:        -Wall
+    ghc-options:        -Wall -Wno-orphans
     build-depends:
         base ^>=4.19.0.0,
         megaparsec ^>=9.6.1,
         containers,
         mtl,
         parser-combinators,
-        relude
+        relude,
+        prettyprinter,
+        prettyprinter-ansi-terminal
 
     mixins:
         base hiding (Prelude),
