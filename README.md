@@ -15,7 +15,14 @@
   </p>
 </p>
 
-![Downloads](https://img.shields.io/github/downloads/sisypheus-dev/feather-language/total) ![Contributors](https://img.shields.io/github/contributors/sisypheus-dev/feather-language?color=dark-green) ![Issues](https://img.shields.io/github/issues/sisypheus-dev/feather-language) ![License](https://img.shields.io/github/license/sisypheus-dev/feather-language)
+<div align="center">
+  
+![Downloads](https://img.shields.io/github/downloads/sisypheus-dev/feather-language/total) 
+![Contributors](https://img.shields.io/github/contributors/sisypheus-dev/feather-language?color=dark-green) 
+![Issues](https://img.shields.io/github/issues/sisypheus-dev/feather-language) 
+![License](https://img.shields.io/github/license/sisypheus-dev/feather-language)
+
+</div>
 
 ## Table Of Contents
 
