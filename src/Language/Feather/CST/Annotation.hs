@@ -15,11 +15,3 @@ data Annotation t = Annotation
 
 pattern (:@:) :: Text -> t -> Annotation t
 pattern name :@: value = Annotation name value
-
-instance {-# OVERLAPS #-} (ToText t) => ToText (Annotation (Maybe t)) where
-  toText (Annotation name value) = case value of
-    Nothing -> name
-    Just t -> name <> ": " <> toText t
-
-instance (ToText t) => ToText (Annotation t) where
-  toText (Annotation name value) = name <> ": " <> toText value

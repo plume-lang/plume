@@ -12,10 +12,3 @@ data Literal
   | LString String
   | LChar Char
   | LFloat Double
-
-instance ToText Literal where
-  toText (LInt i) = show i
-  toText (LBool b) = show b
-  toText (LString s) = show s
-  toText (LChar c) = show c
-  toText (LFloat f) = show f

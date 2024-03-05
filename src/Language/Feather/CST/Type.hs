@@ -38,15 +38,3 @@ pattern TString = TId "str"
 pattern TChar = TId "char"
 pattern TFloat = TId "float"
 pattern TUnit = TTuple []
-
-instance ToText ConcreteType where
-  toText (TId n) = n
-  toText (TFunction args ret) = "(" <> unwords (map toText args) <> ") -> " <> toText ret
-  toText (TTuple ts) = "(" <> intercalate ", " (map toText ts) <> ")"
-  toText (TList t) = "[" <> toText t <> "]"
-  toText (TVar s) = s
-  toText (TCon s ts) = s <> "<" <> intercalate ", " (map toText ts) <> ">"
-  toText (TApp t ts) = toText t <> "<" <> intercalate ", " (map toText ts) <> ">"
-  toText (TRecord r) = "{" <> toText r <> "}"
-  toText TRowEmpty = "..."
-  toText (TRowExtend l t r) = l <> " : " <> toText t <> " | " <> toText r
