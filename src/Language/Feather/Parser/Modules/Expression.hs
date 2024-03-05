@@ -128,33 +128,50 @@ eFunctionDefinition = eLocated $ do
   body <- indentOrInline eExpression
   return (EDeclaration (name :@: Nothing) (EClosure arguments ret body) Nothing)
 
+data Row
+  = Field Text Expression
+  | Extension Expression
+
+orderRows :: [Row] -> ([(Text, Expression)], Maybe Expression)
+orderRows = foldr f ([], Nothing)
+  where
+    f (Field name expr) (acc, rest) = ((name, expr) : acc, rest)
+    f (Extension expr) (acc, _) = (acc, Just expr)
+
 -- { l1: e1, l2: 2, ..., ln: en | r } where l1, l2, ..., ln are record labels
 -- and e1, e2, ..., en are record values. Record is a data structure that
 -- stores key-value pairs. It is similar to a map in other languages but values
 -- are heterogeneous. Labels are just identifiers (as variables).
 eRecord :: Parser Expression
-eRecord = eLocated . braces $ do
-  fields <-
-    (,)
-      -- Parse record fields
-      <$> ( ( do
-                name <- identifier
-                _ <- symbol ":"
-                expr <- eExpression
-                return (name, expr)
-            )
-              `sepBy` comma
-          )
-      -- Parse optional record extension
-      <*> optional (symbol "|" *> eExpression)
+eRecord = eLocated $ do
+  _ <- symbol "{"
+  ilevel <- get
 
-  return $ case fields of
+  fields <- field `indentSepBy` comma <|> field `sepBy` comma
+
+  _ <- indentSameOrInline ilevel $ symbol "}"
+
+  return $ case orderRows fields of
     ([], _) -> ERowEmpty
     (f, r) ->
       foldr
         (\(name, expr) acc -> ERowExtension name expr acc)
         (fromMaybe ERowEmpty r)
         f
+  where
+    field = do
+      ( ( do
+            name <- identifier
+            _ <- symbol ":"
+            expr <- eExpression
+            return (Field name expr)
+        )
+          <|> ( do
+                  _ <- symbol "..."
+                  expr <- eExpression
+                  return (Extension expr)
+              )
+        )
 
 -- Main expression parsing function
 eExpression :: Parser Expression

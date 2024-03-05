@@ -99,7 +99,7 @@ prettyExpr _ r@(ERowExtension {}) = ppExtend (extract r)
     ppExtend :: ([(Text, Expression)], Expression) -> Doc AnsiStyle
     ppExtend ([], e) = prettyExpr 0 e
     ppExtend (names, ERowEmpty) =
-      braces . hsep $
+      braces' . vsep $
         punctuate
           comma
           ( map
@@ -109,19 +109,24 @@ prettyExpr _ r@(ERowExtension {}) = ppExtend (extract r)
               names
           )
     ppExtend (names, e) =
-      braces $
-        hsep
-          ( punctuate
-              comma
-              ( map
-                  ( \(n, v) ->
-                      pretty n <> ": " <> prettyExpr 0 v
-                  )
-                  names
-              )
-          )
-          <+> pipe
-          <+> prettyExpr 0 e
+      "{\n"
+        <> ( indent 2 $
+               vsep
+                 ( punctuate
+                     comma
+                     ( map
+                         ( \(n, v) ->
+                             pretty n <> ": " <> prettyExpr 0 v
+                         )
+                         names
+                     )
+                 )
+                 <> comma
+                 <> line
+                 <> "..."
+                 <> prettyExpr 0 e
+           )
+        <> "\n}"
 prettyExpr _ (ERowSelect e l) = prettyExpr 0 e <> "." <> pretty l
 prettyExpr _ (ERowRestrict e l) = prettyExpr 0 e <+> anCol Blue "except" <+> pretty l
 prettyExpr _ (ELocated e _) = prettyExpr 0 e
@@ -136,10 +141,15 @@ prettyLit (LBool b) = anBold $ anCol Blue $ case b of
 prettyLit (LChar c) = anCol Green . squotes $ pretty c
 
 prettyTy :: ConcreteType -> Doc AnsiStyle
-prettyTy (TVar t) = anItalic $ pretty t
+prettyTy (TVar t) = anBold $ pretty t
 prettyTy (TId n) = anCol Magenta $ pretty n
 prettyTy (TApp t ts) = prettyTy t <+> hsep (map prettyTy ts)
 prettyTy (TFunction ts t) = hsep (map prettyTy ts) <+> "->" <+> prettyTy t
-prettyTy (TRecord r) = "{" <> prettyTy r <> "}"
+prettyTy (TRecord TRowEmpty) = "{}"
+prettyTy (TRecord r) = braces' $ prettyTy r
 prettyTy TRowEmpty = "..."
+prettyTy (TRowExtend l t TRowEmpty) = pretty l <> " : " <> prettyTy t
 prettyTy (TRowExtend l t r) = pretty l <> " : " <> prettyTy t <> " | " <> prettyTy r
+
+braces' :: Doc a -> Doc a
+braces' = enclose "{ " " }"
