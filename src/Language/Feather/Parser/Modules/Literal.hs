@@ -12,6 +12,7 @@ parseLiteral =
     [ parseChar,
       parseString,
       try parseFloat,
+      parseBool,
       parseInteger
     ]
 
