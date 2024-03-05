@@ -28,6 +28,7 @@ operators =
     [ [ binary "and" (EBinary And),
         binary "or" (EBinary Or)
       ],
+      [prefix "not" (EPrefix Not)],
       [ binary "==" (EBinary Equals),
         binary "!=" (EBinary NotEquals),
         binary ">=" (EBinary GreaterThan),
@@ -41,6 +42,5 @@ operators =
       [ binary "*" (EBinary Times),
         binary "/" (EBinary Division)
       ],
-      [binary "%" (EBinary Mod)],
-      [prefix "not" (EPrefix Not)]
+      [binary "%" (EBinary Mod)]
     ]
