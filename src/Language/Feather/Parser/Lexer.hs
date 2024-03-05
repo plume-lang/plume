@@ -64,7 +64,7 @@ consumeIndents = do
   return processedIndent
 
 reservedWords :: [Text]
-reservedWords = ["in", "if", "then", "else", "true", "false"]
+reservedWords = ["in", "if", "then", "else", "true", "false", "except"]
 
 -- Tab width for the indent sensitive parser
 tabWidth :: Int

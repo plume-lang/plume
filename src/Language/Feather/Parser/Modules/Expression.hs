@@ -211,7 +211,7 @@ eExpression = makeExprParser eTerm ([postfixOperators] : operators)
               -- Record restriction e \ x where e may be a record and x a label
               -- to "remove" from the record
               do
-                _ <- symbol "\\"
+                _ <- reserved "except"
                 name <- identifier
                 return $ \e -> ERowRestrict e name,
               -- Record selection e.x where e may be a record and x a label to
