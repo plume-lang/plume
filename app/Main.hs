@@ -3,7 +3,7 @@ module Main where
 import Data.Text.IO
 import Plume.Syntax.Concrete.Internal.Pretty ()
 import Plume.Syntax.Parser
-import Print
+import System.IO.Pretty
 import Text.Megaparsec (errorBundlePretty)
 import Prelude hiding (readFile)
 
