@@ -1,7 +1,7 @@
-module Print where
+module System.IO.Pretty (printText, ppPut, ppPrint) where
 
 import Data.Text.IO
-import Prettyprinter.ANSI
+import Plume.Syntax.Internal.Pretty.ANSI
 import Prettyprinter.Render.Terminal
 import Prelude hiding (print, putStrLn, readFile)
 

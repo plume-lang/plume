@@ -1,4 +1,4 @@
-module Prettyprinter.ANSI where
+module Plume.Syntax.Internal.Pretty.ANSI where
 
 import Prettyprinter
 import Prettyprinter.Render.Terminal

@@ -1,8 +1,8 @@
 module Plume.Syntax.Concrete.Internal.Pretty where
 
 import Plume.Syntax.Concrete
+import Plume.Syntax.Internal.Pretty.ANSI
 import Prettyprinter
-import Prettyprinter.ANSI
 import Prettyprinter.Render.Terminal
 import Prelude hiding (intercalate)
 
