@@ -1,6 +1,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 
-module Language.Feather.CST.Expression where
+module Language.Plume.CST.Expression where
 
 -- Expressions are the most basic form of programs.
 -- They permit the user to express more complex programs by combining
@@ -8,8 +8,8 @@ module Language.Feather.CST.Expression where
 -- variable to a complex function application.
 
 import Data.Text hiding (map)
-import Language.Feather.CST.Annotation
-import Language.Feather.CST.Literal
+import Language.Plume.CST.Annotation
+import Language.Plume.CST.Literal
 import Text.Megaparsec.Pos
 import Prelude hiding (intercalate)
 

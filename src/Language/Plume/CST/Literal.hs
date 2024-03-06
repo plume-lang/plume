@@ -1,4 +1,4 @@
-module Language.Feather.CST.Literal where
+module Language.Plume.CST.Literal where
 
 -- Literals are the most basic form of expressions.
 -- They are the most primary form of data in the langage, letting the user

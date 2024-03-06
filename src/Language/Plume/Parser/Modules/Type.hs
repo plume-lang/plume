@@ -1,8 +1,8 @@
-module Language.Feather.Parser.Modules.Type where
+module Language.Plume.Parser.Modules.Type where
 
 import Data.Foldable
-import Language.Feather.CST.Type
-import Language.Feather.Parser.Lexer
+import Language.Plume.CST.Type
+import Language.Plume.Parser.Lexer
 import Text.Megaparsec
 import Text.Megaparsec.Char
 
@@ -12,11 +12,11 @@ import Text.Megaparsec.Char
 tPrimitive :: Parser ConcreteType
 tPrimitive =
   choice
-    [ symbol "int" $> TInt,
-      symbol "bool" $> TBool,
-      symbol "str" $> TString,
-      symbol "char" $> TChar,
-      symbol "float" $> TFloat
+    [ symbol "int" $> TInt
+    , symbol "bool" $> TBool
+    , symbol "str" $> TString
+    , symbol "char" $> TChar
+    , symbol "float" $> TFloat
     ]
 
 -- (t1, t2, ..., tn) -> ret where t1, t2, ..., tn are the function type arguments types
@@ -71,9 +71,9 @@ data TypeRow
 
 orderTypeRows :: [TypeRow] -> ([(Text, ConcreteType)], Maybe ConcreteType)
 orderTypeRows = foldl' f ([], Nothing)
-  where
-    f (acc, r) (TypeField l t) = (acc ++ [(l, t)], r)
-    f (acc, _) (TypeExt t) = (acc, Just t)
+ where
+  f (acc, r) (TypeField l t) = (acc ++ [(l, t)], r)
+  f (acc, _) (TypeExt t) = (acc, Just t)
 
 buildFinalRecord :: [(Text, ConcreteType)] -> Maybe ConcreteType -> ConcreteType
 buildFinalRecord fields r =
@@ -108,16 +108,16 @@ tRecord = braces $ do
 tType :: Parser ConcreteType
 tType =
   choice
-    [ tRecord,
-      -- Try may be used here because function type starts with the same
+    [ tRecord
+    , -- Try may be used here because function type starts with the same
       -- syntax as tuple
-      try tFunction,
-      tPrimitive,
-      tList,
-      tTuple,
-      tVar,
-      -- Try may be used here because type application starts with an identifier
+      try tFunction
+    , tPrimitive
+    , tList
+    , tTuple
+    , tVar
+    , -- Try may be used here because type application starts with an identifier
       -- just like type identifier
-      try tCon,
-      tId
+      try tCon
+    , tId
     ]

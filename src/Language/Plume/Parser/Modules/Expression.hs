@@ -1,13 +1,13 @@
 {-# LANGUAGE BlockArguments #-}
 
-module Language.Feather.Parser.Modules.Expression where
+module Language.Plume.Parser.Modules.Expression where
 
 import Control.Monad.Combinators.Expr
-import Language.Feather.CST
-import Language.Feather.Parser.Lexer
-import Language.Feather.Parser.Modules.Literal
-import Language.Feather.Parser.Modules.Operator
-import Language.Feather.Parser.Modules.Type
+import Language.Plume.CST
+import Language.Plume.Parser.Lexer
+import Language.Plume.Parser.Modules.Literal
+import Language.Plume.Parser.Modules.Operator
+import Language.Plume.Parser.Modules.Type
 import Text.Megaparsec hiding (many)
 
 -- Some useful parsing functions
@@ -25,8 +25,8 @@ eLocated p = do
 -- where x is an identifier and t is a concrete type
 annotated :: Parser (Annotation (Maybe ConcreteType))
 annotated = Annotation <$> identifier <*> ty
-  where
-    ty = optional (symbol ":" *> tType)
+ where
+  ty = optional (symbol ":" *> tType)
 
 -- Used to parse a block of expressions
 -- This takes care of indentation and newlines
@@ -106,14 +106,14 @@ eClosure = eLocated $ do
     return (args, ret)
   body <- indentOrInline eExpression
   return (EClosure args ret body)
-  where
-    clArguments =
-      choice
-        [ clMonoArg,
-          clPolyArg
-        ]
-    clMonoArg = pure <$> (Annotation <$> identifier <*> pure Nothing)
-    clPolyArg = parens (annotated `sepBy` comma)
+ where
+  clArguments =
+    choice
+      [ clMonoArg
+      , clPolyArg
+      ]
+  clMonoArg = pure <$> (Annotation <$> identifier <*> pure Nothing)
+  clPolyArg = parens (annotated `sepBy` comma)
 
 -- name(a: t1, b: t2, ..., z: tn): ret -> e where name is the function name,
 -- parenthesized elements are function arguments, ret is function return type
@@ -134,9 +134,9 @@ data Row
 
 orderRows :: [Row] -> ([(Text, Expression)], Maybe Expression)
 orderRows = foldr f ([], Nothing)
-  where
-    f (Field name expr) (acc, rest) = ((name, expr) : acc, rest)
-    f (Extension expr) (acc, _) = (acc, Just expr)
+ where
+  f (Field name expr) (acc, rest) = ((name, expr) : acc, rest)
+  f (Extension expr) (acc, _) = (acc, Just expr)
 
 -- { l1: e1, l2: 2, ..., ln: en | r } where l1, l2, ..., ln are record labels
 -- and e1, e2, ..., en are record values. Record is a data structure that
@@ -158,86 +158,86 @@ eRecord = eLocated $ do
         (\(name, expr) acc -> ERowExtension name expr acc)
         (fromMaybe ERowEmpty r)
         f
-  where
-    field = do
-      ( ( do
-            name <- identifier
-            _ <- symbol ":"
-            expr <- eExpression
-            return (Field name expr)
-        )
-          <|> ( do
-                  _ <- symbol "..."
-                  expr <- eExpression
-                  return (Extension expr)
-              )
-        )
+ where
+  field = do
+    ( ( do
+          name <- identifier
+          _ <- symbol ":"
+          expr <- eExpression
+          return (Field name expr)
+      )
+        <|> ( do
+                _ <- symbol "..."
+                expr <- eExpression
+                return (Extension expr)
+            )
+      )
 
 -- Main expression parsing function
 eExpression :: Parser Expression
 eExpression = makeExprParser eTerm ([postfixOperators] : operators)
-  where
-    eTerm =
-      choice
-        [ eLiteral,
-          eRecord,
-          -- Try may be used here because function definitions starts with the
-          -- same syntax as variable declaration
-          try eFunctionDefinition,
-          eClosure,
-          eConditionBranch,
-          -- Try may be used here because declaration starts with the same
-          -- syntax as equality operator (for instance in parsing x == 5, this
-          -- may be conflicting with x = ..., where ... would be "= 5")
-          try eDeclaration,
-          eVariable,
-          eParenthized
-        ]
-    -- Extending operators in order to add function call support. A function
-    -- call is just a postfix operator where operand is the callee and operator
-    -- is the actual arguments associated to the function call. A function call
-    -- is actually an expression of the following form:
-    -- e0(e1, e2, e3) where e_n are basically expressions
-    --
-    -- MakeUnaryOp lets the parser knowing that this operator may be chained,
-    -- in particular for closure calls: x(4)(5)(6)
-    postfixOperators =
-      Postfix $
-        makeUnaryOp $
-          choice
-            [ do
-                arguments <- do
-                  _ <- symbol "("
-                  ilevel <- get
+ where
+  eTerm =
+    choice
+      [ eLiteral
+      , eRecord
+      , -- Try may be used here because function definitions starts with the
+        -- same syntax as variable declaration
+        try eFunctionDefinition
+      , eClosure
+      , eConditionBranch
+      , -- Try may be used here because declaration starts with the same
+        -- syntax as equality operator (for instance in parsing x == 5, this
+        -- may be conflicting with x = ..., where ... would be "= 5")
+        try eDeclaration
+      , eVariable
+      , eParenthized
+      ]
+  -- Extending operators in order to add function call support. A function
+  -- call is just a postfix operator where operand is the callee and operator
+  -- is the actual arguments associated to the function call. A function call
+  -- is actually an expression of the following form:
+  -- e0(e1, e2, e3) where e_n are basically expressions
+  --
+  -- MakeUnaryOp lets the parser knowing that this operator may be chained,
+  -- in particular for closure calls: x(4)(5)(6)
+  postfixOperators =
+    Postfix $
+      makeUnaryOp $
+        choice
+          [ do
+              arguments <- do
+                _ <- symbol "("
+                ilevel <- get
 
-                  -- Parsing function call args either inlined or indented
-                  args <-
-                    indentSepBy eExpression comma
-                      <|> (eExpression `sepBy` comma)
+                -- Parsing function call args either inlined or indented
+                args <-
+                  indentSepBy eExpression comma
+                    <|> (eExpression `sepBy` comma)
 
-                  _ <- indentSameOrInline ilevel $ symbol ")"
-                  return args
+                _ <- indentSameOrInline ilevel $ symbol ")"
+                return args
 
-                -- Optional syntaxic sugar for callback argument
-                lambdaArg <- optional $ do
-                  _ <- symbol "->"
-                  body <- indentOrInline eExpression
-                  return $ EClosure [] Nothing body
+              -- Optional syntaxic sugar for callback argument
+              lambdaArg <- optional $ do
+                _ <- symbol "->"
+                body <- indentOrInline eExpression
+                return $ EClosure [] Nothing body
 
-                return \e -> EApplication e (arguments ++ maybeToList lambdaArg),
-              -- Record restriction e \ x where e may be a record and x a label
-              -- to "remove" from the record
-              do
-                _ <- reserved "except"
-                name <- identifier
-                return $ \e -> ERowRestrict e name,
-              -- Record selection e.x where e may be a record and x a label to
-              -- select from the record
-              do
-                _ <- symbol "."
-                name <- identifier
-                return $ \e -> ERowSelect e name
-            ]
+              return \e -> EApplication e (arguments ++ maybeToList lambdaArg)
+          , -- Record restriction e \ x where e may be a record and x a label
+            -- to "remove" from the record
+            do
+              _ <- reserved "except"
+              name <- identifier
+              return $ \e -> ERowRestrict e name
+          , -- Record selection e.x where e may be a record and x a label to
+            -- select from the record
+            do
+              _ <- symbol "."
+              name <- identifier
+              return $ \e -> ERowSelect e name
+          ]
 
 parseProgram :: Parser Program
 parseProgram = many (nonIndented eExpression <* optional indentSc)

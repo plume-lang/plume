@@ -1,0 +1,76 @@
+cabal-version:   3.0
+name:            plume-language
+version:         0.1.0.0
+license:         MIT
+license-file:    LICENSE
+maintainer:      thomas.vergne.contact@gmail.com
+author:          thomasvergne
+category:        Language
+build-type:      Simple
+extra-doc-files: CHANGELOG.md
+
+library
+    exposed-modules:
+        Language.Plume.CST
+        Language.Plume.CST.Literal
+        Language.Plume.CST.Type
+        Language.Plume.CST.Expression
+        Language.Plume.CST.Annotation
+        Language.Plume.Parser
+        Language.Plume.Parser.Lexer
+        Language.Plume.Parser.Modules.Literal
+        Language.Plume.Parser.Modules.Operator
+        Language.Plume.Parser.Modules.Expression
+        Language.Plume.Parser.Modules.Type
+
+        Prettyprinter.CST
+        Prettyprinter.Annotation
+        Prettyprinter.ANSI
+
+        Print
+
+    hs-source-dirs:     src
+    default-language:   GHC2021
+    default-extensions: OverloadedStrings
+    ghc-options:        -Wall -Wno-orphans
+    build-depends:
+        base ^>=4.19.0.0,
+        megaparsec ^>=9.6.1,
+        containers,
+        mtl,
+        parser-combinators,
+        relude,
+        prettyprinter,
+        prettyprinter-ansi-terminal
+
+    mixins:
+        base hiding (Prelude),
+        relude (Relude as Prelude),
+        relude
+
+executable plume-language
+    main-is:            Main.hs
+    hs-source-dirs:     app
+    default-language:   GHC2021
+    default-extensions: OverloadedStrings
+    ghc-options:        -Wall
+    build-depends:
+        base ^>=4.19.0.0,
+        plume-language,
+        megaparsec ^>=9.6.1,
+        relude
+
+    mixins:
+        base hiding (Prelude),
+        relude (Relude as Prelude),
+        relude
+
+test-suite plume-language-test
+    type:             exitcode-stdio-1.0
+    main-is:          Main.hs
+    hs-source-dirs:   test
+    default-language: GHC2021
+    ghc-options:      -Wall
+    build-depends:
+        base ^>=4.19.0.0,
+        plume-language

@@ -1,9 +1,9 @@
-module Language.Feather.Parser.Modules.Operator where
+module Language.Plume.Parser.Modules.Operator where
 
 import Control.Monad.Combinators.Expr
 import Data.Foldable
-import Language.Feather.CST
-import Language.Feather.Parser.Lexer
+import Language.Plume.CST
+import Language.Plume.Parser.Lexer
 
 -- Useful shortcut functions for defining operators
 
@@ -20,27 +20,31 @@ postfix name f = Postfix (f <$ symbol name)
 makeUnaryOp :: (Alternative f) => f (a -> a) -> f (a -> a)
 makeUnaryOp s = foldr1 (.) . reverse <$> some s
 
--- Actual feather operators definition
+-- Actual Plume operators definition
 -- Reverse is used in order to define operators from low to high precedence.
 operators :: [[Operator Parser Expression]]
 operators =
   reverse
-    [ [ binary "and" (EBinary And),
-        binary "or" (EBinary Or)
-      ],
-      [prefix "not" (EPrefix Not)],
-      [ binary "==" (EBinary Equals),
-        binary "!=" (EBinary NotEquals),
-        binary ">=" (EBinary GreaterThan),
-        binary "<=" (EBinary LesserThan),
-        binary ">" (EBinary StrictlyGreatherThan),
-        binary "<" (EBinary StrictlyLesserThan)
-      ],
-      [ binary "+" (EBinary Plus),
-        binary "-" (EBinary Minus)
-      ],
-      [ binary "*" (EBinary Times),
-        binary "/" (EBinary Division)
-      ],
-      [binary "%" (EBinary Mod)]
+    [
+      [ binary "and" (EBinary And)
+      , binary "or" (EBinary Or)
+      ]
+    , [prefix "not" (EPrefix Not)]
+    ,
+      [ binary "==" (EBinary Equals)
+      , binary "!=" (EBinary NotEquals)
+      , binary ">=" (EBinary GreaterThan)
+      , binary "<=" (EBinary LesserThan)
+      , binary ">" (EBinary StrictlyGreatherThan)
+      , binary "<" (EBinary StrictlyLesserThan)
+      ]
+    ,
+      [ binary "+" (EBinary Plus)
+      , binary "-" (EBinary Minus)
+      ]
+    ,
+      [ binary "*" (EBinary Times)
+      , binary "/" (EBinary Division)
+      ]
+    , [binary "%" (EBinary Mod)]
     ]

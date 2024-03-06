@@ -1,6 +1,6 @@
 module Prettyprinter.Annotation where
 
-import Language.Feather.CST.Annotation
+import Language.Plume.CST.Annotation
 import Prettyprinter
 import Prettyprinter.ANSI
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiWayIf #-}
 
-module Language.Feather.Parser.Lexer where
+module Language.Plume.Parser.Lexer where
 
 import Data.Text (pack)
 import Text.Megaparsec hiding (State (..), many, some)
@@ -19,9 +19,9 @@ indentSc :: Parser ()
 indentSc =
   skipMany
     ( choice
-        [ try $ space *> lineComment,
-          try $ space *> multilineComment,
-          void eol
+        [ try $ space *> lineComment
+        , try $ space *> multilineComment
+        , void eol
         ]
     )
 

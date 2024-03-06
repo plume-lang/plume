@@ -1,7 +1,7 @@
 module Main where
 
 import Data.Text.IO
-import Language.Feather.Parser
+import Language.Plume.Parser
 import Print
 import Text.Megaparsec (errorBundlePretty)
 import Prelude hiding (readFile)

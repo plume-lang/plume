@@ -1,4 +1,4 @@
-# Revision history for feather-language
+# Revision history for plume-language
 
 ## 0.1.0.0 -- YYYY-mm-dd
 

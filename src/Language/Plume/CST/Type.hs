@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 
-module Language.Feather.CST.Type where
+module Language.Plume.CST.Type where
 
 import Data.Text hiding (map)
 import Prelude hiding (intercalate, unwords)
@@ -19,7 +19,7 @@ data ConcreteType
   | TRowExtend Text ConcreteType ConcreteType
 
 pattern TFunction, (:->:) :: [ConcreteType] -> ConcreteType -> ConcreteType
-pattern TFunction args ret = TApp (TId "->") (ret : args)
+pattern TFunction args ret = TApp (TApp (TId "->") [ret]) args
 pattern xs :->: ret = TFunction xs ret
 
 pattern TTuple :: [ConcreteType] -> ConcreteType

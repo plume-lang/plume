@@ -1,7 +1,7 @@
-module Language.Feather.Parser.Modules.Literal where
+module Language.Plume.Parser.Modules.Literal where
 
-import Language.Feather.CST.Literal
-import Language.Feather.Parser.Lexer
+import Language.Plume.CST.Literal
+import Language.Plume.Parser.Lexer
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
@@ -9,11 +9,11 @@ import Text.Megaparsec.Char.Lexer qualified as L
 parseLiteral :: Parser Literal
 parseLiteral =
   choice
-    [ parseChar,
-      parseString,
-      try parseFloat,
-      parseBool,
-      parseInteger
+    [ parseChar
+    , parseString
+    , try parseFloat
+    , parseBool
+    , parseInteger
     ]
 
 -- Parser utility functions
