@@ -2,7 +2,6 @@ module Print where
 
 import Data.Text.IO
 import Prettyprinter.ANSI
-import Prettyprinter.CST ()
 import Prettyprinter.Render.Terminal
 import Prelude hiding (print, putStrLn, readFile)
 

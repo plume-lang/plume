@@ -1,11 +1,18 @@
-module Prettyprinter.CST where
+module Plume.Syntax.Concrete.Internal.Pretty where
 
-import Language.Plume.CST
+import Plume.Syntax.Concrete
 import Prettyprinter
 import Prettyprinter.ANSI
-import Prettyprinter.Annotation ()
 import Prettyprinter.Render.Terminal
 import Prelude hiding (intercalate)
+
+instance {-# OVERLAPS #-} (ANSIPretty t) => ANSIPretty (Annotation (Maybe t)) where
+  ansiPretty (Annotation name value) = case value of
+    Nothing -> anItalic $ pretty name
+    Just t -> (anItalic $ pretty name) <> ":" <+> ansiPretty t
+
+instance (ANSIPretty t) => ANSIPretty (Annotation t) where
+  ansiPretty (Annotation name value) = anItalic (pretty name) <> ":" <+> ansiPretty value
 
 instance {-# OVERLAPS #-} ANSIPretty Program where
   ansiPretty (d : ds) = ansiPretty d <> line <> (if length ds == 0 then "" else line) <> ansiPretty ds

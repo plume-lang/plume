@@ -1,8 +1,7 @@
-module Language.Plume.Parser.Modules.Type where
+module Plume.Syntax.Parser.Modules.Type where
 
-import Data.Foldable
-import Language.Plume.CST.Type
-import Language.Plume.Parser.Lexer
+import Plume.Syntax.Concrete.Type
+import Plume.Syntax.Parser.Lexer
 import Text.Megaparsec
 import Text.Megaparsec.Char
 

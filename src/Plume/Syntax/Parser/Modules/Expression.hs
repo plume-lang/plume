@@ -1,13 +1,13 @@
 {-# LANGUAGE BlockArguments #-}
 
-module Language.Plume.Parser.Modules.Expression where
+module Plume.Syntax.Parser.Modules.Expression where
 
 import Control.Monad.Combinators.Expr
-import Language.Plume.CST
-import Language.Plume.Parser.Lexer
-import Language.Plume.Parser.Modules.Literal
-import Language.Plume.Parser.Modules.Operator
-import Language.Plume.Parser.Modules.Type
+import Plume.Syntax.Concrete
+import Plume.Syntax.Parser.Lexer
+import Plume.Syntax.Parser.Modules.Literal
+import Plume.Syntax.Parser.Modules.Operator
+import Plume.Syntax.Parser.Modules.Type
 import Text.Megaparsec hiding (many)
 
 -- Some useful parsing functions

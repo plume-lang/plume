@@ -11,20 +11,20 @@ extra-doc-files: CHANGELOG.md
 
 library
     exposed-modules:
-        Language.Plume.CST
-        Language.Plume.CST.Literal
-        Language.Plume.CST.Type
-        Language.Plume.CST.Expression
-        Language.Plume.CST.Annotation
-        Language.Plume.Parser
-        Language.Plume.Parser.Lexer
-        Language.Plume.Parser.Modules.Literal
-        Language.Plume.Parser.Modules.Operator
-        Language.Plume.Parser.Modules.Expression
-        Language.Plume.Parser.Modules.Type
+        Plume.Syntax.Concrete
+        Plume.Syntax.Concrete.Literal
+        Plume.Syntax.Concrete.Type
+        Plume.Syntax.Concrete.Expression
+        Plume.Syntax.Concrete.Annotation
+        Plume.Syntax.Concrete.Internal.Pretty
+        
+        Plume.Syntax.Parser
+        Plume.Syntax.Parser.Lexer
+        Plume.Syntax.Parser.Modules.Literal
+        Plume.Syntax.Parser.Modules.Operator
+        Plume.Syntax.Parser.Modules.Expression
+        Plume.Syntax.Parser.Modules.Type
 
-        Prettyprinter.CST
-        Prettyprinter.Annotation
         Prettyprinter.ANSI
 
         Print

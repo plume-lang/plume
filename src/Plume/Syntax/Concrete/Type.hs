@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 
-module Language.Plume.CST.Type where
+module Plume.Syntax.Concrete.Type where
 
 import Data.Text hiding (map)
 import Prelude hiding (intercalate, unwords)

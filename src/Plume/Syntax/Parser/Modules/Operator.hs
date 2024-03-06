@@ -1,9 +1,9 @@
-module Language.Plume.Parser.Modules.Operator where
+module Plume.Syntax.Parser.Modules.Operator where
 
 import Control.Monad.Combinators.Expr
 import Data.Foldable
-import Language.Plume.CST
-import Language.Plume.Parser.Lexer
+import Plume.Syntax.Concrete
+import Plume.Syntax.Parser.Lexer
 
 -- Useful shortcut functions for defining operators
 

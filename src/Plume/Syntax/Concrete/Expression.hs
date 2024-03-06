@@ -1,6 +1,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 
-module Language.Plume.CST.Expression where
+module Plume.Syntax.Concrete.Expression where
 
 -- Expressions are the most basic form of programs.
 -- They permit the user to express more complex programs by combining
@@ -8,8 +8,8 @@ module Language.Plume.CST.Expression where
 -- variable to a complex function application.
 
 import Data.Text hiding (map)
-import Language.Plume.CST.Annotation
-import Language.Plume.CST.Literal
+import Plume.Syntax.Concrete.Annotation
+import Plume.Syntax.Concrete.Literal
 import Text.Megaparsec.Pos
 import Prelude hiding (intercalate)
 

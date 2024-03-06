@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiWayIf #-}
 
-module Language.Plume.Parser.Lexer where
+module Plume.Syntax.Parser.Lexer where
 
 import Data.Text (pack)
 import Text.Megaparsec hiding (State (..), many, some)

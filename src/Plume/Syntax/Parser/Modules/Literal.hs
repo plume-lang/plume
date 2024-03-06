@@ -1,7 +1,7 @@
-module Language.Plume.Parser.Modules.Literal where
+module Plume.Syntax.Parser.Modules.Literal where
 
-import Language.Plume.CST.Literal
-import Language.Plume.Parser.Lexer
+import Plume.Syntax.Concrete.Literal
+import Plume.Syntax.Parser.Lexer
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L

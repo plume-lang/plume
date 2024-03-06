@@ -1,8 +1,8 @@
-module Language.Plume.Parser where
+module Plume.Syntax.Parser where
 
-import Language.Plume.CST
-import Language.Plume.Parser.Lexer
-import Language.Plume.Parser.Modules.Expression
+import Plume.Syntax.Concrete
+import Plume.Syntax.Parser.Lexer
+import Plume.Syntax.Parser.Modules.Expression
 import Text.Megaparsec
 
 type FileContent = Text
