@@ -16,5 +16,9 @@ import Prelude hiding (modify)
 -- - Error handling with throwIO function
 type IOReader env a = ReaderT env IO a
 
-delete :: (Monoid a, MonadIO m) => IORef a -> m ()
+delete, reset :: (Monoid a, MonadIO m) => IORef a -> m ()
 delete ref = liftIO $ writeIORef ref mempty
+reset = delete
+
+initialize :: (Monoid a, MonadIO m) => m (IORef a)
+initialize = liftIO $ newIORef mempty
