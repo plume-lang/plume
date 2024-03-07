@@ -3,7 +3,6 @@
 module Plume.Syntax.Parser.Lexer where
 
 import Control.Monad.Parser
-import Data.Set qualified as Set
 import Data.Text (pack)
 import System.IO.Unsafe
 import Text.Megaparsec hiding (many, some)
