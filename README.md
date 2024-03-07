@@ -44,7 +44,7 @@ Its syntax has been designed to be non-aggressive and free, resulting in a pleas
 
 - **Powerful structures** enabled with row-polymorphism to let you take serious advantage of the language
 - **Extension system**, allowing you to define generalized behaviors for your types
-- **Strict type system**, letting you to serenely compile your programs wwithout worrying about runtime errors
+- **Strict type system**, letting you to serenely compile your programs without worrying about runtime errors
 - **Safe standard library** to avoid basic but hard-to-find bugs
 - **Macro system** to expand actual syntax and to avoid unnecessary function calls
 
