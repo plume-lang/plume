@@ -15,7 +15,7 @@ class IsRow a where
   -- Extract all extension informations from the row
   -- Note that the value of type a should be a row type, it must
   -- contain a label, a value and an optional rest of the row.
-  extractExtend :: a -> ([(Text, a)], a)
+  extractExtend :: a -> ([Annotation a], a)
 
 instance IsRow ConcreteType where
   isRowEmpty TRowEmpty = True
@@ -24,7 +24,7 @@ instance IsRow ConcreteType where
   isRowExtend (TRowExtend _ _ _) = True
   isRowExtend _ = False
 
-  extractExtend (TRowExtend label val r') = ((label, val) : names, rest')
+  extractExtend (TRowExtend label val r') = ((label :@: val) : names, rest')
    where
     (names, rest') = extractExtend r'
   extractExtend e = ([], e)
@@ -36,7 +36,7 @@ instance IsRow Expression where
   isRowExtend (ERowExtension _ _ _) = True
   isRowExtend _ = False
 
-  extractExtend (ERowExtension label val r') = ((label, val) : names, rest')
+  extractExtend (ERowExtension label val r') = ((label :@: val) : names, rest')
    where
     (names, rest') = extractExtend r'
   extractExtend e = ([], e)
