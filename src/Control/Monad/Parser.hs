@@ -5,6 +5,7 @@ module Control.Monad.Parser (
   ParsingError,
   parse,
   parseWithRef,
+  parseWithRefValue,
 ) where
 
 import Control.Monad.IO as IO
@@ -38,11 +39,20 @@ parseWithRef ::
   FilePath ->
   FileContent ->
   IO (Either ParsingError a)
-parseWithRef ref p filePath fileContent = do
+parseWithRef ref = parseWithRefValue (ref, mempty)
+
+parseWithRefValue ::
+  (IORef ref, ref) ->
+  Parser a ->
+  FilePath ->
+  FileContent ->
+  IO (Either ParsingError a)
+parseWithRefValue (ref, value) p filePath fileContent = do
+  writeIORef ref value
   r <-
     runParserT
       p
       filePath
       fileContent
-  delete ref
+  writeIORef ref value
   return r
