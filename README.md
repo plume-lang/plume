@@ -42,13 +42,13 @@ Plume is a programming language that aims to be as simple as existing languages 
 
 Its syntax has been designed to be non-aggressive and free, resulting in a pleasant-to-use and very extensible language. Plume supports some very cool features such as:
 
-- **Row polymorphism**, allowing more complex record operations than structural type systems.
-- **Extension system**, can be seen as Rust's trait system. Very enjoyable way to express overloading in a safety way.
-- **Strict type system**, letting you to serenely compile your programs
+- **Powerful structures** enabled with row-polymorphism to let you take serious advantage of the language
+- **Extension system**, allowing you to define generalized behaviors for your types
+- **Strict type system**, letting you to serenely compile your programs wwithout worrying about runtime errors
 - **Safe standard library** to avoid basic but hard-to-find bugs
 - **Macro system** to expand actual syntax and to avoid unnecessary function calls
 
-These are some of the language features available with Plume. But it stills have other interesting properties to offer to you like platform-independent code or binary (because it either runs on a virtual machine or compiles down to Javascript), great runtime performances and so on..
+These are some of the language features available with Plume. But it stills have other interesting properties to offer to you like platform-independent code or binary (because it either runs on a virtual machine or compiles down to WASM), great runtime performances and so on..
 
 ## Built With
 
