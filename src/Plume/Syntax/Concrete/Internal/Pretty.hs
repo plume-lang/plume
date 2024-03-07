@@ -6,16 +6,14 @@ import Plume.Syntax.Internal.Pretty.ANSI
 import Prettyprinter.Render.Terminal
 import Prelude hiding (intercalate)
 
-instance {-# OVERLAPS #-} (ANSIPretty t) => ANSIPretty (Annotation (Maybe t)) where
-  ansiPretty (Annotation name (Just v)) =
-    anItalic (pretty name)
-      <> ":" <+> ansiPretty v
-  ansiPretty (Annotation name Nothing) = anItalic (pretty name)
-
 instance (ANSIPretty t) => ANSIPretty (Annotation t) where
   ansiPretty (Annotation name value) =
     anItalic (pretty name)
       <> ":" <+> ansiPretty value
+
+typeAnnotation :: (ANSIPretty t) => Annotation (Maybe t) -> Doc AnsiStyle
+typeAnnotation (Annotation name Nothing) = anItalic (pretty name)
+typeAnnotation (Annotation name (Just t)) = anItalic (pretty name) <> ":" <+> ansiPretty t
 
 instance {-# OVERLAPS #-} ANSIPretty Program where
   ansiPretty [d] = ansiPretty d
@@ -69,7 +67,7 @@ prettyExpr _ (EApplication e es) =
 prettyExpr _ (EVariable v) = anItalic $ pretty v
 prettyExpr _ (ELiteral l) = prettyLit l
 prettyExpr _ (EDeclaration a e1' e2') =
-  ansiPretty a
+  typeAnnotation a
     <+> "="
     <+> prettyExpr 0 e1'
     <+> case e2' of
@@ -123,36 +121,31 @@ prettyTy TRowEmpty = "..."
 prettyTy (TRowExtend l t TRowEmpty) = pretty l <> " : " <> prettyTy t
 prettyTy (TRowExtend l t r) = pretty l <> " : " <> prettyTy t <> " | " <> prettyTy r
 
-ppRecordHelper :: (ANSIPretty a, IsRow a) => Bool -> ([(Text, a)], a) -> Doc AnsiStyle
+ppRecordHelper :: (ANSIPretty a, IsRow a) => (Bool, Bool) -> ([Annotation a], a) -> Doc AnsiStyle
 ppRecordHelper _ ([], e) = ansiPretty e
-ppRecordHelper b (names, e) =
+ppRecordHelper (isType, containsExtension) (names, e) =
   enclosed . indents $
     ( renderRows $
         punctuate
           comma
-          ( map
-              ( \(n, v) ->
-                  pretty n <> ": " <> ansiPretty v
-              )
-              names
-          )
+          (map ansiPretty names)
     )
       <> rowExtends
  where
   nl :: Doc AnsiStyle
-  nl = bool mempty line b
+  nl = bool mempty line isType
 
   indents :: Doc AnsiStyle -> Doc AnsiStyle
-  indents = bool id (indent 2) b
+  indents = bool id (indent 2) isType
 
   renderRows :: [Doc AnsiStyle] -> Doc AnsiStyle
-  renderRows = bool hsep vsep b
+  renderRows = bool hsep vsep isType
 
   rowExtends :: Doc AnsiStyle
-  rowExtends = bool mempty (nl <> comma <> ansiPretty e) (isRowExtend e)
+  rowExtends = bool mempty (comma <> nl <> "..." <> ansiPretty e) containsExtension
 
   enclosed :: Doc AnsiStyle -> Doc AnsiStyle
-  enclosed = bool (enclose "{ " " }") (enclose "{\n" "\n}") b
+  enclosed = bool (enclose "{ " " }") (enclose "{\n" "\n}") isType
 
 ppRecord :: (ANSIPretty a, IsRow a) => Bool -> a -> Doc AnsiStyle
-ppRecord b = ppRecordHelper b . extractExtend
+ppRecord b e = ppRecordHelper (b, isRowExtend e) $ extractExtend e
