@@ -30,6 +30,11 @@ library
 
         System.IO.Pretty
 
+        Control.Monad.IO
+        Control.Monad.Parser
+
+        GHC.Records
+
     hs-source-dirs:     src
     default-language:   GHC2021
     default-extensions: OverloadedStrings
