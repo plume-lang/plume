@@ -2,12 +2,17 @@
 
 module Plume.Syntax.Parser.Lexer where
 
+import Control.Monad.Parser
+import Data.Set qualified as Set
 import Data.Text (pack)
-import Text.Megaparsec hiding (State (..), many, some)
+import System.IO.Unsafe
+import Text.Megaparsec hiding (many, some)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
+import Prelude hiding (modify)
 
-type Parser = ParsecT Void Text (State Int)
+indentation :: IORef Int
+indentation = unsafePerformIO $ newIORef 0
 
 lineComment :: Parser ()
 lineComment = L.skipLineComment "//"
@@ -35,6 +40,9 @@ sc =
     lineComment
     multilineComment
 
+isReal :: (Num a, RealFrac a) => a -> Bool
+isReal x = (ceiling x :: Integer) == floor x
+
 consumeIndents :: Parser Int
 consumeIndents = do
   -- Optionally consuming spaces and tabs
@@ -42,12 +50,20 @@ consumeIndents = do
     optional $
       ( ( do
             sp <- howMany1 (char ' ')
+
+            tabWidth <- readIORef tabWidthRef
+
             -- If the number of spaces is divisible by tab width then it is a valid
             -- indentation and we can return the number of tabs. Otherwise, we return
             -- the nearest integer value of the division of spaces by tab width.
-            if sp `mod` tabWidth == 0
-              then return (sp `div` tabWidth)
-              else return (truncate ((fromIntegral sp :: Double) / fromIntegral tabWidth))
+            case tabWidth of
+              Just tw -> do
+                if isReal (fromIntegral sp / fromIntegral tw :: Double)
+                  then return $ sp `div` tw
+                  else fail $ "Indentation level mismatch, tab width should be equal to " ++ show tw ++ " but received " ++ show sp
+              Nothing -> do
+                writeIORef tabWidthRef (Just sp)
+                return sp
         )
           <|> howMany1 (char '\t')
       )
@@ -60,15 +76,17 @@ consumeIndents = do
         Nothing -> 0
 
   -- Storing the current processed indent in the state
-  modify (const processedIndent)
+  writeIORef indentation processedIndent
   return processedIndent
 
 reservedWords :: [Text]
 reservedWords = ["in", "if", "then", "else", "true", "false", "except"]
 
 -- Tab width for the indent sensitive parser
-tabWidth :: Int
-tabWidth = 4
+-- Defaulting to Nothing, meaning that the tab width is not set
+-- It is set on first space or tab consumption
+tabWidthRef :: IORef (Maybe Int)
+tabWidthRef = unsafePerformIO $ newIORef Nothing
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
@@ -124,7 +142,7 @@ howMany1 p = length <$> some p
 -- It returns a list of parsed results with the same indentation level.
 indent :: Parser a -> Parser [a]
 indent p = do
-  ilevel <- get
+  ilevel <- readIORef indentation
   level <- eol >> consumeIndents
   if level > ilevel
     then do
@@ -135,7 +153,7 @@ indent p = do
 
 indentSepBy :: Parser a -> Parser b -> Parser [a]
 indentSepBy p sep = do
-  ilevel <- get
+  ilevel <- readIORef indentation
   level <- eol >> consumeIndents
   if level > ilevel
     then do
@@ -165,7 +183,7 @@ indentSame ilevel p = try $ do
   level <- indentSc *> consumeIndents
   if level == ilevel
     then p
-    else fail "Indentation level mismatch"
+    else fail $ "Indentation level mismatch, expected " ++ show ilevel ++ " but received " ++ show level
 
 -- Indent parser that takes a parser and applies it only and only if there is
 -- no indentation.

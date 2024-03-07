@@ -1,6 +1,7 @@
 module Plume.Syntax.Parser.Modules.Operator where
 
 import Control.Monad.Combinators.Expr
+import Control.Monad.Parser
 import Data.Foldable
 import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer

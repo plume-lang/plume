@@ -3,6 +3,7 @@
 module Plume.Syntax.Parser.Modules.Expression where
 
 import Control.Monad.Combinators.Expr
+import Control.Monad.Parser
 import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer
 import Plume.Syntax.Parser.Modules.Literal
@@ -45,6 +46,7 @@ eLiteral = ELiteral <$> parseLiteral <?> "literal"
 eBlock :: Parser Expression -> Parser Expression
 eBlock p = eLocated $ do
   bl <- indent p
+
   case bl of
     [] -> fail "Empty block"
     [x] -> return x
@@ -72,7 +74,7 @@ eDeclaration = eLocated $ do
         <$> identifier
         <*> optional (symbol ":" *> tType)
         <* symbol "="
-  ilevel <- get
+  ilevel <- readIORef indentation
   expr <- indentOrInline eExpression
   body <- optional (indentSameOrInline ilevel $ reserved "in" *> eExpression)
   return (EDeclaration var expr body)
@@ -84,7 +86,7 @@ eConditionBranch = eLocated $ do
   _ <- reserved "if"
   cond <- eExpression
   _ <- reserved "then"
-  ilevel <- get
+  ilevel <- readIORef indentation
   thenBr <- indentOrInline eExpression
   _ <- indentSameOrInline ilevel $ reserved "else"
   elseBr <- indentOrInline eExpression
@@ -145,7 +147,7 @@ orderRows = foldr f ([], Nothing)
 eRecord :: Parser Expression
 eRecord = eLocated $ do
   _ <- symbol "{"
-  ilevel <- get
+  ilevel <- readIORef indentation
 
   fields <- field `indentSepBy` comma <|> field `sepBy` comma
 
@@ -208,7 +210,7 @@ eExpression = makeExprParser eTerm ([postfixOperators] : operators)
           [ do
               arguments <- do
                 _ <- symbol "("
-                ilevel <- get
+                ilevel <- readIORef indentation
 
                 -- Parsing function call args either inlined or indented
                 args <-

@@ -1,5 +1,6 @@
 module Plume.Syntax.Parser.Modules.Literal where
 
+import Control.Monad.Parser
 import Plume.Syntax.Concrete.Literal
 import Plume.Syntax.Parser.Lexer
 import Text.Megaparsec
