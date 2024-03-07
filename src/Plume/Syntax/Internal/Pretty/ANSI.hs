@@ -1,17 +1,22 @@
-module Plume.Syntax.Internal.Pretty.ANSI where
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE UndecidableInstances #-}
 
-import Prettyprinter
+module Plume.Syntax.Internal.Pretty.ANSI (
+  module PP,
+  ANSIPretty (..),
+  anCol,
+  anBold,
+  anItalic,
+) where
+
+import Prettyprinter as PP
+import Prettyprinter.Internal as PP
 import Prettyprinter.Render.Terminal
 
 class ANSIPretty a where
   ansiPretty :: a -> Doc AnsiStyle
-
-instance (ANSIPretty a) => ANSIPretty [a] where
-  ansiPretty = hsep . map ansiPretty
-
-instance (ANSIPretty a) => ANSIPretty (Maybe a) where
-  ansiPretty Nothing = mempty
-  ansiPretty (Just a) = ansiPretty a
+  default ansiPretty :: (Pretty a) => a -> Doc AnsiStyle
+  ansiPretty = pretty
 
 anCol :: Color -> Doc AnsiStyle -> Doc AnsiStyle
 anCol = annotate . color
