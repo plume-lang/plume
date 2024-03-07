@@ -19,6 +19,7 @@ library
         Plume.Syntax.Concrete.Expression
         Plume.Syntax.Concrete.Annotation
         Plume.Syntax.Concrete.Internal.Pretty
+        Plume.Syntax.Concrete.Internal.Row
 
         Plume.Syntax.Parser
         Plume.Syntax.Parser.Lexer

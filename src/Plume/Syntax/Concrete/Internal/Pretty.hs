@@ -1,21 +1,25 @@
 module Plume.Syntax.Concrete.Internal.Pretty where
 
 import Plume.Syntax.Concrete
+import Plume.Syntax.Concrete.Internal.Row
 import Plume.Syntax.Internal.Pretty.ANSI
-import Prettyprinter
 import Prettyprinter.Render.Terminal
 import Prelude hiding (intercalate)
 
 instance {-# OVERLAPS #-} (ANSIPretty t) => ANSIPretty (Annotation (Maybe t)) where
-  ansiPretty (Annotation name value) = case value of
-    Nothing -> anItalic $ pretty name
-    Just t -> (anItalic $ pretty name) <> ":" <+> ansiPretty t
+  ansiPretty (Annotation name (Just v)) =
+    anItalic (pretty name)
+      <> ":" <+> ansiPretty v
+  ansiPretty (Annotation name Nothing) = anItalic (pretty name)
 
 instance (ANSIPretty t) => ANSIPretty (Annotation t) where
-  ansiPretty (Annotation name value) = anItalic (pretty name) <> ":" <+> ansiPretty value
+  ansiPretty (Annotation name value) =
+    anItalic (pretty name)
+      <> ":" <+> ansiPretty value
 
 instance {-# OVERLAPS #-} ANSIPretty Program where
-  ansiPretty (d : ds) = ansiPretty d <> line <> (if length ds == 0 then "" else line) <> ansiPretty ds
+  ansiPretty [d] = ansiPretty d
+  ansiPretty (d : ds) = ansiPretty d <> line <> line <> ansiPretty ds
   ansiPretty [] = mempty
 
 instance ANSIPretty Expression where ansiPretty = prettyExpr 0
@@ -94,45 +98,7 @@ prettyExpr _ (EBlock es) =
       <> indent 2 (vsep (map (prettyExpr 0) es))
       <> line
 prettyExpr _ ERowEmpty = "..."
-prettyExpr _ r@(ERowExtension{}) = ppExtend (extract r)
- where
-  extract :: Expression -> ([(Text, Expression)], Expression)
-  extract (ERowExtension label val r') = ((label, val) : names, rest')
-   where
-    (names, rest') = extract r'
-  extract e = ([], e)
-
-  ppExtend :: ([(Text, Expression)], Expression) -> Doc AnsiStyle
-  ppExtend ([], e) = prettyExpr 0 e
-  ppExtend (names, ERowEmpty) =
-    braces' . vsep $
-      punctuate
-        comma
-        ( map
-            ( \(n, v) ->
-                pretty n <> ": " <> prettyExpr 0 v
-            )
-            names
-        )
-  ppExtend (names, e) =
-    "{\n"
-      <> ( indent 2 $
-            vsep
-              ( punctuate
-                  comma
-                  ( map
-                      ( \(n, v) ->
-                          pretty n <> ": " <> prettyExpr 0 v
-                      )
-                      names
-                  )
-              )
-              <> comma
-              <> line
-              <> "..."
-              <> prettyExpr 0 e
-         )
-      <> "\n}"
+prettyExpr _ r@(ERowExtension{}) = ppRecord True r
 prettyExpr _ (ERowSelect e l) = prettyExpr 0 e <> "." <> pretty l
 prettyExpr _ (ERowRestrict e l) = prettyExpr 0 e <+> anCol Blue "except" <+> pretty l
 prettyExpr _ (ELocated e _) = prettyExpr 0 e
@@ -152,46 +118,41 @@ prettyTy (TId n) = anCol Magenta $ pretty n
 prettyTy (TApp t ts) = prettyTy t <+> hsep (map prettyTy ts)
 prettyTy (TFunction ts t) = hsep (map prettyTy ts) <+> "->" <+> prettyTy t
 prettyTy (TRecord TRowEmpty) = "{}"
-prettyTy (TRecord r) = ppExtend (extract r)
- where
-  extract :: ConcreteType -> ([(Text, ConcreteType)], ConcreteType)
-  extract (TRowExtend label val r') = ((label, val) : names, rest')
-   where
-    (names, rest') = extract r'
-  extract e = ([], e)
-
-  ppExtend :: ([(Text, ConcreteType)], ConcreteType) -> Doc AnsiStyle
-  ppExtend ([], e) = prettyTy e
-  ppExtend (names, TRowEmpty) =
-    braces' . hsep $
-      punctuate
-        comma
-        ( map
-            ( \(n, v) ->
-                pretty n <> ": " <> prettyTy v
-            )
-            names
-        )
-  ppExtend (names, e) =
-    "{"
-      <+> ( hsep
-              ( punctuate
-                  comma
-                  ( map
-                      ( \(n, v) ->
-                          pretty n <> ": " <> prettyTy v
-                      )
-                      names
-                  )
-              )
-              <> comma
-                <+> "..."
-              <> prettyTy e
-          )
-      <+> "}"
+prettyTy (TRecord r) = ppRecord False r
 prettyTy TRowEmpty = "..."
 prettyTy (TRowExtend l t TRowEmpty) = pretty l <> " : " <> prettyTy t
 prettyTy (TRowExtend l t r) = pretty l <> " : " <> prettyTy t <> " | " <> prettyTy r
 
-braces' :: Doc a -> Doc a
-braces' = enclose "{ " " }"
+ppRecordHelper :: (ANSIPretty a, IsRow a) => Bool -> ([(Text, a)], a) -> Doc AnsiStyle
+ppRecordHelper _ ([], e) = ansiPretty e
+ppRecordHelper b (names, e) =
+  enclosed . indents $
+    ( renderRows $
+        punctuate
+          comma
+          ( map
+              ( \(n, v) ->
+                  pretty n <> ": " <> ansiPretty v
+              )
+              names
+          )
+    )
+      <> rowExtends
+ where
+  nl :: Doc AnsiStyle
+  nl = bool mempty line b
+
+  indents :: Doc AnsiStyle -> Doc AnsiStyle
+  indents = bool id (indent 2) b
+
+  renderRows :: [Doc AnsiStyle] -> Doc AnsiStyle
+  renderRows = bool hsep vsep b
+
+  rowExtends :: Doc AnsiStyle
+  rowExtends = bool mempty (nl <> comma <> ansiPretty e) (isRowExtend e)
+
+  enclosed :: Doc AnsiStyle -> Doc AnsiStyle
+  enclosed = bool (enclose "{ " " }") (enclose "{\n" "\n}") b
+
+ppRecord :: (ANSIPretty a, IsRow a) => Bool -> a -> Doc AnsiStyle
+ppRecord b = ppRecordHelper b . extractExtend
