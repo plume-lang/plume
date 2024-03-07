@@ -13,6 +13,10 @@ import Prettyprinter as PP
 import Prettyprinter.Internal as PP
 import Prettyprinter.Render.Terminal
 
+instance (ANSIPretty a) => ANSIPretty (Maybe a) where
+  ansiPretty (Just a) = ansiPretty a
+  ansiPretty Nothing = mempty
+
 class ANSIPretty a where
   ansiPretty :: a -> Doc AnsiStyle
   default ansiPretty :: (Pretty a) => a -> Doc AnsiStyle
