@@ -9,8 +9,9 @@ import Prelude hiding (readFile)
 
 main :: IO ()
 main = do
-  content <- readFile "example/main.plm"
-  let x = parseTest content
+  let file = "example/main.plm"
+  content <- readFile file
+  x <- parsePlumeFile file content
   case x of
     Left e -> printText $ errorBundlePretty e
     Right r -> ppPrint r
