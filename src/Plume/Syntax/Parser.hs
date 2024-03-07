@@ -9,6 +9,9 @@ parseTestPlume :: FileContent -> IO (Either ParsingError Program)
 parseTestPlume = parsePlumeFile mempty
 
 parsePlumeFile :: FilePath -> FileContent -> IO (Either ParsingError Program)
-parsePlumeFile fp fc = do
-  writeIORef indentation 0
-  parseWithRef indentation (scn *> parseProgram) fp fc
+parsePlumeFile fp fc =
+  parseWithRefValue
+    (indentation, 0)
+    (scn *> parseProgram)
+    fp
+    fc
