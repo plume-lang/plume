@@ -4,6 +4,7 @@ module Plume.Syntax.Parser.Modules.Expression where
 
 import Control.Monad.Combinators.Expr
 import Control.Monad.Parser
+import Data.Text qualified as T
 import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer
 import Plume.Syntax.Parser.Modules.Literal
@@ -241,5 +242,19 @@ eExpression = makeExprParser eTerm ([postfixOperators] : operators)
               return $ \e -> ERowSelect e name
           ]
 
+tRequire :: Parser Expression
+tRequire = eLocated $ do
+  _ <- reserved "require"
+  txt <- T.pack <$> stringLiteral
+  return (ERequire txt)
+
+parseToplevel :: Parser Expression
+parseToplevel =
+  nonIndented $
+    choice
+      [ tRequire
+      , eExpression
+      ]
+
 parseProgram :: Parser Program
-parseProgram = many (nonIndented eExpression <* optional indentSc)
+parseProgram = many (parseToplevel <* optional indentSc)

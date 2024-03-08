@@ -79,7 +79,16 @@ consumeIndents = do
   return processedIndent
 
 reservedWords :: [Text]
-reservedWords = ["in", "if", "then", "else", "true", "false", "except"]
+reservedWords =
+  [ "in"
+  , "if"
+  , "then"
+  , "else"
+  , "true"
+  , "false"
+  , "except"
+  , "require"
+  ]
 
 -- Tab width for the indent sensitive parser
 -- Defaulting to Nothing, meaning that the tab width is not set
@@ -124,7 +133,7 @@ identifier = do
   r <- pack <$> lexeme ((:) <$> (letterChar <|> oneOf ("_" :: String)) <*> many (alphaNumChar <|> oneOf ("_" :: String)))
   -- Guarding parsed result and failing when reserved word is parsed
   -- (such as reserved keyword)
-  guard (r `notElem` reservedWords)
+  guard (r `notElem` reservedWords) <?> "variable name"
   return r
 
 -- How many times a parser can be applied. It returns the number of
