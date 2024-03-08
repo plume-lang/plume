@@ -1,8 +1,9 @@
 module Main where
 
 import Data.Text.IO
-import Plume.Syntax.Concrete.Internal.Pretty ()
+import Plume.Syntax.Abstract.Internal.Pretty ()
 import Plume.Syntax.Parser
+import Plume.Syntax.Translation.ConcreteToAbstract
 import System.IO.Pretty
 import Text.Megaparsec (errorBundlePretty)
 import Prelude hiding (readFile)
@@ -14,4 +15,6 @@ main = do
   x <- parsePlumeFile file content
   case x of
     Left e -> printText $ errorBundlePretty e
-    Right r -> ppPrint r
+    Right r -> do
+      ast <- mapM concreteToAbstract r
+      ppPrint ast
