@@ -39,14 +39,24 @@ data ConcreteExpression t
   | EApplication (ConcreteExpression t) [ConcreteExpression t]
   | EBinary BinaryOperator (ConcreteExpression t) (ConcreteExpression t)
   | EPrefix PrefixOperator (ConcreteExpression t)
-  | EDeclaration (Annotation (Maybe t)) (ConcreteExpression t) (Maybe (ConcreteExpression t))
-  | EConditionBranch (ConcreteExpression t) (ConcreteExpression t) (ConcreteExpression t)
-  | EClosure [Annotation (Maybe t)] (Maybe t) (ConcreteExpression t)
+  | EDeclaration
+      (Annotation (Maybe t))
+      (ConcreteExpression t)
+      (Maybe (ConcreteExpression t))
+  | EConditionBranch
+      (ConcreteExpression t)
+      (ConcreteExpression t)
+      (ConcreteExpression t)
+  | EClosure
+      [Annotation (Maybe t)]
+      (Maybe t)
+      (ConcreteExpression t)
   | EBlock [ConcreteExpression t]
   | ERowEmpty
   | ERowExtension Text (ConcreteExpression t) (ConcreteExpression t)
   | ERowSelect (ConcreteExpression t) Text
   | ERowRestrict (ConcreteExpression t) Text
+  | ERequire Text
   | ELocated (ConcreteExpression t) Position
 
 pattern (:>:) :: ConcreteExpression t -> Position -> ConcreteExpression t

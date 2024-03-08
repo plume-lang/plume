@@ -76,10 +76,10 @@ prettyExpr _ (EDeclaration a e1' e2') =
 prettyExpr _ (EConditionBranch e1' e2' e3') =
   anCol Blue "if"
     <+> prettyExpr 0 e1'
-    <+> anCol Blue "then\n"
-    <> indent 2 (prettyExpr 0 e2')
-    <> anCol Blue "\nelse\n"
-    <> indent 2 (prettyExpr 0 e3')
+    <+> anCol Blue "then "
+    <> prettyExpr 0 e2'
+    <> anCol Blue "\nelse "
+    <> prettyExpr 0 e3'
 prettyExpr _ (EClosure as t e) =
   ppArgs as t
     <+> "->\n"
@@ -91,14 +91,12 @@ prettyExpr _ (EClosure as t e) =
   ppRet Nothing = ""
   ppRet (Just t') = ":" <+> prettyTy t'
 prettyExpr _ (EBlock es) =
-  braces $
-    line
-      <> indent 2 (vsep (map (prettyExpr 0) es))
-      <> line
+  line <> indent 4 (vsep (map (prettyExpr 0) es))
 prettyExpr _ ERowEmpty = "..."
 prettyExpr _ r@(ERowExtension{}) = ppRecord True r
 prettyExpr _ (ERowSelect e l) = prettyExpr 0 e <> "." <> pretty l
 prettyExpr _ (ERowRestrict e l) = prettyExpr 0 e <+> anCol Blue "except" <+> pretty l
+prettyExpr _ (ERequire l) = anCol Blue "require" <+> anCol Green (dquotes $ pretty l)
 prettyExpr _ (ELocated e _) = prettyExpr 0 e
 
 prettyLit :: Literal -> Doc AnsiStyle
