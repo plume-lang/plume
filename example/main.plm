@@ -1,5 +1,7 @@
 x: int = 5
 
+require "example/indent.plm"
+
 welcome(name: str) -> print("tet" + 5.3, 4)
 
 add = (y: int) ->
@@ -13,6 +15,8 @@ factorial(n: int) ->
     test
   else
     n * factorial(n - 1) + true
+
+require "example/modules/hello.plm"
 
 5 % x except n
 
