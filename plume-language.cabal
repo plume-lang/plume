@@ -58,7 +58,8 @@ library
         relude,
         prettyprinter,
         prettyprinter-ansi-terminal,
-        uniplate
+        filepath,
+        directory
 
     mixins:
         base hiding (Prelude),
