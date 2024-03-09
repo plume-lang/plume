@@ -24,6 +24,11 @@ instance Throwable Text where
 instance Throwable ParsingError where
   showError = toText . errorBundlePretty
 
+-- catchIO is an utility function that aims at catching function that may
+-- throw an error during execution and automatically print the error and
+-- exiting the program with a failure status code.
+-- If no error is thrown, the function will continue its execution by
+-- applying the provided function to the right result.
 catchIO
   :: (MonadIO m, Throwable err)
   => m (Either err a)
@@ -32,5 +37,7 @@ catchIO
 catchIO m f = do
   x <- m
   case x of
-    Left e -> liftIO $ printText (showError e) >> exitFailure
+    Left e -> liftIO $ do
+      printText (showError e)
+      exitFailure
     Right r -> f r
