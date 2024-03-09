@@ -21,32 +21,32 @@ instance Semigroup Int where (<>) = (+)
 
 instance Monoid Int where mempty = 0
 
-parse ::
-  Parser a ->
-  FilePath ->
-  FileContent ->
-  IO (Either ParsingError a)
+parse
+  :: Parser a
+  -> FilePath
+  -> FileContent
+  -> IO (Either ParsingError a)
 parse p filePath fileContent = do
   runParserT
     p
     filePath
     fileContent
 
-parseWithRef ::
-  (Monoid ref) =>
-  IORef ref ->
-  Parser a ->
-  FilePath ->
-  FileContent ->
-  IO (Either ParsingError a)
+parseWithRef
+  :: (Monoid ref)
+  => IORef ref
+  -> Parser a
+  -> FilePath
+  -> FileContent
+  -> IO (Either ParsingError a)
 parseWithRef ref = parseWithRefValue (ref, mempty)
 
-parseWithRefValue ::
-  (IORef ref, ref) ->
-  Parser a ->
-  FilePath ->
-  FileContent ->
-  IO (Either ParsingError a)
+parseWithRefValue
+  :: (IORef ref, ref)
+  -> Parser a
+  -> FilePath
+  -> FileContent
+  -> IO (Either ParsingError a)
 parseWithRefValue (ref, value) p filePath fileContent = do
   writeIORef ref value
   r <-

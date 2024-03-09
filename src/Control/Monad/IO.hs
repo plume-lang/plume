@@ -1,4 +1,3 @@
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Control.Monad.IO where
