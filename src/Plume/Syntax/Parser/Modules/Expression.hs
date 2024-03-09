@@ -163,18 +163,15 @@ eRecord = eLocated $ do
         f
  where
   field = do
-    ( ( do
-          name <- identifier
-          _ <- symbol ":"
-          expr <- eExpression
-          return (Field name expr)
+    ( do
+        name <- identifier
+        _ <- symbol ":"
+        Field name <$> eExpression
       )
-        <|> ( do
-                _ <- symbol "..."
-                expr <- eExpression
-                return (Extension expr)
-            )
-      )
+      <|> ( do
+              _ <- symbol "..."
+              Extension <$> eExpression
+          )
 
 -- Main expression parsing function
 eExpression :: Parser Expression

@@ -8,10 +8,13 @@ import Plume.Syntax.Parser.Lexer
 
 -- Useful shortcut functions for defining operators
 
-binary :: Text -> (Expression -> Expression -> Expression) -> Operator Parser Expression
+binary
+  :: Text -> (Expression -> Expression -> Expression) -> Operator Parser Expression
 binary name f = InfixL (f <$ symbol name)
 
-prefix, postfix :: Text -> (Expression -> Expression) -> Operator Parser Expression
+prefix
+  , postfix
+    :: Text -> (Expression -> Expression) -> Operator Parser Expression
 prefix name f = Prefix (f <$ symbol name)
 postfix name f = Postfix (f <$ symbol name)
 

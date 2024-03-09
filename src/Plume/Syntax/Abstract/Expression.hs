@@ -7,7 +7,6 @@ module Plume.Syntax.Abstract.Expression where
 -- removes some concrete syntax details and makes the program more abstract
 -- in order to make it easier to manipulate and transform.
 
-import Data.Data
 import Data.Text hiding (map)
 import Plume.Syntax.Concrete.Annotation
 import Plume.Syntax.Concrete.Expression (Position)
@@ -36,7 +35,7 @@ data AbstractExpression t
   | ERowSelect (AbstractExpression t) Text
   | ERowRestrict (AbstractExpression t) Text
   | ELocated (AbstractExpression t) Position
-  deriving (Eq, Data, Typeable)
+  deriving (Eq)
 
 pattern (:>:) :: AbstractExpression t -> Position -> AbstractExpression t
 pattern e :>: p = ELocated e p

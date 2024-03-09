@@ -103,9 +103,7 @@ prettyLit :: Literal -> Doc AnsiStyle
 prettyLit (LInt i) = anCol Yellow $ pretty i
 prettyLit (LFloat f) = anCol Yellow $ pretty f
 prettyLit (LString s) = anCol Green . dquotes $ pretty s
-prettyLit (LBool b) = anBold $ anCol Blue $ case b of
-  True -> "true"
-  False -> "false"
+prettyLit (LBool b) = anBold $ anCol Blue (if b then "true" else "false")
 prettyLit (LChar c) = anCol Green . squotes $ pretty c
 
 prettyTy :: ConcreteType -> Doc AnsiStyle
@@ -119,15 +117,16 @@ prettyTy TRowEmpty = "..."
 prettyTy (TRowExtend l t TRowEmpty) = pretty l <> " : " <> prettyTy t
 prettyTy (TRowExtend l t r) = pretty l <> " : " <> prettyTy t <> " | " <> prettyTy r
 
-ppRecordHelper :: (ANSIPretty a, IsRow a) => (Bool, Bool) -> ([Annotation a], a) -> Doc AnsiStyle
+ppRecordHelper ::
+  (ANSIPretty a, IsRow a) => (Bool, Bool) -> ([Annotation a], a) -> Doc AnsiStyle
 ppRecordHelper _ ([], e) = ansiPretty e
 ppRecordHelper (isType, containsExtension) (names, e) =
   enclosed . indents $
-    ( renderRows $
-        punctuate
+    renderRows
+      ( punctuate
           comma
           (map ansiPretty names)
-    )
+      )
       <> rowExtends
  where
   nl :: Doc AnsiStyle

@@ -13,7 +13,7 @@ instance IsRow Expression where
   isRowEmpty ERowEmpty = True
   isRowEmpty _ = False
 
-  isRowExtend (ERowExtension _ _ _) = True
+  isRowExtend (ERowExtension{}) = True
   isRowExtend _ = False
 
   extractExtend (ERowExtension label val r') = ((label :@: val) : names, rest')

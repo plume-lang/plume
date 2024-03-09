@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
-
 module Plume.Syntax.Parser.Lexer where
 
 import Control.Monad.Parser
@@ -10,6 +8,7 @@ import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 import Prelude hiding (modify)
 
+{-# NOINLINE indentation #-}
 indentation :: IORef Int
 indentation = unsafePerformIO $ newIORef 0
 
@@ -35,7 +34,7 @@ scn = L.space space1 lineComment multilineComment
 sc :: Parser ()
 sc =
   L.space
-    (void (char (' ') <|> char '\t'))
+    (void (char ' ' <|> char '\t'))
     lineComment
     multilineComment
 
@@ -59,7 +58,12 @@ consumeIndents = do
               Just tw -> do
                 if isReal (fromIntegral sp / fromIntegral tw :: Double)
                   then return $ sp `div` tw
-                  else fail $ "Indentation level mismatch, tab width should be equal to " ++ show tw ++ " but received " ++ show sp
+                  else
+                    fail $
+                      "Indentation level mismatch, tab width should be equal to "
+                        ++ show tw
+                        ++ " but received "
+                        ++ show sp
               Nothing -> do
                 writeIORef tabWidthRef (Just sp)
                 return sp
@@ -70,9 +74,7 @@ consumeIndents = do
 
   -- If the indentation is not present, we return 0, basically meaning that
   -- this line is not indented.
-  let processedIndent = case ilevel of
-        Just i -> i
-        Nothing -> 0
+  let processedIndent = fromMaybe 0 ilevel
 
   -- Storing the current processed indent in the state
   writeIORef indentation processedIndent
@@ -94,6 +96,7 @@ reservedWords =
 -- Defaulting to Nothing, meaning that the tab width is not set
 -- It is set on first space or tab consumption
 tabWidthRef :: IORef (Maybe Int)
+{-# NOINLINE tabWidthRef #-}
 tabWidthRef = unsafePerformIO $ newIORef Nothing
 
 lexeme :: Parser a -> Parser a
@@ -130,7 +133,13 @@ colon = symbol ":"
 
 identifier :: Parser Text
 identifier = do
-  r <- pack <$> lexeme ((:) <$> (letterChar <|> oneOf ("_" :: String)) <*> many (alphaNumChar <|> oneOf ("_" :: String)))
+  r <-
+    pack
+      <$> lexeme
+        ( (:)
+            <$> (letterChar <|> oneOf ("_" :: String))
+            <*> many (alphaNumChar <|> oneOf ("_" :: String))
+        )
   -- Guarding parsed result and failing when reserved word is parsed
   -- (such as reserved keyword)
   guard (r `notElem` reservedWords) <?> "variable name"
@@ -191,7 +200,12 @@ indentSame ilevel p = try $ do
   level <- indentSc *> consumeIndents
   if level == ilevel
     then p
-    else fail $ "Indentation level mismatch, expected " ++ show ilevel ++ " but received " ++ show level
+    else
+      fail $
+        "Indentation level mismatch, expected "
+          ++ show ilevel
+          ++ " but received "
+          ++ show level
 
 -- Indent parser that takes a parser and applies it only and only if there is
 -- no indentation.
@@ -202,4 +216,5 @@ nonIndented p = do
   ilevel <- consumeIndents
   if ilevel == 0
     then p
-    else fail $ "Indentation level mismatch, expected 0 but received " ++ show ilevel
+    else
+      fail $ "Indentation level mismatch, expected 0 but received " ++ show ilevel

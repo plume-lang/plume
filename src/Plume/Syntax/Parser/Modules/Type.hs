@@ -25,8 +25,7 @@ tFunction :: Parser ConcreteType
 tFunction = do
   args <- parens (tType `sepBy` comma)
   _ <- symbol "->"
-  ret <- tType
-  return (TFunction args ret)
+  TFunction args <$> tType
 
 -- (t1, t2, ..., tn) where t1, t2, ..., tn are the tuple type elements. There are tuple
 -- special cases depending on the quantity of types specified for the tuple:
@@ -95,8 +94,7 @@ tRecord = braces $ do
         ( ( do
               l <- identifier
               _ <- colon
-              t <- tType
-              return (TypeField l t)
+              TypeField l <$> tType
           )
             <|> (symbol "..." *> (TypeExt <$> tType))
         )
