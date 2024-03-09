@@ -15,8 +15,8 @@ bireturn = return . return
 concreteToAbstract :: CST.Expression -> IO (Either Text AST.Expression)
 concreteToAbstract (CST.EVariable n) = bireturn $ AST.EVariable n
 concreteToAbstract (CST.ELiteral l) = bireturn $ AST.ELiteral l
-concreteToAbstract e@(CST.EBinary{}) = convertOperation concreteToAbstract e
-concreteToAbstract e@(CST.EPrefix{}) = convertOperation concreteToAbstract e
+concreteToAbstract e@(CST.EBinary {}) = convertOperation concreteToAbstract e
+concreteToAbstract e@(CST.EPrefix {}) = convertOperation concreteToAbstract e
 concreteToAbstract (CST.EApplication e es) = do
   e' <- concreteToAbstract e
   es' <- sequence <$> mapM concreteToAbstract es
