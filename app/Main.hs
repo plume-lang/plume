@@ -16,5 +16,7 @@ main = do
   case x of
     Left e -> printText $ errorBundlePretty e
     Right r -> do
-      ast <- mapM concreteToAbstract r
-      ppPrint ast
+      ast <- sequence <$> mapM concreteToAbstract r
+      case ast of
+        Left e -> printText e
+        Right r' -> ppPrint r'
