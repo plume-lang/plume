@@ -14,5 +14,5 @@ main = do
   content <- readFile file
 
   parsePlumeFile file content `with` \cst -> do
-    sequence <$> mapM concreteToAbstract cst `with` \ast -> do
+    runConcreteToAbstract cst `with` \ast -> do
       ppPrint ast
