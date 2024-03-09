@@ -86,7 +86,7 @@ prettyExpr _ (EClosure as t e) =
     <+> indent 2 (prettyExpr 0 e)
  where
   ppArgs [x :@: Nothing] Nothing = pretty x
-  ppArgs xs ret = parens (hsep . punctuate comma $ map ansiPretty xs) <> ppRet ret
+  ppArgs xs ret = parens (hsep . punctuate comma $ map typeAnnotation xs) <> ppRet ret
 
   ppRet Nothing = ""
   ppRet (Just t') = ":" <+> prettyTy t'
