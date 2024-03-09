@@ -93,7 +93,7 @@ prettyExpr _ (EClosure as t e) =
 prettyExpr _ (EBlock es) =
   line <> indent 4 (vsep (map (prettyExpr 0) es))
 prettyExpr _ ERowEmpty = "..."
-prettyExpr _ r@(ERowExtension{}) = ppRecord True r
+prettyExpr _ r@(ERowExtension {}) = ppRecord True r
 prettyExpr _ (ERowSelect e l) = prettyExpr 0 e <> "." <> pretty l
 prettyExpr _ (ERowRestrict e l) = prettyExpr 0 e <+> anCol Blue "except" <+> pretty l
 prettyExpr _ (ERequire l) = anCol Blue "require" <+> anCol Green (dquotes $ pretty l)
@@ -117,8 +117,8 @@ prettyTy TRowEmpty = "..."
 prettyTy (TRowExtend l t TRowEmpty) = pretty l <> " : " <> prettyTy t
 prettyTy (TRowExtend l t r) = pretty l <> " : " <> prettyTy t <> " | " <> prettyTy r
 
-ppRecordHelper ::
-  (ANSIPretty a, IsRow a) => (Bool, Bool) -> ([Annotation a], a) -> Doc AnsiStyle
+ppRecordHelper
+  :: (ANSIPretty a, IsRow a) => (Bool, Bool) -> ([Annotation a], a) -> Doc AnsiStyle
 ppRecordHelper _ ([], e) = ansiPretty e
 ppRecordHelper (isType, containsExtension) (names, e) =
   enclosed . indents $

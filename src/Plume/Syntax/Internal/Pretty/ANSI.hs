@@ -30,3 +30,7 @@ anBold = annotate bold
 
 anItalic :: Doc AnsiStyle -> Doc AnsiStyle
 anItalic = annotate italicized
+
+instance ToText (Doc AnsiStyle) where
+  toText = renderStrict . layoutPretty defaultLayoutOptions
+  {-# INLINE toText #-}

@@ -13,7 +13,7 @@ instance IsRow Expression where
   isRowEmpty ERowEmpty = True
   isRowEmpty _ = False
 
-  isRowExtend (ERowExtension{}) = True
+  isRowExtend (ERowExtension {}) = True
   isRowExtend _ = False
 
   extractExtend (ERowExtension label val r') = ((label :@: val) : names, rest')
@@ -59,7 +59,7 @@ prettyExpr _ (EClosure as t e) =
 prettyExpr _ (EBlock es) =
   line <> indent 4 (vsep (map (prettyExpr 0) es))
 prettyExpr _ ERowEmpty = "..."
-prettyExpr _ r@(ERowExtension{}) = ppRecord True r
+prettyExpr _ r@(ERowExtension {}) = ppRecord True r
 prettyExpr _ (ERowSelect e l) = prettyExpr 0 e <> "." <> pretty l
 prettyExpr _ (ERowRestrict e l) = prettyExpr 0 e <+> anCol Blue "except" <+> pretty l
 prettyExpr _ (ELocated e _) = prettyExpr 0 e
