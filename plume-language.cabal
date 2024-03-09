@@ -42,6 +42,7 @@ library
 
         Control.Monad.IO
         Control.Monad.Parser
+        Control.Monad.Exception
 
         GHC.Records
 
