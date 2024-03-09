@@ -14,5 +14,5 @@ currentDirectory = unsafePerformIO $ newIORef =<< getCurrentDirectory
 convertRequire :: Translator Text CST.Expression AST.Expression
 convertRequire _ (CST.ERequire modName) = do
   print modName
-  return $ return (AST.EVariable modName)
+  return $ Left "Require not implemented"
 convertRequire _ _ = error "Impossible happened"
