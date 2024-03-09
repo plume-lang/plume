@@ -29,15 +29,17 @@ instance Throwable ParsingError where
 -- exiting the program with a failure status code.
 -- If no error is thrown, the function will continue its execution by
 -- applying the provided function to the right result.
-catchIO
+with
   :: (MonadIO m, Throwable err)
   => m (Either err a)
   -> (a -> m b)
   -> m b
-catchIO m f = do
+with m f = do
   x <- m
   case x of
     Left e -> liftIO $ do
       printText (showError e)
       exitFailure
     Right r -> f r
+
+infix 1 `with`

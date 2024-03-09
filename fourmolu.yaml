@@ -47,7 +47,8 @@ unicode: never
 respectful: true
 
 # Fixity information for operators
-fixities: []
+fixities: 
+  - infix 1 `with`
 
 # Module reexports Fourmolu should know about
 reexports: []

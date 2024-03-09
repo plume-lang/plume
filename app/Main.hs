@@ -13,6 +13,6 @@ main = do
   let file = "example/main.plm"
   content <- readFile file
 
-  catchIO (parsePlumeFile file content) $ \cst -> do
-    catchIO (sequence <$> mapM concreteToAbstract cst) $ \ast -> do
+  parsePlumeFile file content `with` \cst -> do
+    sequence <$> mapM concreteToAbstract cst `with` \ast -> do
       ppPrint ast
