@@ -4,6 +4,12 @@ module Plume.Syntax.Translation.Generics where
 
 import Control.Monad.Exception
 import Control.Monad.IO
+import GHC.IO
+import Plume.Syntax.Concrete.Expression (Position)
+
+{-# NOINLINE positionRef #-}
+positionRef :: IORef (Maybe Position)
+positionRef = unsafePerformIO $ newIORef Nothing
 
 -- A spreadable type is a type that can handle either a single value or a
 -- spread of values. It is used to specify the translator that we need to
@@ -12,6 +18,30 @@ data Spreadable a b
   = Spread a
   | Single b
   | Empty
+
+data Error
+  = CompilerError Text -- Used to add some context
+  | MacroNotFound Text Position
+  | -- [Text] are the macro arguments, Int is the number of actual arguments
+    ArgumentsMismatch [Text] Int Position
+  | ModuleNotFound Text Position
+  | NoPositionSaved -- Used when the parser does not save the position
+
+instance Throwable Error where
+  showError = \case
+    CompilerError err -> err
+    MacroNotFound name pos ->
+      "Macro " <> name <> " not found at " <> show pos
+    ArgumentsMismatch args n pos ->
+      "Invalid number of arguments for macro at "
+        <> show pos
+        <> ". Expected "
+        <> show (length args)
+        <> " but got "
+        <> show n
+    ModuleNotFound name pos ->
+      "Module " <> name <> " not found at " <> show pos
+    NoPositionSaved -> "No position saved"
 
 -- A translator error is a type that represents an error that can occur
 -- during the translation process. It is a type alias for an Either type
@@ -53,11 +83,11 @@ throwError err = return $ Left err
 -- If it is a spread of values that hold only one value, it returns the
 -- value. If it is a single value, it returns the value. Otherwise, it
 -- returns an error.
-shouldBeAlone :: Either Text (Spreadable [a] a) -> Either Text a
+shouldBeAlone :: Either Error (Spreadable [a] a) -> Either Error a
 shouldBeAlone (Right (Single x)) = Right x
 shouldBeAlone (Right (Spread [x])) = Right x
 shouldBeAlone (Left err) = Left err
-shouldBeAlone _ = Left "Expected a single element"
+shouldBeAlone _ = Left (CompilerError "Expected a single value")
 
 -- Flat let us flatten a list of spreadable values into a single list of
 -- values.

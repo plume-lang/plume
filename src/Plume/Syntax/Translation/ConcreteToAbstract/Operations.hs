@@ -4,12 +4,13 @@ import Plume.Syntax.Abstract qualified as AST
 import Plume.Syntax.Concrete qualified as CST
 import Plume.Syntax.Concrete.Internal.Show ()
 import Plume.Syntax.Translation.Generics (
+  Error (..),
   Translator,
   shouldBeAlone,
   transRet,
  )
 
-convertOperation :: Translator Text CST.Expression AST.Expression
+convertOperation :: Translator Error CST.Expression AST.Expression
 -- A binary expression is just a function application with the operator as
 -- the function and the operands as the arguments.
 -- So, e1 `op` e2 is equivalent to op(e1, e2).
@@ -24,4 +25,4 @@ convertOperation f (CST.EBinary op e1 e2) = do
 convertOperation f (CST.EPrefix op e) = do
   e' <- fmap (: []) . shouldBeAlone <$> f e
   transRet $ AST.EApplication (AST.EVariable (toText op)) <$> e'
-convertOperation _ _ = error "Impossible happened"
+convertOperation _ _ = return $ Left (CompilerError "Received invalid operation expression")

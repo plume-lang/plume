@@ -1,8 +1,11 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Plume.Syntax.Translation.ConcreteToAbstract where
 
 import Plume.Syntax.Abstract qualified as AST
 import Plume.Syntax.Concrete qualified as CST
 
+import Control.Monad.Exception
 import Plume.Syntax.Translation.ConcreteToAbstract.MacroResolver
 import Plume.Syntax.Translation.ConcreteToAbstract.Operations
 import Plume.Syntax.Translation.ConcreteToAbstract.Require
@@ -18,7 +21,7 @@ interpretSpreadable Empty = AST.EBlock []
 
 concreteToAbstract
   :: CST.Expression
-  -> TranslatorReader Text AST.Expression
+  -> TranslatorReader Error AST.Expression
 concreteToAbstract (CST.EVariable n) = transRet . Right $ AST.EVariable n
 concreteToAbstract (CST.ELiteral l) = transRet . Right $ AST.ELiteral l
 concreteToAbstract e@(CST.EBinary {}) = convertOperation concreteToAbstract e
@@ -48,7 +51,7 @@ concreteToAbstract (CST.EConditionBranch e1 e2 e3) = do
   transRet $ AST.EConditionBranch <$> e1' <*> e2' <*> e3'
 concreteToAbstract (CST.EClosure anns t e) = do
   -- Same method as described for condition branches
-  e' <- fmap (AST.EBlock . fromSpreadable) <$> concreteToAbstract e
+  e' <- fmap interpretSpreadable <$> concreteToAbstract e
   transRet $ AST.EClosure anns t <$> e'
 concreteToAbstract (CST.EBlock es) = do
   -- Blocks can be composed of spread elements, so we need to flatten
@@ -77,17 +80,17 @@ concreteToAbstract (CST.ERowRestrict e l) = do
 concreteToAbstract r@(CST.ERequire _) =
   convertRequire concreteToAbstract r
 concreteToAbstract (CST.ELocated e p) = do
-  e' <- concreteToAbstract e
-  return $ case e' of
-    -- Located expressions can consist of regular expressions, wrapped
-    -- in Single constructor
-    Right (Single e'') -> return (Single (AST.ELocated e'' p))
-    -- But if they're spread elements, we need to get rid of the location
-    -- information as this is misleading
-    Right (Spread es) -> return (Spread es)
-    -- If there's an error, we just return it
-    Right Empty -> return Empty
-    Left err -> Left err
+  old <- readIORef positionRef
+  writeIORef positionRef (Just p)
+
+  res <-
+    concreteToAbstract e `with` \case
+      Single e' -> bireturn (Single (AST.ELocated e' p))
+      Spread es -> bireturn (Spread es)
+      Empty -> bireturn Empty
+
+  writeIORef positionRef old
+  return res
 concreteToAbstract m@(CST.EMacro {}) =
   convertMacro concreteToAbstract m
 concreteToAbstract m@(CST.EMacroFunction {}) =
@@ -97,7 +100,7 @@ concreteToAbstract m@(CST.EMacroVariable _) =
 concreteToAbstract m@(CST.EMacroApplication {}) =
   convertMacro concreteToAbstract m
 
-runConcreteToAbstract :: [CST.Expression] -> IO (Either Text [AST.Expression])
+runConcreteToAbstract :: [CST.Expression] -> IO (Either Error [AST.Expression])
 runConcreteToAbstract x = do
   -- Getting the current working directory as a starting point
   -- for the reader monad
