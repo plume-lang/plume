@@ -11,6 +11,7 @@ import Plume.Syntax.Parser.Modules.Literal
 import Plume.Syntax.Parser.Modules.Operator
 import Plume.Syntax.Parser.Modules.Type
 import Text.Megaparsec hiding (many)
+import Text.Megaparsec.Char
 
 -- Some useful parsing functions
 
@@ -75,7 +76,7 @@ eDeclaration = eLocated $ do
         <$> identifier
         <*> optional (symbol ":" *> tType)
         <* symbol "="
-  ilevel <- readIORef indentation
+  ilevel <- ask
   expr <- indentOrInline eExpression
   body <- optional (indentSameOrInline ilevel $ reserved "in" *> eExpression)
   return (EDeclaration var expr body)
@@ -84,10 +85,10 @@ eDeclaration = eLocated $ do
 -- e2 is the "else" branch
 eConditionBranch :: Parser Expression
 eConditionBranch = eLocated $ do
+  ilevel <- ask
   _ <- reserved "if"
   cond <- eExpression
   _ <- reserved "then"
-  ilevel <- readIORef indentation
   thenBr <- indentOrInline eExpression
   _ <- indentSameOrInline ilevel $ reserved "else"
   elseBr <- indentOrInline eExpression
@@ -131,6 +132,27 @@ eFunctionDefinition = eLocated $ do
   body <- indentOrInline eExpression
   return (EDeclaration (name :@: Nothing) (EClosure arguments ret body) Nothing)
 
+eMacro :: Parser Expression
+eMacro = eLocated $ do
+  name <- char '@' *> identifier <* symbol "="
+  EMacro name <$> indentOrInline eExpression
+
+eMacroFunction :: Parser Expression
+eMacroFunction = eLocated $ do
+  name <- char '@' *> identifier
+  args <- parens (identifier `sepBy` comma)
+  _ <- symbol "->"
+  EMacroFunction name args <$> indentOrInline eExpression
+
+eMacroVariable :: Parser Expression
+eMacroVariable = eLocated $ EMacroVariable <$> (char '@' *> identifier)
+
+eMacroApplication :: Parser Expression
+eMacroApplication = eLocated $ do
+  name <- char '@' *> identifier
+  args <- parens (eExpression `sepBy` comma)
+  return (EMacroApplication name args)
+
 data Row
   = Field Text Expression
   | Extension Expression
@@ -148,7 +170,7 @@ orderRows = foldr f ([], Nothing)
 eRecord :: Parser Expression
 eRecord = eLocated $ do
   _ <- symbol "{"
-  ilevel <- readIORef indentation
+  ilevel <- ask
 
   fields <- field `indentSepBy` comma <|> field `sepBy` comma
 
@@ -180,6 +202,8 @@ eExpression = makeExprParser eTerm ([postfixOperators] : operators)
   eTerm =
     choice
       [ eLiteral
+      , try eMacroApplication
+      , try eMacroVariable
       , eRecord
       , -- Try may be used here because function definitions starts with the
         -- same syntax as variable declaration
@@ -208,7 +232,7 @@ eExpression = makeExprParser eTerm ([postfixOperators] : operators)
           [ do
               arguments <- do
                 _ <- symbol "("
-                ilevel <- readIORef indentation
+                ilevel <- ask
 
                 -- Parsing function call args either inlined or indented
                 args <-
@@ -250,6 +274,8 @@ parseToplevel =
   nonIndented $
     choice
       [ tRequire
+      , try eMacroFunction
+      , try eMacro
       , eExpression
       ]
 

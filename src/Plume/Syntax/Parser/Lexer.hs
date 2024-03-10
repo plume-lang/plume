@@ -8,10 +8,6 @@ import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 import Prelude hiding (modify)
 
-{-# NOINLINE indentation #-}
-indentation :: IORef Int
-indentation = unsafePerformIO $ newIORef 0
-
 lineComment :: Parser ()
 lineComment = L.skipLineComment "//"
 
@@ -43,32 +39,52 @@ isReal x = (ceiling x :: Integer) == floor x
 
 consumeIndents :: Parser Int
 consumeIndents = do
+  tabWidth <- readIORef tabWidthRef
+  isTab <- readIORef isTabIndent
+
   -- Optionally consuming spaces and tabs
   ilevel <-
     optional $
       ( ( do
             sp <- howMany1 (char ' ')
 
-            tabWidth <- readIORef tabWidthRef
-
             -- If the number of spaces is divisible by tab width then it is a valid
             -- indentation and we can return the number of tabs. Otherwise, we return
             -- the nearest integer value of the division of spaces by tab width.
-            case tabWidth of
-              Just tw -> do
-                if isReal (fromIntegral sp / fromIntegral tw :: Double)
-                  then return $ sp `div` tw
-                  else
-                    fail $
-                      "Indentation level mismatch, tab width should be equal to "
-                        ++ show tw
-                        ++ " but received "
-                        ++ show sp
+            case isTab of
+              Just True ->
+                fail "Code should not mix tabs and spaces for indentation"
+              Just False ->
+                case tabWidth of
+                  Just tw -> do
+                    if isReal (fromIntegral sp / fromIntegral tw :: Double)
+                      then return $ sp `div` tw
+                      else
+                        fail $
+                          "Indentation level mismatch, tab width should be equal to "
+                            ++ show tw
+                            ++ " but received "
+                            ++ show sp
+                  Nothing -> do
+                    writeIORef tabWidthRef (Just sp)
+                    return 1
               Nothing -> do
+                writeIORef isTabIndent (Just False)
                 writeIORef tabWidthRef (Just sp)
-                return sp
+                return 1
         )
-          <|> howMany1 (char '\t')
+          <|> ( do
+                  tabs <- howMany1 (char '\t')
+                  case isTab of
+                    Just True ->
+                      return tabs
+                    Just False ->
+                      fail "Code should not mix tabs and spaces for indentation"
+                    Nothing -> do
+                      writeIORef isTabIndent (Just True)
+                      writeIORef tabWidthRef (Just tabs)
+                      return tabs
+              )
       )
         <* try indentSc
 
@@ -76,8 +92,6 @@ consumeIndents = do
   -- this line is not indented.
   let processedIndent = fromMaybe 0 ilevel
 
-  -- Storing the current processed indent in the state
-  writeIORef indentation processedIndent
   return processedIndent
 
 reservedWords :: [Text]
@@ -98,6 +112,11 @@ reservedWords =
 tabWidthRef :: IORef (Maybe Int)
 {-# NOINLINE tabWidthRef #-}
 tabWidthRef = unsafePerformIO $ newIORef Nothing
+
+-- Tab utility to tell the parser whether to use tabs or spaces
+isTabIndent :: IORef (Maybe Bool)
+{-# NOINLINE isTabIndent #-}
+isTabIndent = unsafePerformIO $ newIORef Nothing
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
@@ -159,22 +178,22 @@ howMany1 p = length <$> some p
 -- It returns a list of parsed results with the same indentation level.
 indent :: Parser a -> Parser [a]
 indent p = do
-  ilevel <- readIORef indentation
+  ilevel <- ask
   level <- eol >> consumeIndents
   if level > ilevel
     then do
-      x <- p
+      x <- local (const level) p
       xs <- many $ indentSame level p
       return (x : xs)
     else return []
 
 indentSepBy :: Parser a -> Parser b -> Parser [a]
 indentSepBy p sep = do
-  ilevel <- readIORef indentation
+  ilevel <- ask
   level <- eol >> consumeIndents
   if level > ilevel
     then do
-      x <- p <* sep
+      x <- local (const level) p <* sep
       xs <- many $ indentSame level (p <* sep)
       end <- indentSame level p
       return (x : xs ++ [end])
@@ -197,9 +216,9 @@ indentSameOrInline ilevel p = indentSame ilevel p <|> p
 -- It fails if the indentation level is not the same
 indentSame :: Int -> Parser a -> Parser a
 indentSame ilevel p = try $ do
-  level <- indentSc *> consumeIndents
+  level <- eol *> consumeIndents
   if level == ilevel
-    then p
+    then local (const level) p
     else
       fail $
         "Indentation level mismatch, expected "
@@ -215,6 +234,5 @@ nonIndented :: Parser a -> Parser a
 nonIndented p = do
   ilevel <- consumeIndents
   if ilevel == 0
-    then p
-    else
-      fail $ "Indentation level mismatch, expected 0 but received " ++ show ilevel
+    then local (const 0) p
+    else fail $ "Indentation level mismatch, expected 0 but received " ++ show ilevel

@@ -9,7 +9,4 @@ parseTestPlume :: FileContent -> IO (Either ParsingError Program)
 parseTestPlume = parsePlumeFile mempty
 
 parsePlumeFile :: FilePath -> FileContent -> IO (Either ParsingError Program)
-parsePlumeFile =
-  parseWithRefValue
-    (indentation, 0)
-    (scn *> parseProgram)
+parsePlumeFile = parse (scn *> parseProgram)
