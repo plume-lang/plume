@@ -1,1 +1,4 @@
 print("Hello world")
+
+@print(name) ->
+  print("Hello " + name)

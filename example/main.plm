@@ -4,6 +4,8 @@ require "example/indent.plm"
 
 welcome(name: str) -> print("tet" + 5.3, 4)
 
+print(@bruh)
+
 add = (y: int) ->
   z: int = x + y + 45
 
@@ -17,6 +19,8 @@ factorial(n: int) ->
     n * factorial(n - 1) + true
 
 require "example/modules/hello.plm"
+
+@print("test")
 
 5 % x except n
 

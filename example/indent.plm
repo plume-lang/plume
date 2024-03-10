@@ -4,6 +4,8 @@ facto(n): int ->
     else
         n * facto(n - 1)
 
+@bruh = "test"
+
 test = {
     x: facto(5),
     ...r
