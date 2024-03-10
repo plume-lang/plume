@@ -3,10 +3,18 @@ module Plume.Syntax.Translation.ConcreteToAbstract where
 import Plume.Syntax.Abstract qualified as AST
 import Plume.Syntax.Concrete qualified as CST
 
+import Plume.Syntax.Translation.ConcreteToAbstract.MacroResolver
 import Plume.Syntax.Translation.ConcreteToAbstract.Operations
 import Plume.Syntax.Translation.ConcreteToAbstract.Require
 import Plume.Syntax.Translation.Generics
 import System.Directory
+
+interpretSpreadable
+  :: Spreadable [AST.Expression] AST.Expression -> AST.Expression
+interpretSpreadable (Single e) = e
+interpretSpreadable (Spread [e]) = e
+interpretSpreadable (Spread es) = AST.EBlock es
+interpretSpreadable Empty = AST.EBlock []
 
 concreteToAbstract
   :: CST.Expression
@@ -35,8 +43,8 @@ concreteToAbstract (CST.EConditionBranch e1 e2 e3) = do
   -- But the branches can be spread elements, so we need to check if they
   -- are, and then combine them into a single expression by wrapping them
   -- into a block.
-  e2' <- fmap (AST.EBlock . fromSpreadable) <$> concreteToAbstract e2
-  e3' <- fmap (AST.EBlock . fromSpreadable) <$> concreteToAbstract e3
+  e2' <- fmap interpretSpreadable <$> concreteToAbstract e2
+  e3' <- fmap interpretSpreadable <$> concreteToAbstract e3
   transRet $ AST.EConditionBranch <$> e1' <*> e2' <*> e3'
 concreteToAbstract (CST.EClosure anns t e) = do
   -- Same method as described for condition branches
@@ -45,7 +53,12 @@ concreteToAbstract (CST.EClosure anns t e) = do
 concreteToAbstract (CST.EBlock es) = do
   -- Blocks can be composed of spread elements, so we need to flatten
   -- the list of expressions into a single expression.
-  es' <- fmap flat . sequence <$> mapM concreteToAbstract es
+  es' <-
+    fmap flat . sequence <$> do
+      oldMacroSt <- readIORef macroState
+      res <- mapM concreteToAbstract es
+      writeIORef macroState oldMacroSt
+      return res
   transRet $ AST.EBlock <$> es'
 concreteToAbstract CST.ERowEmpty = bireturn $ Single AST.ERowEmpty
 concreteToAbstract (CST.ERowExtension l e1 e2) = do
@@ -73,7 +86,16 @@ concreteToAbstract (CST.ELocated e p) = do
     -- information as this is misleading
     Right (Spread es) -> return (Spread es)
     -- If there's an error, we just return it
+    Right Empty -> return Empty
     Left err -> Left err
+concreteToAbstract m@(CST.EMacro {}) =
+  convertMacro concreteToAbstract m
+concreteToAbstract m@(CST.EMacroFunction {}) =
+  convertMacro concreteToAbstract m
+concreteToAbstract m@(CST.EMacroVariable _) =
+  convertMacro concreteToAbstract m
+concreteToAbstract m@(CST.EMacroApplication {}) =
+  convertMacro concreteToAbstract m
 
 runConcreteToAbstract :: [CST.Expression] -> IO (Either Text [AST.Expression])
 runConcreteToAbstract x = do

@@ -58,6 +58,10 @@ data ConcreteExpression t
   | ERowRestrict (ConcreteExpression t) Text
   | ERequire Text
   | ELocated (ConcreteExpression t) Position
+  | EMacro Text (ConcreteExpression t)
+  | EMacroFunction Text [Text] (ConcreteExpression t)
+  | EMacroVariable Text
+  | EMacroApplication Text [ConcreteExpression t]
 
 pattern (:>:) :: ConcreteExpression t -> Position -> ConcreteExpression t
 pattern e :>: p = ELocated e p

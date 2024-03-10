@@ -98,6 +98,18 @@ prettyExpr _ (ERowSelect e l) = prettyExpr 0 e <> "." <> pretty l
 prettyExpr _ (ERowRestrict e l) = prettyExpr 0 e <+> anCol Blue "except" <+> pretty l
 prettyExpr _ (ERequire l) = anCol Blue "require" <+> anCol Green (dquotes $ pretty l)
 prettyExpr _ (ELocated e _) = prettyExpr 0 e
+prettyExpr _ (EMacro n e) = anCol Yellow "@" <> anCol Yellow (pretty n) <+> "=" <+> prettyExpr 0 e
+prettyExpr _ (EMacroFunction n args e) =
+  anCol Yellow "@"
+    <> anCol Yellow (pretty n)
+      <+> parens (hsep . punctuate comma $ map pretty args)
+      <+> "->"
+      <+> prettyExpr 0 e
+prettyExpr _ (EMacroVariable n) = anCol Yellow "@" <> anCol Yellow (pretty n)
+prettyExpr _ (EMacroApplication n es) =
+  anCol Yellow "@"
+    <> anCol Yellow (pretty n)
+    <> parens (hsep . punctuate comma $ map (prettyExpr 0) es)
 
 prettyLit :: Literal -> Doc AnsiStyle
 prettyLit (LInt i) = anCol Yellow $ pretty i

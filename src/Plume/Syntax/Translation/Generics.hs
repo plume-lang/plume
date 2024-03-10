@@ -11,6 +11,7 @@ import Control.Monad.IO
 data Spreadable a b
   = Spread a
   | Single b
+  | Empty
 
 -- A translator error is a type that represents an error that can occur
 -- during the translation process. It is a type alias for an Either type
@@ -45,6 +46,9 @@ transRet = pure . fmap Single
 maybeM :: (Monad m) => (a -> m b) -> Maybe a -> m (Maybe b)
 maybeM f = maybe (return Nothing) (fmap Just . f)
 
+throwError :: err -> TranslatorReader err b
+throwError err = return $ Left err
+
 -- ShouldBeAlone checks if a value is a single value or a spread of values.
 -- If it is a spread of values that hold only one value, it returns the
 -- value. If it is a single value, it returns the value. Otherwise, it
@@ -61,6 +65,7 @@ flat :: [Spreadable [a] a] -> [a]
 flat = concatMap $ \case
   Spread a -> a
   Single a -> [a]
+  Empty -> []
 
 -- Monadic version of the concatMap function.
 concatMapM :: (Monad m) => (a -> m [b]) -> [a] -> m [b]
@@ -71,12 +76,15 @@ concatMapM f = fmap concat . mapM f
 fromSpreadable :: Spreadable [a] a -> [a]
 fromSpreadable (Spread a) = a
 fromSpreadable (Single a) = [a]
+fromSpreadable Empty = []
 
 -- Some logging instances for the spreadable type.
 instance (ToText a, ToText b) => ToText (Spreadable a b) where
   toText (Spread a) = toText a
   toText (Single b) = toText b
+  toText Empty = "Empty"
 
 instance (Throwable err) => Throwable (Spreadable [err] err) where
   showError (Spread errs) = unlines $ map showError errs
   showError (Single err) = showError err
+  showError Empty = "Empty"

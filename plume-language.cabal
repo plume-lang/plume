@@ -37,6 +37,8 @@ library
         Plume.Syntax.Translation.ConcreteToAbstract
         Plume.Syntax.Translation.ConcreteToAbstract.Operations
         Plume.Syntax.Translation.ConcreteToAbstract.Require
+        Plume.Syntax.Translation.ConcreteToAbstract.MacroResolver
+        Plume.Syntax.Translation.Substitution
 
         System.IO.Pretty
 
