@@ -24,3 +24,4 @@ cabal.project.local~
 .zed
 __pycache__
 report.html
+.DS_Store
