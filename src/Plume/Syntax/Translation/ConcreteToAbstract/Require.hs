@@ -2,7 +2,6 @@
 
 module Plume.Syntax.Translation.ConcreteToAbstract.Require where
 
-import Control.Monad.Exception
 import Plume.Syntax.Abstract qualified as AST
 import Plume.Syntax.Concrete qualified as CST
 import Plume.Syntax.Parser
@@ -42,7 +41,17 @@ convertRequire f (CST.ERequire modName) = do
       -- Returning the generated AST as a spreadable AST (just a list of
       -- expressions represented as a single expression).
       local (const newCurrentDirectory) $
-        liftIO (parsePlumeFile modPath content) `with` \cst ->
-          sequence <$> mapM f cst `with` \ast -> do
-            bireturn . Spread $ flat ast
+        liftIO (parsePlumeFile modPath content) >>= \case
+          Left err -> throwError $ ParserError err
+          Right cst ->
+            sequenceMapM f cst >>= \case
+              Left err -> throwError err
+              Right ast -> bireturn . Spread $ flat ast
 convertRequire _ _ = throwError $ CompilerError "Received invalid require expression"
+
+sequenceMapM
+  :: (Monad m, Traversable t, Monad f)
+  => (a -> f (m a1))
+  -> t a
+  -> f (m (t a1))
+sequenceMapM f = (sequence <$>) . mapM f

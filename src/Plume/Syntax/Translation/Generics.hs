@@ -4,6 +4,7 @@ module Plume.Syntax.Translation.Generics where
 
 import Control.Monad.Exception
 import Control.Monad.IO
+import Control.Monad.Parser
 import GHC.IO
 import Plume.Syntax.Concrete.Expression (Position)
 
@@ -26,6 +27,7 @@ data Error
     ArgumentsMismatch [Text] Int Position
   | ModuleNotFound Text Position
   | NoPositionSaved -- Used when the parser does not save the position
+  | ParserError ParsingError
 
 instance Throwable Error where
   showError = \case
@@ -42,6 +44,7 @@ instance Throwable Error where
     ModuleNotFound name pos ->
       "Module " <> name <> " not found at " <> show pos
     NoPositionSaved -> "No position saved"
+    ParserError err -> showError err
 
 -- A translator error is a type that represents an error that can occur
 -- during the translation process. It is a type alias for an Either type
