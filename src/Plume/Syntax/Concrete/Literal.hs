@@ -9,7 +9,7 @@ type Label = Text
 data Literal
   = LInt Integer
   | LBool Bool
-  | LString String
+  | LString Text
   | LChar Char
   | LFloat Double
   deriving (Eq)
