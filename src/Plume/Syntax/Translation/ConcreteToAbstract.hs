@@ -9,6 +9,7 @@ import Control.Monad.Exception
 import Plume.Syntax.Translation.ConcreteToAbstract.MacroResolver
 import Plume.Syntax.Translation.ConcreteToAbstract.Operations
 import Plume.Syntax.Translation.ConcreteToAbstract.Require
+import Plume.Syntax.Translation.ConcreteToAbstract.UFCS
 import Plume.Syntax.Translation.Generics
 import System.Directory
 
@@ -26,6 +27,8 @@ concreteToAbstract (CST.EVariable n) = transRet . Right $ AST.EVariable n
 concreteToAbstract (CST.ELiteral l) = transRet . Right $ AST.ELiteral l
 concreteToAbstract e@(CST.EBinary {}) = convertOperation concreteToAbstract e
 concreteToAbstract e@(CST.EPrefix {}) = convertOperation concreteToAbstract e
+concreteToAbstract e@(CST.EApplication (CST.EProperty _ _) _) =
+  convertUFCS concreteToAbstract e
 concreteToAbstract (CST.EApplication e es) = do
   -- Checking if the first expression is alone, meaning that it is not
   -- composed of multiple elements (like a spread element), and unwraping
@@ -63,20 +66,6 @@ concreteToAbstract (CST.EBlock es) = do
       writeIORef macroState oldMacroSt
       return res
   transRet $ AST.EBlock <$> es'
-concreteToAbstract CST.ERowEmpty = bireturn $ Single AST.ERowEmpty
-concreteToAbstract (CST.ERowExtension l e1 e2) = do
-  -- We can't represent spread elements in row extensions
-  e1' <- shouldBeAlone <$> concreteToAbstract e1
-  e2' <- shouldBeAlone <$> concreteToAbstract e2
-  transRet $ AST.ERowExtension l <$> e1' <*> e2'
-concreteToAbstract (CST.ERowSelect e l) = do
-  -- Same for row selections as we select on a single record
-  e' <- shouldBeAlone <$> concreteToAbstract e
-  transRet $ AST.ERowSelect <$> e' <*> pure l
-concreteToAbstract (CST.ERowRestrict e l) = do
-  -- Row restrict don't work too on spread elements
-  e' <- shouldBeAlone <$> concreteToAbstract e
-  transRet $ AST.ERowRestrict <$> e' <*> pure l
 concreteToAbstract r@(CST.ERequire _) =
   convertRequire concreteToAbstract r
 concreteToAbstract (CST.ELocated e p) = do
@@ -108,6 +97,11 @@ concreteToAbstract (CST.ESwitch e ps) = do
         (\(p, body) -> (p,) . fmap interpretSpreadable <$> concreteToAbstract body)
         ps
   transRet $ AST.ESwitch <$> e' <*> ps'
+concreteToAbstract (CST.EProperty {}) = do
+  pos <- readIORef positionRef
+  throwError $ case pos of
+    Just p -> CompilerError $ "Unexpected property at " <> show p
+    Nothing -> CompilerError "Unexpected property"
 
 runConcreteToAbstract :: [CST.Expression] -> IO (Either Error [AST.Expression])
 runConcreteToAbstract x = do

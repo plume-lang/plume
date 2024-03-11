@@ -17,7 +17,6 @@ library
         Plume.Syntax.Concrete.Expression
         Plume.Syntax.Concrete.Internal.Show
         Plume.Syntax.Concrete.Internal.Pretty
-        Plume.Syntax.Concrete.Internal.Row
 
         Plume.Syntax.Common
         Plume.Syntax.Common.Literal
@@ -43,6 +42,7 @@ library
         Plume.Syntax.Translation.ConcreteToAbstract.Operations
         Plume.Syntax.Translation.ConcreteToAbstract.Require
         Plume.Syntax.Translation.ConcreteToAbstract.MacroResolver
+        Plume.Syntax.Translation.ConcreteToAbstract.UFCS
         Plume.Syntax.Translation.Substitution
 
         System.IO.Pretty
