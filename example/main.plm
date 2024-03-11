@@ -4,7 +4,6 @@ require "example/indent.plm"
 
 welcome(name: str) -> print("tet" + 5.3, 4)
 
-print(@bruh)
 
 add = (y: int) ->
   z: int = x + y + 45
@@ -28,3 +27,9 @@ t = x.n except r
 in 2
 
 print(factorial(5)) // rest
+
+@bruh = "test"
+
+@print("Thomas")
+
+print(@bruh)
