@@ -3,24 +3,11 @@ module Plume.Syntax.Abstract.Internal.Pretty where
 import Plume.Syntax.Abstract
 import Plume.Syntax.Common
 import Plume.Syntax.Common.Internal.Pretty
-import Plume.Syntax.Concrete.Internal.Row
 import Plume.Syntax.Internal.Pretty.ANSI
 import Prettyprinter.Render.Terminal
 import Prelude hiding (intercalate)
 
 instance ANSIPretty Expression where ansiPretty = prettyExpr
-
-instance IsRow Expression where
-  isRowEmpty ERowEmpty = True
-  isRowEmpty _ = False
-
-  isRowExtend (ERowExtension {}) = True
-  isRowExtend _ = False
-
-  extractExtend (ERowExtension label val r') = ((label :@: val) : names, rest')
-   where
-    (names, rest') = extractExtend r'
-  extractExtend e = ([], e)
 
 instance {-# OVERLAPS #-} ANSIPretty Program where
   ansiPretty [d] = ansiPretty d
@@ -60,10 +47,6 @@ prettyExpr (EClosure as t e) =
   ppRet (Just t') = ":" <+> prettyTy t'
 prettyExpr (EBlock es) =
   line' <> indent 2 (vsep (map prettyExpr es))
-prettyExpr ERowEmpty = "..."
-prettyExpr r@(ERowExtension {}) = ppRecord True r
-prettyExpr (ERowSelect e l) = prettyExpr e <> "." <> pretty l
-prettyExpr (ERowRestrict e l) = prettyExpr e <+> anCol Blue "except" <+> pretty l
 prettyExpr (ELocated e _) = prettyExpr e
 prettyExpr (ESwitch e ps) =
   anCol Blue "switch"

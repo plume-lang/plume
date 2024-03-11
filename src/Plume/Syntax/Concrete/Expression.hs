@@ -53,10 +53,7 @@ data ConcreteExpression t
       (Maybe t)
       (ConcreteExpression t)
   | EBlock [ConcreteExpression t]
-  | ERowEmpty
-  | ERowExtension Text (ConcreteExpression t) (ConcreteExpression t)
-  | ERowSelect (ConcreteExpression t) Text
-  | ERowRestrict (ConcreteExpression t) Text
+  | EProperty Text (ConcreteExpression t)
   | ERequire Text
   | ELocated (ConcreteExpression t) Position
   | EMacro Text (ConcreteExpression t)

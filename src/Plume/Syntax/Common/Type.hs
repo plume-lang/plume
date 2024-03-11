@@ -14,9 +14,6 @@ data PlumeType
   = TId Text
   | TVar Text
   | TApp PlumeType [PlumeType]
-  | TRecord PlumeType
-  | TRowEmpty
-  | TRowExtend Text PlumeType PlumeType
 
 pattern TFunction, (:->:) :: [PlumeType] -> PlumeType -> PlumeType
 pattern TFunction args ret = TApp (TApp (TId "->") [ret]) args

@@ -80,10 +80,6 @@ prettyExpr _ (EClosure as t e) =
   ppRet (Just t') = ":" <+> prettyTy t'
 prettyExpr _ (EBlock es) =
   line <> indent 4 (vsep (map (prettyExpr 0) es))
-prettyExpr _ ERowEmpty = "..."
-prettyExpr _ r@(ERowExtension {}) = ppRecord True r
-prettyExpr _ (ERowSelect e l) = prettyExpr 0 e <> "." <> pretty l
-prettyExpr _ (ERowRestrict e l) = prettyExpr 0 e <+> anCol Blue "except" <+> pretty l
 prettyExpr _ (ERequire l) = anCol Blue "require" <+> anCol Green (dquotes $ pretty l)
 prettyExpr _ (ELocated e _) = prettyExpr 0 e
 prettyExpr _ (EMacro n e) = anCol Yellow "@" <> anCol Yellow (pretty n) <+> "=" <+> prettyExpr 0 e
@@ -105,3 +101,4 @@ prettyExpr _ (ESwitch e ps) =
     <> indent 2 (vsep (map prettyCase ps))
  where
   prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "->" <+> prettyExpr 0 e'
+prettyExpr _ (EProperty n e) = parens $ prettyExpr 0 e <> "." <> anItalic (pretty n)

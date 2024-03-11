@@ -174,48 +174,6 @@ eMacroApplication = eLocated $ do
   args <- parens (eExpression `sepBy` comma)
   return (EMacroApplication name args)
 
-data Row
-  = Field Text Expression
-  | Extension Expression
-
-orderRows :: [Row] -> ([(Text, Expression)], Maybe Expression)
-orderRows = foldr f ([], Nothing)
- where
-  f (Field name expr) (acc, rest) = ((name, expr) : acc, rest)
-  f (Extension expr) (acc, _) = (acc, Just expr)
-
--- { l1: e1, l2: 2, ..., ln: en | r } where l1, l2, ..., ln are record labels
--- and e1, e2, ..., en are record values. Record is a data structure that
--- stores key-value pairs. It is similar to a map in other languages but values
--- are heterogeneous. Labels are just identifiers (as variables).
-eRecord :: Parser Expression
-eRecord = eLocated $ do
-  _ <- symbol "{"
-  ilevel <- ask
-
-  fields <- field `indentSepBy` comma <|> field `sepBy` comma
-
-  _ <- indentSameOrInline ilevel $ symbol "}"
-
-  return $ case orderRows fields of
-    ([], _) -> ERowEmpty
-    (f, r) ->
-      foldr
-        (\(name, expr) acc -> ERowExtension name expr acc)
-        (fromMaybe ERowEmpty r)
-        f
- where
-  field = do
-    ( do
-        name <- identifier
-        _ <- symbol ":"
-        Field name <$> eExpression
-      )
-      <|> ( do
-              _ <- symbol "..."
-              Extension <$> eExpression
-          )
-
 -- Main expression parsing function
 eExpression :: Parser Expression
 eExpression = makeExprParser eTerm ([postfixOperators] : operators)
@@ -226,7 +184,6 @@ eExpression = makeExprParser eTerm ([postfixOperators] : operators)
       , try eMacroApplication
       , eMacroVariable
       , eSwitch
-      , eRecord
       , -- Try may be used here because function definitions starts with the
         -- same syntax as variable declaration
         eFunctionDefinition
@@ -271,18 +228,9 @@ eExpression = makeExprParser eTerm ([postfixOperators] : operators)
                 return $ EClosure [] Nothing body
 
               return \e -> EApplication e (arguments ++ maybeToList lambdaArg)
-          , -- Record restriction e \ x where e may be a record and x a label
-            -- to "remove" from the record
-            do
-              _ <- reserved "except"
-              name <- identifier
-              return $ \e -> ERowRestrict e name
           , -- Record selection e.x where e may be a record and x a label to
             -- select from the record
-            do
-              _ <- symbol "."
-              name <- identifier
-              return $ \e -> ERowSelect e name
+            EProperty <$> (char '.' *> nonLexedIdentifier <* scn)
           ]
 
 tRequire :: Parser Expression

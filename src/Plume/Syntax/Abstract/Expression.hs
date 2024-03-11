@@ -29,10 +29,6 @@ data AbstractExpression t
       (Maybe t)
       (AbstractExpression t)
   | EBlock [AbstractExpression t]
-  | ERowEmpty
-  | ERowExtension Text (AbstractExpression t) (AbstractExpression t)
-  | ERowSelect (AbstractExpression t) Text
-  | ERowRestrict (AbstractExpression t) Text
   | ELocated (AbstractExpression t) Position
   | ESwitch (AbstractExpression t) [(Pattern, AbstractExpression t)]
   deriving (Eq)

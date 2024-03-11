@@ -167,6 +167,20 @@ identifier = do
   guard (r `notElem` reservedWords) <?> "variable name"
   return r
 
+nonLexedIdentifier :: Parser Text
+nonLexedIdentifier = do
+  r <-
+    pack
+      <$> ( (:)
+              <$> (letterChar <|> oneOf ("_" :: String))
+              <*> many (alphaNumChar <|> oneOf ("_" :: String))
+          )
+
+  -- Guarding parsed result and failing when reserved word is parsed
+  -- (such as reserved keyword)
+  guard (r `notElem` reservedWords) <?> "variable name"
+  return r
+
 -- How many times a parser can be applied. It returns the number of
 -- times the parser was applied.
 howMany :: Parser a -> Parser Int
