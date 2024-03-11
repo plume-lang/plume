@@ -30,6 +30,8 @@ instance ANSIPretty PrefixOperator where ansiPretty = prettyPrefix
 
 instance ANSIPretty ConcreteType where ansiPretty = prettyTy
 
+instance ANSIPretty ConcretePattern where ansiPretty = prettyPat
+
 prettyBin :: BinaryOperator -> Doc AnsiStyle
 prettyBin Plus = "+"
 prettyBin Minus = "-"
@@ -110,6 +112,19 @@ prettyExpr _ (EMacroApplication n es) =
   anCol Yellow "@"
     <> anCol Yellow (pretty n)
     <> parens (hsep . punctuate comma $ map (prettyExpr 0) es)
+prettyExpr _ (ESwitch e ps) =
+  anCol Blue "switch"
+    <+> prettyExpr 0 e
+    <+> line
+    <> indent 2 (vsep (map prettyCase ps))
+ where
+  prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "->" <+> prettyExpr 0 e'
+
+prettyPat :: ConcretePattern -> Doc AnsiStyle
+prettyPat (PVariable v) = anItalic $ pretty v
+prettyPat (PLiteral l) = prettyLit l
+prettyPat (PConstructor n ps) = anCol Magenta (pretty n) <+> hsep (map prettyPat ps)
+prettyPat PWildcard = "?"
 
 prettyLit :: Literal -> Doc AnsiStyle
 prettyLit (LInt i) = anCol Yellow $ pretty i

@@ -10,6 +10,7 @@ module Plume.Syntax.Concrete.Expression where
 import Data.Text hiding (map)
 import Plume.Syntax.Concrete.Annotation
 import Plume.Syntax.Concrete.Literal
+import Plume.Syntax.Concrete.Pattern
 import Text.Megaparsec.Pos
 import Prelude hiding (intercalate)
 
@@ -62,6 +63,9 @@ data ConcreteExpression t
   | EMacroFunction Text [Text] (ConcreteExpression t)
   | EMacroVariable Text
   | EMacroApplication Text [ConcreteExpression t]
+  | ESwitch
+      (ConcreteExpression t)
+      [(ConcretePattern, ConcreteExpression t)]
 
 pattern (:>:) :: ConcreteExpression t -> Position -> ConcreteExpression t
 pattern e :>: p = ELocated e p
