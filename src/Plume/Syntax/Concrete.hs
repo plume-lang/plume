@@ -7,6 +7,7 @@ module Plume.Syntax.Concrete (module CST, Expression, Program) where
 import Plume.Syntax.Concrete.Annotation as CST
 import Plume.Syntax.Concrete.Expression as CST
 import Plume.Syntax.Concrete.Literal as CST
+import Plume.Syntax.Concrete.Pattern as CST
 import Plume.Syntax.Concrete.Type as CST
 
 type Expression = ConcreteExpression ConcreteType

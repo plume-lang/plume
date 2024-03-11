@@ -104,6 +104,8 @@ reservedWords =
   , "false"
   , "except"
   , "require"
+  , "switch"
+  , "case"
   ]
 
 -- Tab width for the indent sensitive parser
@@ -250,4 +252,5 @@ nonIndented p = do
   ilevel <- consumeIndents
   if ilevel == 0
     then local (const 0) p
-    else fail $ "Indentation level mismatch, expected 0 but received " ++ show ilevel
+    else
+      fail $ "Indentation level mismatch, expected 0 but received " ++ show ilevel

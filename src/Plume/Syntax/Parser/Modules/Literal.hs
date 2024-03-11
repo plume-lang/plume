@@ -62,6 +62,9 @@ float = lexeme L.float
 
 -- Actual literal parsing functions
 
+parseString :: Parser Literal
+parseString = LString <$> stringLiteral
+
 parseChar :: Parser Literal
 parseChar = LChar <$> charLiteral
 

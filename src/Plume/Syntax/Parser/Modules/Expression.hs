@@ -8,6 +8,7 @@ import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer
 import Plume.Syntax.Parser.Modules.Literal
 import Plume.Syntax.Parser.Modules.Operator
+import Plume.Syntax.Parser.Modules.Pattern
 import Plume.Syntax.Parser.Modules.Type
 import Text.Megaparsec hiding (many)
 import Text.Megaparsec.Char
@@ -134,6 +135,21 @@ eFunctionDefinition = eLocated $ do
   body <- indentOrInline eExpression
   return (EDeclaration (name :@: Nothing) (EClosure arguments ret body) Nothing)
 
+eCasePattern :: Parser (ConcretePattern, Expression)
+eCasePattern = do
+  _ <- reserved "case"
+  pattern' <- parsePattern
+  _ <- symbol "->"
+  body <- indentOrInline eExpression
+  return (pattern', body)
+
+eSwitch :: Parser Expression
+eSwitch = eLocated $ do
+  _ <- reserved "switch"
+  cond <- eExpression
+  branches <- indent eCasePattern
+  return (ESwitch cond branches)
+
 eMacro :: Parser Expression
 eMacro = eLocated $ do
   name <- try $ char '@' *> identifier <* symbol "="
@@ -208,6 +224,7 @@ eExpression = makeExprParser eTerm ([postfixOperators] : operators)
       [ parseLiteral eExpression
       , try eMacroApplication
       , eMacroVariable
+      , eSwitch
       , eRecord
       , -- Try may be used here because function definitions starts with the
         -- same syntax as variable declaration
