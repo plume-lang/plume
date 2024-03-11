@@ -4,7 +4,6 @@ module Plume.Syntax.Parser.Modules.Expression where
 
 import Control.Monad.Combinators.Expr
 import Control.Monad.Parser
-import Data.Text qualified as T
 import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer
 import Plume.Syntax.Parser.Modules.Literal
@@ -41,16 +40,13 @@ indentOrInline p = do
 
 -- Actual parsing functions
 
-eLiteral :: Parser Expression
-eLiteral = ELiteral <$> parseLiteral <?> "literal"
-
 -- { e1; e2; ...; en } where e1, e2, ..., en are expressions
 eBlock :: Parser Expression -> Parser Expression
 eBlock p = eLocated $ do
   bl <- indent p
 
   case bl of
-    [] -> fail "Empty block"
+    [] -> fail "Block should contain at least one expression"
     [x] -> return x
     _ -> return (EBlock bl)
 
@@ -63,7 +59,10 @@ eParenthized = parens eExpression
 -- So variables cannot have spaces, quotes, double quotes, some open-close
 -- symbols (like brackets, braces, angles, parenthesis) and unicode characters
 eVariable :: Parser Expression
-eVariable = eLocated $ EVariable <$> identifier
+eVariable = eLocated $ EVariable <$> identifier <* notFollowedBy (oneOf forbiddenChars)
+
+forbiddenChars :: [Char]
+forbiddenChars = [':']
 
 -- x: t = e1 in e2 where x is variable name (resp. identifier), t is optional
 -- variable type, e1 is variable's actual value and e2 is the optional return
@@ -75,6 +74,7 @@ eDeclaration = eLocated $ do
       Annotation
         <$> identifier
         <*> optional (symbol ":" *> tType)
+        <* (notFollowedBy "==" <?> "variable declaration")
         <* symbol "="
   ilevel <- ask
   expr <- indentOrInline eExpression
@@ -125,23 +125,27 @@ eClosure = eLocated $ do
 -- declaration and closure expression
 eFunctionDefinition :: Parser Expression
 eFunctionDefinition = eLocated $ do
-  name <- identifier
-  arguments <- parens (annotated `sepBy` comma)
-  ret <- optional (symbol ":" *> tType)
-  _ <- symbol "->"
+  (name, arguments, ret) <- try $ do
+    name <- identifier
+    arguments <- parens (annotated `sepBy` comma)
+    ret <- optional (symbol ":" *> tType)
+    _ <- symbol "->"
+    return (name, arguments, ret)
   body <- indentOrInline eExpression
   return (EDeclaration (name :@: Nothing) (EClosure arguments ret body) Nothing)
 
 eMacro :: Parser Expression
 eMacro = eLocated $ do
-  name <- char '@' *> identifier <* symbol "="
+  name <- try $ char '@' *> identifier <* symbol "="
   EMacro name <$> indentOrInline eExpression
 
 eMacroFunction :: Parser Expression
 eMacroFunction = eLocated $ do
-  name <- char '@' *> identifier
-  args <- parens (identifier `sepBy` comma)
-  _ <- symbol "->"
+  (name, args) <- try $ do
+    name <- char '@' *> identifier
+    args <- parens (identifier `sepBy` comma)
+    _ <- symbol "->"
+    return (name, args)
   EMacroFunction name args <$> indentOrInline eExpression
 
 eMacroVariable :: Parser Expression
@@ -201,19 +205,19 @@ eExpression = makeExprParser eTerm ([postfixOperators] : operators)
  where
   eTerm =
     choice
-      [ eLiteral
+      [ parseLiteral eExpression
       , try eMacroApplication
-      , try eMacroVariable
+      , eMacroVariable
       , eRecord
       , -- Try may be used here because function definitions starts with the
         -- same syntax as variable declaration
-        try eFunctionDefinition
+        eFunctionDefinition
       , eClosure
       , eConditionBranch
       , -- Try may be used here because declaration starts with the same
         -- syntax as equality operator (for instance in parsing x == 5, this
         -- may be conflicting with x = ..., where ... would be "= 5")
-        try eDeclaration
+        eDeclaration
       , eVariable
       , eParenthized
       ]
@@ -266,16 +270,15 @@ eExpression = makeExprParser eTerm ([postfixOperators] : operators)
 tRequire :: Parser Expression
 tRequire = eLocated $ do
   _ <- reserved "require"
-  txt <- T.pack <$> stringLiteral
-  return (ERequire txt)
+  ERequire <$> stringLiteral
 
 parseToplevel :: Parser Expression
 parseToplevel =
   nonIndented $
     choice
       [ tRequire
-      , try eMacroFunction
-      , try eMacro
+      , eMacroFunction
+      , eMacro
       , eExpression
       ]
 

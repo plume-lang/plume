@@ -159,6 +159,7 @@ identifier = do
             <$> (letterChar <|> oneOf ("_" :: String))
             <*> many (alphaNumChar <|> oneOf ("_" :: String))
         )
+
   -- Guarding parsed result and failing when reserved word is parsed
   -- (such as reserved keyword)
   guard (r `notElem` reservedWords) <?> "variable name"
@@ -226,6 +227,20 @@ indentSame ilevel p = try $ do
           ++ " but received "
           ++ show level
 
+sameLine :: Parser a -> Parser a
+sameLine p = try $ do
+  lineNumber <- sourceLine <$> getSourcePos
+  x <- p
+  lineNumberEnd <- sourceLine <$> getSourcePos
+  if lineNumber == lineNumberEnd
+    then return x
+    else
+      fail $
+        "Expected to be on the same line as line "
+          ++ show lineNumber
+          ++ " but received line "
+          ++ show lineNumberEnd
+
 -- Indent parser that takes a parser and applies it only and only if there is
 -- no indentation.
 -- This indent sensitive parsing function is quite special as it does not
@@ -235,5 +250,4 @@ nonIndented p = do
   ilevel <- consumeIndents
   if ilevel == 0
     then local (const 0) p
-    else
-      fail $ "Indentation level mismatch, expected 0 but received " ++ show ilevel
+    else fail $ "Indentation level mismatch, expected 0 but received " ++ show ilevel
