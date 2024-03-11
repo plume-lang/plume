@@ -1,12 +1,12 @@
 module Plume.Syntax.Parser.Modules.Pattern (parsePattern) where
 
 import Control.Monad.Parser
-import Plume.Syntax.Concrete
+import Plume.Syntax.Common.Pattern
 import Plume.Syntax.Parser.Lexer
 import Plume.Syntax.Parser.Modules.Literal hiding (parseLiteral)
 import Text.Megaparsec
 
-parsePattern :: Parser ConcretePattern
+parsePattern :: Parser Pattern
 parsePattern =
   choice
     [ parseWildcard
@@ -15,10 +15,10 @@ parsePattern =
     , parseLiteral
     ]
 
-parseVariable :: Parser ConcretePattern
+parseVariable :: Parser Pattern
 parseVariable = PVariable <$> identifier
 
-parseLiteral :: Parser ConcretePattern
+parseLiteral :: Parser Pattern
 parseLiteral =
   PLiteral
     <$> choice
@@ -29,11 +29,11 @@ parseLiteral =
       , parseInteger
       ]
 
-parseConstructor :: Parser ConcretePattern
+parseConstructor :: Parser Pattern
 parseConstructor = do
   name <- identifier
   args <- parens (parsePattern `sepBy` comma)
   return $ PConstructor name args
 
-parseWildcard :: Parser ConcretePattern
+parseWildcard :: Parser Pattern
 parseWildcard = PWildcard <$ symbol "?"

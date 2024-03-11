@@ -1,7 +1,8 @@
 module Plume.Syntax.Abstract.Internal.Pretty where
 
 import Plume.Syntax.Abstract
-import Plume.Syntax.Concrete.Internal.Pretty hiding (prettyExpr)
+import Plume.Syntax.Common
+import Plume.Syntax.Common.Internal.Pretty
 import Plume.Syntax.Concrete.Internal.Row
 import Plume.Syntax.Internal.Pretty.ANSI
 import Prettyprinter.Render.Terminal

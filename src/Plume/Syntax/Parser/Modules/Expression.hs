@@ -4,6 +4,7 @@ module Plume.Syntax.Parser.Modules.Expression where
 
 import Control.Monad.Combinators.Expr
 import Control.Monad.Parser
+import Plume.Syntax.Common
 import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer
 import Plume.Syntax.Parser.Modules.Literal
@@ -26,7 +27,7 @@ eLocated p = do
 
 -- Used to parse variable annotations such as (x: t)
 -- where x is an identifier and t is a concrete type
-annotated :: Parser (Annotation (Maybe ConcreteType))
+annotated :: Parser (Annotation (Maybe PlumeType))
 annotated = Annotation <$> identifier <*> ty
  where
   ty = optional (symbol ":" *> tType)
@@ -135,7 +136,7 @@ eFunctionDefinition = eLocated $ do
   body <- indentOrInline eExpression
   return (EDeclaration (name :@: Nothing) (EClosure arguments ret body) Nothing)
 
-eCasePattern :: Parser (ConcretePattern, Expression)
+eCasePattern :: Parser (Pattern, Expression)
 eCasePattern = do
   _ <- reserved "case"
   pattern' <- parsePattern

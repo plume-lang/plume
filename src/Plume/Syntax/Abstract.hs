@@ -5,9 +5,8 @@ module Plume.Syntax.Abstract (module AST, Expression, Program) where
 -- to be later imported by the parser and the type checker.
 
 import Plume.Syntax.Abstract.Expression as AST
-import Plume.Syntax.Concrete.Annotation as AST
-import Plume.Syntax.Concrete.Type as AST
+import Plume.Syntax.Common.Type
 
-type Expression = AbstractExpression ConcreteType
+type Expression = AbstractExpression PlumeType
 
 type Program = [Expression]

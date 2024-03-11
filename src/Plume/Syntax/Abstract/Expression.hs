@@ -8,10 +8,8 @@ module Plume.Syntax.Abstract.Expression where
 -- in order to make it easier to manipulate and transform.
 
 import Data.Text hiding (map)
-import Plume.Syntax.Concrete.Annotation
+import Plume.Syntax.Common
 import Plume.Syntax.Concrete.Expression (Position)
-import Plume.Syntax.Concrete.Literal
-import Plume.Syntax.Concrete.Pattern
 import Prelude hiding (intercalate)
 
 data AbstractExpression t
@@ -36,7 +34,7 @@ data AbstractExpression t
   | ERowSelect (AbstractExpression t) Text
   | ERowRestrict (AbstractExpression t) Text
   | ELocated (AbstractExpression t) Position
-  | ESwitch (AbstractExpression t) [(ConcretePattern, AbstractExpression t)]
+  | ESwitch (AbstractExpression t) [(Pattern, AbstractExpression t)]
   deriving (Eq)
 
 pattern (:>:) :: AbstractExpression t -> Position -> AbstractExpression t

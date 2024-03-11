@@ -3,7 +3,7 @@ module Plume.Syntax.Translation.Substitution where
 import Data.Foldable
 import Data.Set qualified as S
 import Plume.Syntax.Abstract qualified as AST
-import Plume.Syntax.Concrete.Pattern qualified as AST
+import Plume.Syntax.Common qualified as AST
 
 class Free a where
   ftv :: a -> Set Text
@@ -11,7 +11,7 @@ class Free a where
 instance Free (AST.Annotation a) where
   ftv (AST.Annotation t _) = S.singleton t
 
-instance Free AST.ConcretePattern where
+instance Free AST.Pattern where
   ftv (AST.PVariable t) = S.singleton t
   ftv AST.PWildcard = S.empty
   ftv (AST.PLiteral _) = S.empty

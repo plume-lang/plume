@@ -2,6 +2,7 @@ module Plume.Syntax.Parser.Modules.Literal where
 
 import Control.Monad.Parser
 import Data.Text qualified as T
+import Plume.Syntax.Common.Literal
 import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer
 import Text.Megaparsec hiding (many, some)
