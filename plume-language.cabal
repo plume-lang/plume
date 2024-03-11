@@ -16,6 +16,7 @@ library
         Plume.Syntax.Concrete
         Plume.Syntax.Concrete.Literal
         Plume.Syntax.Concrete.Type
+        Plume.Syntax.Concrete.Pattern
         Plume.Syntax.Concrete.Expression
         Plume.Syntax.Concrete.Annotation
         Plume.Syntax.Concrete.Internal.Show
@@ -28,6 +29,7 @@ library
         Plume.Syntax.Parser.Modules.Operator
         Plume.Syntax.Parser.Modules.Expression
         Plume.Syntax.Parser.Modules.Type
+        Plume.Syntax.Parser.Modules.Pattern
 
         Plume.Syntax.Abstract
         Plume.Syntax.Abstract.Expression
