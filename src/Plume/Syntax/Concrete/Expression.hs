@@ -8,9 +8,9 @@ module Plume.Syntax.Concrete.Expression where
 -- variable to a complex function application.
 
 import Data.Text hiding (map)
-import Plume.Syntax.Concrete.Annotation
-import Plume.Syntax.Concrete.Literal
-import Plume.Syntax.Concrete.Pattern
+import Plume.Syntax.Common.Annotation
+import Plume.Syntax.Common.Literal
+import Plume.Syntax.Common.Pattern
 import Text.Megaparsec.Pos
 import Prelude hiding (intercalate)
 
@@ -65,7 +65,7 @@ data ConcreteExpression t
   | EMacroApplication Text [ConcreteExpression t]
   | ESwitch
       (ConcreteExpression t)
-      [(ConcretePattern, ConcreteExpression t)]
+      [(Pattern, ConcreteExpression t)]
 
 pattern (:>:) :: ConcreteExpression t -> Position -> ConcreteExpression t
 pattern e :>: p = ELocated e p

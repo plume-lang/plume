@@ -1,4 +1,4 @@
-module Plume.Syntax.Concrete.Literal where
+module Plume.Syntax.Common.Literal where
 
 -- Literals are the most basic form of expressions.
 -- They are the most primary form of data in the langage, letting the user

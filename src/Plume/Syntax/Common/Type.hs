@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 
-module Plume.Syntax.Concrete.Type where
+module Plume.Syntax.Common.Type where
 
 import Data.Text hiding (map)
 import Prelude hiding (intercalate, unwords)
@@ -10,28 +10,28 @@ import Prelude hiding (intercalate, unwords)
 -- This module defines concrete types and type variables which
 -- will be mainly used by the type checker to infer the types of expressions.
 
-data ConcreteType
+data PlumeType
   = TId Text
   | TVar Text
-  | TApp ConcreteType [ConcreteType]
-  | TRecord ConcreteType
+  | TApp PlumeType [PlumeType]
+  | TRecord PlumeType
   | TRowEmpty
-  | TRowExtend Text ConcreteType ConcreteType
+  | TRowExtend Text PlumeType PlumeType
 
-pattern TFunction, (:->:) :: [ConcreteType] -> ConcreteType -> ConcreteType
+pattern TFunction, (:->:) :: [PlumeType] -> PlumeType -> PlumeType
 pattern TFunction args ret = TApp (TApp (TId "->") [ret]) args
 pattern xs :->: ret = TFunction xs ret
 
-pattern TTuple :: [ConcreteType] -> ConcreteType
+pattern TTuple :: [PlumeType] -> PlumeType
 pattern TTuple ts = TApp (TId ",") ts
 
-pattern TList :: ConcreteType -> ConcreteType
+pattern TList :: PlumeType -> PlumeType
 pattern TList t = TApp (TId "[]") [t]
 
-pattern TCon :: Text -> [ConcreteType] -> ConcreteType
+pattern TCon :: Text -> [PlumeType] -> PlumeType
 pattern TCon s ts = TApp (TId s) ts
 
-pattern TInt, TBool, TString, TChar, TFloat, TUnit :: ConcreteType
+pattern TInt, TBool, TString, TChar, TFloat, TUnit :: PlumeType
 pattern TInt = TId "int"
 pattern TBool = TId "bool"
 pattern TString = TId "str"

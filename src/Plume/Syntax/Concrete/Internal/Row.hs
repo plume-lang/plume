@@ -1,5 +1,6 @@
 module Plume.Syntax.Concrete.Internal.Row where
 
+import Plume.Syntax.Common
 import Plume.Syntax.Concrete
 
 -- IsRow is a typeclass utility used to check if a polymorphic type "a"
@@ -17,7 +18,7 @@ class IsRow a where
   -- contain a label, a value and an optional rest of the row.
   extractExtend :: a -> ([Annotation a], a)
 
-instance IsRow ConcreteType where
+instance IsRow PlumeType where
   isRowEmpty TRowEmpty = True
   isRowEmpty _ = False
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 
-module Plume.Syntax.Concrete.Annotation where
+module Plume.Syntax.Common.Annotation where
 
 -- Annotations are used to store additional information about variables.
 -- It's a simple key-value pair, where the key is a string and the value is a generic type.
