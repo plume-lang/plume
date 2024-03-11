@@ -64,3 +64,10 @@ prettyExpr r@(ERowExtension {}) = ppRecord True r
 prettyExpr (ERowSelect e l) = prettyExpr e <> "." <> pretty l
 prettyExpr (ERowRestrict e l) = prettyExpr e <+> anCol Blue "except" <+> pretty l
 prettyExpr (ELocated e _) = prettyExpr e
+prettyExpr (ESwitch e ps) =
+  anCol Blue "switch"
+    <+> prettyExpr e
+    <+> line
+    <> indent 2 (vsep (map prettyCase ps))
+ where
+  prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "->" <+> prettyExpr e'

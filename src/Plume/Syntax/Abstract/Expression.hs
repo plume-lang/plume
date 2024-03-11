@@ -11,6 +11,7 @@ import Data.Text hiding (map)
 import Plume.Syntax.Concrete.Annotation
 import Plume.Syntax.Concrete.Expression (Position)
 import Plume.Syntax.Concrete.Literal
+import Plume.Syntax.Concrete.Pattern
 import Prelude hiding (intercalate)
 
 data AbstractExpression t
@@ -35,6 +36,7 @@ data AbstractExpression t
   | ERowSelect (AbstractExpression t) Text
   | ERowRestrict (AbstractExpression t) Text
   | ELocated (AbstractExpression t) Position
+  | ESwitch (AbstractExpression t) [(ConcretePattern, AbstractExpression t)]
   deriving (Eq)
 
 pattern (:>:) :: AbstractExpression t -> Position -> AbstractExpression t

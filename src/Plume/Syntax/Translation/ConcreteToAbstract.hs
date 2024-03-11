@@ -99,6 +99,15 @@ concreteToAbstract m@(CST.EMacroVariable _) =
   convertMacro concreteToAbstract m
 concreteToAbstract m@(CST.EMacroApplication {}) =
   convertMacro concreteToAbstract m
+concreteToAbstract (CST.ESwitch e ps) = do
+  -- Same method as described for condition branches
+  e' <- shouldBeAlone <$> concreteToAbstract e
+  ps' <-
+    mapM sequence
+      <$> mapM
+        (\(p, body) -> (p,) . fmap interpretSpreadable <$> concreteToAbstract body)
+        ps
+  transRet $ AST.ESwitch <$> e' <*> ps'
 
 runConcreteToAbstract :: [CST.Expression] -> IO (Either Error [AST.Expression])
 runConcreteToAbstract x = do
