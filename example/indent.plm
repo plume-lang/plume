@@ -5,10 +5,3 @@ facto(n): int ->
         n * facto(n - 1)
 
 @bruh = "test"
-
-test = {
-    x: facto(5),
-    ...r
-}
-
-print(test except x)

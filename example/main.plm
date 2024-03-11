@@ -27,10 +27,6 @@ require "example/modules/hello.plm"
 
 @print(@bruh)
 
-5 % x except n
-
-t = x.n except r
-in 2
 
 print(factorial(5)) // rest
 
@@ -40,3 +36,5 @@ print(factorial(5)) // rest
 @print(@bruh)
 
 print(@bruh)
+
+print(x.show())
