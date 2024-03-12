@@ -4,10 +4,14 @@ require "example/indent.plm"
 
 welcome(name: str) -> print("tet" + 5.3, 4)
 
+x: int = 5
+
 switch x
   case 5 -> 
     print("test") 
+
     print("test2")
+    return 5
   case 6 -> print("test2")
   case ? -> print("test3")
 
@@ -17,11 +21,10 @@ add = (y: int) ->
 welcome("Thomas")
 
 factorial(n: int) ->
-  if n == 0 then
-    1
-    test
-  else
-    n * factorial(n - 1) + true
+  if n == 0 then 
+    return 0
+  
+  return n * factorial(n - 1)
 
 require "example/modules/hello.plm"
 
