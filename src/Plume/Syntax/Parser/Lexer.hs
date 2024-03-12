@@ -1,6 +1,7 @@
 module Plume.Syntax.Parser.Lexer where
 
 import Control.Monad.Parser
+import Data.Char
 import Data.Text (pack)
 import System.IO.Unsafe
 import Text.Megaparsec hiding (many, some)
@@ -106,7 +107,31 @@ reservedWords =
   , "require"
   , "switch"
   , "case"
+  , "return"
   ]
+
+notSpace :: Parser ()
+notSpace = void $ satisfy (/= ' ')
+
+space' :: Parser ()
+space' = void $ satisfy isSpace
+
+emptyLine :: Parser ()
+emptyLine = do
+  sc <* (notFollowedBy notSpace <|> void eol)
+
+emptyLineWithoutConsumingEOL :: Parser ()
+emptyLineWithoutConsumingEOL = do
+  sc <* (notFollowedBy notSpace <|> void (lookAhead eol))
+
+emptyLineWithEOL :: Parser ()
+emptyLineWithEOL = do
+  sc
+  x <- (Nothing <$ notFollowedBy notSpace) <|> Just <$> optional eol
+  case x of
+    Nothing -> void eol
+    Just (Just _) -> return ()
+    Just Nothing -> fail "Expected a newline"
 
 -- Tab width for the indent sensitive parser
 -- Defaulting to Nothing, meaning that the tab width is not set
@@ -152,11 +177,12 @@ comma = symbol ","
 colon :: Parser Text
 colon = symbol ":"
 
-identifier :: Parser Text
-identifier = do
+identifierHelper :: Bool -> Parser Text
+identifierHelper isLexed = do
+  let lex = if isLexed then lexeme else id
   r <-
     pack
-      <$> lexeme
+      <$> lex
         ( (:)
             <$> (letterChar <|> oneOf ("_" :: String))
             <*> many (alphaNumChar <|> oneOf ("_" :: String))
@@ -164,22 +190,15 @@ identifier = do
 
   -- Guarding parsed result and failing when reserved word is parsed
   -- (such as reserved keyword)
-  guard (r `notElem` reservedWords) <?> "variable name"
-  return r
+  if r `elem` reservedWords
+    then fail $ "The identifier " ++ show r ++ " is a reserved word"
+    else return r
 
-nonLexedIdentifier :: Parser Text
-nonLexedIdentifier = do
-  r <-
-    pack
-      <$> ( (:)
-              <$> (letterChar <|> oneOf ("_" :: String))
-              <*> many (alphaNumChar <|> oneOf ("_" :: String))
-          )
+identifier :: Parser Text
+identifier = identifierHelper True
 
-  -- Guarding parsed result and failing when reserved word is parsed
-  -- (such as reserved keyword)
-  guard (r `notElem` reservedWords) <?> "variable name"
-  return r
+field :: Parser Text
+field = identifierHelper False
 
 -- How many times a parser can be applied. It returns the number of
 -- times the parser was applied.
@@ -196,18 +215,18 @@ howMany1 p = length <$> some p
 indent :: Parser a -> Parser [a]
 indent p = do
   ilevel <- ask
-  level <- eol >> consumeIndents
+  level <- eol >> optional (try emptyLineWithEOL) >> consumeIndents
   if level > ilevel
     then do
       x <- local (const level) p
-      xs <- many $ indentSame level p
+      xs <- many $ indentSame level (p <* optional (try emptyLineWithoutConsumingEOL))
       return (x : xs)
     else return []
 
 indentSepBy :: Parser a -> Parser b -> Parser [a]
 indentSepBy p sep = do
   ilevel <- ask
-  level <- eol >> consumeIndents
+  level <- eol >> optional (try emptyLineWithEOL) >> consumeIndents
   if level > ilevel
     then do
       x <- local (const level) p <* sep
@@ -233,15 +252,19 @@ indentSameOrInline ilevel p = indentSame ilevel p <|> p
 -- It fails if the indentation level is not the same
 indentSame :: Int -> Parser a -> Parser a
 indentSame ilevel p = try $ do
-  level <- eol *> consumeIndents
+  level <- eol *> optional (try emptyLineWithEOL) *> consumeIndents
   if level == ilevel
     then local (const level) p
-    else
-      fail $
-        "Indentation level mismatch, expected "
-          ++ show ilevel
-          ++ " but received "
-          ++ show level
+    else do
+      e <- optional $ indentSame ilevel p
+      case e of
+        Just x -> return x
+        Nothing ->
+          fail $
+            "Indentation level mismatch, expected "
+              ++ show ilevel
+              ++ " but received "
+              ++ show level
 
 sameLine :: Parser a -> Parser a
 sameLine p = try $ do
