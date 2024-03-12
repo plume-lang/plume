@@ -47,7 +47,7 @@ data ConcreteExpression t
   | EConditionBranch
       (ConcreteExpression t)
       (ConcreteExpression t)
-      (ConcreteExpression t)
+      (Maybe (ConcreteExpression t))
   | EClosure
       [Annotation (Maybe t)]
       (Maybe t)
@@ -63,6 +63,7 @@ data ConcreteExpression t
   | ESwitch
       (ConcreteExpression t)
       [(Pattern, ConcreteExpression t)]
+  | EReturn (ConcreteExpression t)
 
 pattern (:>:) :: ConcreteExpression t -> Position -> ConcreteExpression t
 pattern e :>: p = ELocated e p

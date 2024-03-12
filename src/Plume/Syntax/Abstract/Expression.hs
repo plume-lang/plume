@@ -23,7 +23,7 @@ data AbstractExpression t
   | EConditionBranch
       (AbstractExpression t)
       (AbstractExpression t)
-      (AbstractExpression t)
+      (Maybe (AbstractExpression t))
   | EClosure
       [Annotation (Maybe t)]
       (Maybe t)
@@ -31,6 +31,7 @@ data AbstractExpression t
   | EBlock [AbstractExpression t]
   | ELocated (AbstractExpression t) Position
   | ESwitch (AbstractExpression t) [(Pattern, AbstractExpression t)]
+  | EReturn (AbstractExpression t)
   deriving (Eq)
 
 pattern (:>:) :: AbstractExpression t -> Position -> AbstractExpression t

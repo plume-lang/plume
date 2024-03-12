@@ -36,7 +36,7 @@ substitute (name, expr) (AST.EConditionBranch e1 e2 e3) =
   AST.EConditionBranch
     (substitute (name, expr) e1)
     (substitute (name, expr) e2)
-    (substitute (name, expr) e3)
+    (substitute (name, expr) <$> e3)
 substitute (name, expr) (AST.EClosure anns t e)
   | name `S.notMember` ftv anns = AST.EClosure anns t (substitute (name, expr) e)
   | otherwise = AST.EClosure anns t e
@@ -50,6 +50,7 @@ substitute (name, expr) (AST.ESwitch e ps) =
   proceed (p, e')
     | name `S.notMember` ftv p = (p, substitute (name, expr) e')
     | otherwise = (p, e')
+substitute (name, expr) (AST.EReturn e) = AST.EReturn (substitute (name, expr) e)
 
 substituteMany :: [(Text, AST.Expression)] -> AST.Expression -> AST.Expression
 substituteMany xs e = foldl (flip substitute) e xs

@@ -33,8 +33,9 @@ prettyExpr (EConditionBranch e1' e2' e3') =
     <+> prettyExpr e1'
     <+> anCol Blue "then "
     <> prettyExpr e2'
-    <> anCol Blue "\nelse "
-    <> prettyExpr e3'
+    <> case e3' of
+      Nothing -> ""
+      Just e3'' -> anCol Blue "\nelse " <> prettyExpr e3''
 prettyExpr (EClosure as t e) =
   ppArgs as t
     <+> "->"
@@ -55,3 +56,4 @@ prettyExpr (ESwitch e ps) =
     <> indent 2 (vsep (map prettyCase ps))
  where
   prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "->" <+> prettyExpr e'
+prettyExpr (EReturn e) = anCol Blue "return" <+> prettyExpr e

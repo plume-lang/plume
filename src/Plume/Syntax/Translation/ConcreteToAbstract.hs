@@ -50,7 +50,8 @@ concreteToAbstract (CST.EConditionBranch e1 e2 e3) = do
   -- are, and then combine them into a single expression by wrapping them
   -- into a block.
   e2' <- fmap interpretSpreadable <$> concreteToAbstract e2
-  e3' <- fmap interpretSpreadable <$> concreteToAbstract e3
+  e3' <-
+    fmap (fmap interpretSpreadable) . sequence <$> maybeM concreteToAbstract e3
   transRet $ AST.EConditionBranch <$> e1' <*> e2' <*> e3'
 concreteToAbstract (CST.EClosure anns t e) = do
   -- Same method as described for condition branches
@@ -102,6 +103,12 @@ concreteToAbstract (CST.EProperty {}) = do
   throwError $ case pos of
     Just p -> CompilerError $ "Unexpected property at " <> show p
     Nothing -> CompilerError "Unexpected property"
+concreteToAbstract (CST.EReturn e) = do
+  -- Return can be a spread element, so we need to check if it is and
+  -- then combine the expressions into a single expression by wrapping
+  -- them into a block.
+  e' <- fmap interpretSpreadable <$> concreteToAbstract e
+  transRet $ AST.EReturn <$> e'
 
 runConcreteToAbstract :: [CST.Expression] -> IO (Either Error [AST.Expression])
 runConcreteToAbstract x = do

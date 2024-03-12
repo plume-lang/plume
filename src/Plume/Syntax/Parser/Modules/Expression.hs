@@ -36,9 +36,9 @@ annotated = Annotation <$> identifier <*> ty
 -- This takes care of indentation and newlines
 -- Block either starts with a new line and indentations or
 -- it is a single line expression
-indentOrInline :: Parser Expression -> Parser Expression
-indentOrInline p = do
-  eBlock p <|> eLocated p
+indentOrInline :: Parser Expression
+indentOrInline = do
+  eBlock parseStatement <|> eLocated eExpression
 
 -- Actual parsing functions
 
@@ -79,22 +79,35 @@ eDeclaration = eLocated $ do
         <* (notFollowedBy "==" <?> "variable declaration")
         <* symbol "="
   ilevel <- ask
-  expr <- indentOrInline eExpression
+  expr <- indentOrInline
   body <- optional (indentSameOrInline ilevel $ reserved "in" *> eExpression)
   return (EDeclaration var expr body)
 
+stmtOrExpr :: Bool -> (Parser a -> Parser (Maybe a))
+stmtOrExpr isStatement = if isStatement then optional else (Just <$>)
+
+parser :: Bool -> Parser Expression
+parser True = parseStatement
+parser False = eExpression
+
 -- if e1 then e2 else e3 where e1 is the condition, e2 is the "then" branch and
 -- e2 is the "else" branch
-eConditionBranch :: Parser Expression
-eConditionBranch = eLocated $ do
+eConditionBranch :: Bool -> Parser Expression
+eConditionBranch isStatement = eLocated $ do
   ilevel <- ask
   _ <- reserved "if"
   cond <- eExpression
   _ <- reserved "then"
-  thenBr <- indentOrInline eExpression
-  _ <- indentSameOrInline ilevel $ reserved "else"
-  elseBr <- indentOrInline eExpression
+  thenBr <- indentOrInline
+  elseBr <- stmtOrExpr isStatement $ do
+    _ <- indentSameOrInline ilevel $ reserved "else"
+    indentOrInline
   return (EConditionBranch cond thenBr elseBr)
+
+eReturn :: Parser Expression
+eReturn = eLocated $ do
+  _ <- reserved "return"
+  EReturn <$> eExpression
 
 -- (a: t1, b: t2, ..., z: tn): ret -> e where a, b, ..., z are closure
 -- arguments, t1, t2, ..., tn are closure optional arguments types, ret is the
@@ -110,8 +123,7 @@ eClosure = eLocated $ do
     ret <- optional (symbol ":" *> tType)
     _ <- symbol "->"
     return (args, ret)
-  body <- indentOrInline eExpression
-  return (EClosure args ret body)
+  EClosure args ret <$> indentOrInline
  where
   clArguments =
     choice
@@ -133,7 +145,7 @@ eFunctionDefinition = eLocated $ do
     ret <- optional (symbol ":" *> tType)
     _ <- symbol "->"
     return (name, arguments, ret)
-  body <- indentOrInline eExpression
+  body <- indentOrInline
   return (EDeclaration (name :@: Nothing) (EClosure arguments ret body) Nothing)
 
 eCasePattern :: Parser (Pattern, Expression)
@@ -141,7 +153,7 @@ eCasePattern = do
   _ <- reserved "case"
   pattern' <- parsePattern
   _ <- symbol "->"
-  body <- indentOrInline eExpression
+  body <- indentOrInline
   return (pattern', body)
 
 eSwitch :: Parser Expression
@@ -154,7 +166,7 @@ eSwitch = eLocated $ do
 eMacro :: Parser Expression
 eMacro = eLocated $ do
   name <- try $ char '@' *> identifier <* symbol "="
-  EMacro name <$> indentOrInline eExpression
+  EMacro name <$> indentOrInline
 
 eMacroFunction :: Parser Expression
 eMacroFunction = eLocated $ do
@@ -163,7 +175,7 @@ eMacroFunction = eLocated $ do
     args <- parens (identifier `sepBy` comma)
     _ <- symbol "->"
     return (name, args)
-  EMacroFunction name args <$> indentOrInline eExpression
+  EMacroFunction name args <$> indentOrInline
 
 eMacroVariable :: Parser Expression
 eMacroVariable = eLocated $ EMacroVariable <$> (char '@' *> identifier)
@@ -173,6 +185,16 @@ eMacroApplication = eLocated $ do
   name <- char '@' *> identifier
   args <- parens (eExpression `sepBy` comma)
   return (EMacroApplication name args)
+
+parseStatement :: Parser Expression
+parseStatement =
+  choice
+    [ eReturn
+    , eConditionBranch True
+    , eDeclaration
+    , eFunctionDefinition
+    , eExpression
+    ]
 
 -- Main expression parsing function
 eExpression :: Parser Expression
@@ -184,15 +206,8 @@ eExpression = makeExprParser eTerm ([postfixOperators] : operators)
       , try eMacroApplication
       , eMacroVariable
       , eSwitch
-      , -- Try may be used here because function definitions starts with the
-        -- same syntax as variable declaration
-        eFunctionDefinition
       , eClosure
-      , eConditionBranch
-      , -- Try may be used here because declaration starts with the same
-        -- syntax as equality operator (for instance in parsing x == 5, this
-        -- may be conflicting with x = ..., where ... would be "= 5")
-        eDeclaration
+      , eConditionBranch False
       , eVariable
       , eParenthized
       ]
@@ -224,13 +239,12 @@ eExpression = makeExprParser eTerm ([postfixOperators] : operators)
               -- Optional syntaxic sugar for callback argument
               lambdaArg <- optional $ do
                 _ <- symbol "->"
-                body <- indentOrInline eExpression
-                return $ EClosure [] Nothing body
+                EClosure [] Nothing <$> indentOrInline
 
               return \e -> EApplication e (arguments ++ maybeToList lambdaArg)
           , -- Record selection e.x where e may be a record and x a label to
             -- select from the record
-            EProperty <$> (char '.' *> nonLexedIdentifier <* scn)
+            EProperty <$> (char '.' *> field <* scn)
           ]
 
 tRequire :: Parser Expression
@@ -240,13 +254,12 @@ tRequire = eLocated $ do
 
 parseToplevel :: Parser Expression
 parseToplevel =
-  nonIndented $
-    choice
-      [ tRequire
-      , eMacroFunction
-      , eMacro
-      , eExpression
-      ]
+  choice
+    [ tRequire
+    , eMacroFunction
+    , eMacro
+    , parseStatement
+    ]
 
 parseProgram :: Parser Program
-parseProgram = many (parseToplevel <* optional indentSc)
+parseProgram = many (nonIndented parseToplevel <* optional indentSc)
