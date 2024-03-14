@@ -6,6 +6,7 @@ data PlumeType
   = TId Text
   | TVar Int
   | TApp PlumeType [PlumeType]
+  deriving (Eq)
 
 pattern TFunction, (:->:) :: [PlumeType] -> PlumeType -> PlumeType
 pattern TFunction args ret = TApp (TApp (TId "->") [ret]) args
