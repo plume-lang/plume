@@ -3,14 +3,17 @@
 module Plume.TypeChecker.Monad (
   module Monad,
   MonadChecker,
+  Inference,
   checkerST,
   fresh,
   freshTVar,
   instantiate,
+  generalize,
   local,
 ) where
 
 import Data.Map qualified as Map
+import Data.Set qualified as Set
 import GHC.IO hiding (liftIO)
 import Plume.TypeChecker.Monad.State as Monad
 import Plume.TypeChecker.Monad.Substitution as Monad
@@ -20,6 +23,7 @@ import Plume.TypeChecker.Monad.Type.Scheme as Monad
 import Prelude hiding (local)
 
 type MonadChecker m = MonadIO m
+type Inference m from to = (MonadChecker m) => from -> m (PlumeType, to)
 
 checkerST :: IORef CheckerState
 {-# NOINLINE checkerST #-}
@@ -47,3 +51,8 @@ local f m = do
   a <- m
   writeIORef checkerST old
   return a
+
+generalize :: Environment -> PlumeType -> Scheme
+generalize env t = Forall vars t
+ where
+  vars = Set.toList (free t Set.\\ free env)
