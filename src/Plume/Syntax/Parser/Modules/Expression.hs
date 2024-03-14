@@ -133,6 +133,33 @@ eClosure = eLocated $ do
   clMonoArg = pure <$> (Annotation <$> identifier <*> pure Nothing)
   clPolyArg = parens (annotated `sepBy` comma)
 
+eExtension :: Parser Expression
+eExtension = eLocated $ do
+  _ <- reserved "extends"
+  ty <- parens ((:@:) <$> (identifier <* colon) <*> tType)
+  members <- indent eExtensionMember
+  return (ETypeExtension ty members)
+
+eExtensionMember :: Parser (ExtensionMember PlumeType)
+eExtensionMember =
+  choice
+    [ eExtFunction
+    ]
+
+eExtFunction :: Parser (ExtensionMember PlumeType)
+eExtFunction = do
+  (name, args, ret) <- try $ do
+    name <- identifier
+    args <- parens (annotated `sepBy` comma)
+    ret <- optional (symbol ":" *> tType)
+    _ <- symbol "->"
+    return (name, args, ret)
+  ExtDeclaration
+    Nothing
+    (name :@: Nothing)
+    . EClosure args ret
+    <$> indentOrInline
+
 -- name(a: t1, b: t2, ..., z: tn): ret -> e where name is the function name,
 -- parenthesized elements are function arguments, ret is function return type
 -- and e function body. This is a sugared form that combines both variable
@@ -258,6 +285,7 @@ parseToplevel :: Parser Expression
 parseToplevel =
   choice
     [ tRequire
+    , eExtension
     , eMacroFunction
     , eMacro
     , parseStatement

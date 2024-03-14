@@ -3,6 +3,7 @@
 module Plume.Syntax.Translation.ConcreteToAbstract where
 
 import Plume.Syntax.Abstract qualified as AST
+import Plume.Syntax.Common qualified as Common
 import Plume.Syntax.Concrete qualified as CST
 
 import Control.Monad.Exception
@@ -109,6 +110,17 @@ concreteToAbstract (CST.EReturn e) = do
   -- them into a block.
   e' <- fmap interpretSpreadable <$> concreteToAbstract e
   transRet $ AST.EReturn <$> e'
+concreteToAbstract (CST.ETypeExtension ann ems) = do
+  ems' <-
+    fmap flat . sequence <$> mapM concreteToAbstractExtensionMember ems
+  transRet $ AST.ETypeExtension ann <$> ems'
+
+concreteToAbstractExtensionMember
+  :: CST.ExtensionMember Common.PlumeType
+  -> TranslatorReader Error (AST.ExtensionMember Common.PlumeType)
+concreteToAbstractExtensionMember (CST.ExtDeclaration g ann e) = do
+  e' <- shouldBeAlone <$> concreteToAbstract e
+  return $ Single . AST.ExtDeclaration g ann <$> e'
 
 runConcreteToAbstract :: [CST.Expression] -> IO (Either Error [AST.Expression])
 runConcreteToAbstract x = do

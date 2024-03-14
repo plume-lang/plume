@@ -109,3 +109,19 @@ prettyExpr _ (ESwitch e ps) =
   prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "->" <+> prettyExpr 0 e'
 prettyExpr _ (EProperty n e) = parens $ prettyExpr 0 e <> "." <> anItalic (pretty n)
 prettyExpr _ (EReturn e) = anCol Blue "return" <+> prettyExpr 0 e
+prettyExpr _ (ETypeExtension a es) =
+  anCol Blue "extends"
+    <+> ansiPretty a
+    <+> line
+    <> indent 2 (vsep (map prettyExt es))
+
+prettyExt :: ExtensionMember PlumeType -> Doc AnsiStyle
+prettyExt (ExtDeclaration gs a e1') =
+  gen
+    <> typeAnnotation a
+      <+> "="
+      <+> prettyExpr 0 e1'
+ where
+  gen = case gs of
+    Nothing -> ""
+    Just gs' -> "forall " <> hsep (map pretty gs') <> ". "

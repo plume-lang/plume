@@ -52,6 +52,19 @@ substitute (name, expr) (AST.ESwitch e ps) =
     | name `S.notMember` ftv p = (p, substitute (name, expr) e')
     | otherwise = (p, e')
 substitute (name, expr) (AST.EReturn e) = AST.EReturn (substitute (name, expr) e)
+substitute (name, expr) (AST.ETypeExtension ann ems)
+  | name `S.notMember` ftv ann =
+      AST.ETypeExtension ann (map (substituteExt (name, expr)) ems)
+  | otherwise = AST.ETypeExtension ann ems
+
+substituteExt
+  :: (Text, AST.Expression)
+  -> AST.ExtensionMember AST.PlumeType
+  -> AST.ExtensionMember AST.PlumeType
+substituteExt (name, expr) (AST.ExtDeclaration g ann e)
+  | name `S.notMember` ftv ann =
+      AST.ExtDeclaration g ann (substitute (name, expr) e)
+  | otherwise = AST.ExtDeclaration g ann e
 
 substituteMany :: [(Text, AST.Expression)] -> AST.Expression -> AST.Expression
 substituteMany xs e = foldl (flip substitute) e xs

@@ -65,6 +65,13 @@ data ConcreteExpression t
       (ConcreteExpression t)
       [(Pattern, ConcreteExpression t)]
   | EReturn (ConcreteExpression t)
+  | ETypeExtension (Annotation t) [ExtensionMember t]
+
+data ExtensionMember t
+  = ExtDeclaration
+      (Maybe [Text])
+      (Annotation (Maybe t))
+      (ConcreteExpression t)
 
 pattern (:>:) :: ConcreteExpression t -> Position -> ConcreteExpression t
 pattern e :>: p = ELocated e p

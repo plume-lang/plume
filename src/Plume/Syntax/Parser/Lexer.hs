@@ -108,6 +108,7 @@ reservedWords =
   , "switch"
   , "case"
   , "return"
+  , "extends"
   ]
 
 notSpace :: Parser ()

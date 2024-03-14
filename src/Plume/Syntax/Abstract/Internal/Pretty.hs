@@ -9,6 +9,9 @@ import Prelude hiding (intercalate)
 
 instance ANSIPretty Expression where ansiPretty = prettyExpr
 
+instance ANSIPretty (ExtensionMember PlumeType) where
+  ansiPretty = prettyExtMember
+
 instance {-# OVERLAPS #-} ANSIPretty Program where
   ansiPretty [d] = ansiPretty d
   ansiPretty (d : ds) = ansiPretty d <> line <> line <> ansiPretty ds
@@ -62,3 +65,19 @@ prettyExpr (ESwitch e ps) =
  where
   prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "->" <+> prettyExpr e'
 prettyExpr (EReturn e) = anCol Blue "return" <+> prettyExpr e
+prettyExpr (ETypeExtension ann ems) =
+  anCol Blue "extends"
+    <+> ansiPretty ann
+    <+> line
+    <> indent 2 (vsep (map prettyExtMember ems))
+
+prettyExtMember :: ExtensionMember PlumeType -> Doc AnsiStyle
+prettyExtMember (ExtDeclaration g ann e) =
+  gen
+    <> typeAnnotation ann
+      <+> "="
+      <+> prettyExpr e
+ where
+  gen = case g of
+    Nothing -> ""
+    Just gs -> "forall " <> hsep (punctuate comma (map pretty gs)) <> ". "

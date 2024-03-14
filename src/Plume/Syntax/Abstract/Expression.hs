@@ -33,6 +33,14 @@ data AbstractExpression t
   | ELocated (AbstractExpression t) Position
   | ESwitch (AbstractExpression t) [(Pattern, AbstractExpression t)]
   | EReturn (AbstractExpression t)
+  | ETypeExtension (Annotation t) [ExtensionMember t]
+  deriving (Eq)
+
+data ExtensionMember t
+  = ExtDeclaration
+      (Maybe [Text])
+      (Annotation (Maybe t))
+      (AbstractExpression t)
   deriving (Eq)
 
 pattern (:>:) :: AbstractExpression t -> Position -> AbstractExpression t
