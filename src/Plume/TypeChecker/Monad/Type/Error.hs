@@ -10,6 +10,7 @@ data TypeError
   | UnboundVariable Text
   | UnificationMismatch [PlumeType] [PlumeType]
   | NotAFunction PlumeType
+  | CompilerError Text
 
 instance Throwable PlumeType where
   showError (TVar i) = show i
@@ -43,3 +44,4 @@ instance Throwable TypeError where
       <> showError ts2
   showError (NotAFunction t) =
     "Not a function " <> showError t
+  showError (CompilerError t) = "Compiler error " <> show t
