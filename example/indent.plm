@@ -1,4 +1,4 @@
-facto(n): int ->
+facto(n): int =>
     if n == 0 then
         1
     else
