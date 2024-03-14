@@ -61,6 +61,8 @@ library
         Plume.TypeChecker.Constraints.Unification
         Plume.TypeChecker.Constraints.Solver
 
+        Plume.TypeChecker.Checker
+
         System.IO.Pretty
 
         Control.Monad.IO
