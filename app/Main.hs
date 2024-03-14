@@ -5,7 +5,7 @@ import Data.Text.IO
 import Plume.Syntax.Abstract.Internal.Pretty ()
 import Plume.Syntax.Parser
 import Plume.Syntax.Translation.ConcreteToAbstract
-import System.IO.Pretty
+import Plume.TypeChecker.Checker hiding (with)
 import Prelude hiding (readFile)
 
 main :: IO ()
@@ -15,4 +15,5 @@ main = do
 
   parsePlumeFile file content `with` \cst -> do
     runConcreteToAbstract cst `with` \ast -> do
-      ppPrint ast
+      runSynthesize ast `with` \_ -> do
+        print @Text "done"
