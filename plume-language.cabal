@@ -70,6 +70,8 @@ library
         Control.Monad.Parser
         Control.Monad.Exception
 
+        GHC.Records
+
     hs-source-dirs:     src
     default-language:   GHC2021
     default-extensions: OverloadedStrings
