@@ -11,19 +11,21 @@ module Plume.TypeChecker.Monad (
   instantiate,
   generalize,
   local,
+  gets,
 ) where
 
 import Control.Monad.Except
 import Data.Map qualified as Map
 import Data.Set qualified as Set
+import Plume.Syntax.Concrete (Position)
 import Plume.TypeChecker.Monad.State as Monad
 import Plume.TypeChecker.Monad.Substitution as Monad
 import Plume.TypeChecker.Monad.Type as Monad
 import Plume.TypeChecker.Monad.Type.Error as Monad
 import Plume.TypeChecker.Monad.Type.Scheme as Monad
-import Prelude hiding (local)
+import Prelude hiding (gets, local)
 
-type MonadChecker m = (MonadIO m, MonadError TypeError m)
+type MonadChecker m = (MonadIO m, MonadError (TypeError, Maybe Position) m)
 type Inference m from to = (MonadChecker m) => from -> m (PlumeType, to)
 
 fresh :: (MonadIO m) => m Int
@@ -41,10 +43,10 @@ instantiate (Forall vars t) = do
   let s = Map.fromList $ zip vars vars'
    in return $ apply s t
 
-local :: (MonadChecker m) => (Environment -> Environment) -> m a -> m a
+local :: (MonadChecker m) => (CheckerState -> CheckerState) -> m a -> m a
 local f m = do
   old <- readIORef checkerST
-  writeIORef checkerST (old {variables = f old.variables})
+  writeIORef checkerST (f old)
   a <- m
   writeIORef checkerST old
   return a
@@ -53,3 +55,6 @@ generalize :: Environment -> PlumeType -> Scheme
 generalize env t = Forall vars t
  where
   vars = Set.toList (free t Set.\\ free env)
+
+gets :: (MonadIO m) => (CheckerState -> a) -> m a
+gets f = f <$> readIORef checkerST
