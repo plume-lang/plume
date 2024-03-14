@@ -2,7 +2,9 @@ module Plume.TypeChecker.Monad.Type.Error where
 
 import Control.Monad.Exception
 import Data.Text qualified as T
+import Plume.Syntax.Concrete (Position)
 import Plume.TypeChecker.Monad.Type
+import Text.Megaparsec (SourcePos (..), unPos)
 
 data TypeError
   = UnificationFail PlumeType PlumeType
@@ -47,3 +49,13 @@ instance Throwable TypeError where
     "Not a function " <> showError t
   showError (CompilerError t) = "Compiler error " <> show t
   showError EmptyMatch = "Empty match"
+
+instance (Throwable a) => Throwable (a, Maybe Position) where
+  showError (err, pos) =
+    showError err <> case pos of
+      Just p -> " at " <> showError p
+      Nothing -> ""
+
+instance Throwable Position where
+  showError (SourcePos fp l1 c1, SourcePos {}) =
+    toText fp <> ":" <> show (unPos l1) <> ":" <> show (unPos c1)
