@@ -81,7 +81,7 @@ eDeclaration = eLocated $ do
   ilevel <- ask
   expr <- indentOrInline
   body <- optional (indentSameOrInline ilevel $ reserved "in" *> eExpression)
-  return (EDeclaration var expr body)
+  return (EDeclaration Nothing var expr body)
 
 stmtOrExpr :: Bool -> (Parser a -> Parser (Maybe a))
 stmtOrExpr isStatement = if isStatement then optional else (Just <$>)
@@ -139,14 +139,16 @@ eClosure = eLocated $ do
 -- declaration and closure expression
 eFunctionDefinition :: Parser Expression
 eFunctionDefinition = eLocated $ do
-  (name, arguments, ret) <- try $ do
+  (name, generics, arguments, ret) <- try $ do
     name <- identifier
+    generics <- optional (angles (identifier `sepBy` comma))
     arguments <- parens (annotated `sepBy` comma)
     ret <- optional (symbol ":" *> tType)
     _ <- symbol "->"
-    return (name, arguments, ret)
+    return (name, generics, arguments, ret)
   body <- indentOrInline
-  return (EDeclaration (name :@: Nothing) (EClosure arguments ret body) Nothing)
+  return
+    (EDeclaration generics (name :@: Nothing) (EClosure arguments ret body) Nothing)
 
 eCasePattern :: Parser (Pattern, Expression)
 eCasePattern = do

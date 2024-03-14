@@ -4,7 +4,6 @@ import Control.Monad.Parser
 import Plume.Syntax.Common.Type
 import Plume.Syntax.Parser.Lexer
 import Text.Megaparsec
-import Text.Megaparsec.Char
 
 -- Primitive types parsing function
 -- Primitive types are just types that are not using other types
@@ -47,11 +46,6 @@ tList :: Parser PlumeType
 tList =
   TList <$> brackets tType
 
--- 'a where a is an identifier is used in order to build type variables (the most basic
--- type component used to deal with generic programming)
-tVar :: Parser PlumeType
-tVar = char '\'' *> (TVar <$> identifier)
-
 -- x<t1, t2, ..., tn> where x is an identifier (resp. datatype name) and t1, t2, ... tn
 -- are the datatype arguments. This is used to represent type applications over user-defined
 -- datatypes (such as ADTs, or even GADTs...)
@@ -74,7 +68,6 @@ tType =
     , tPrimitive
     , tList
     , tTuple
-    , tVar
     , -- Try may be used here because type application starts with an identifier
       -- just like type identifier
       try tCon

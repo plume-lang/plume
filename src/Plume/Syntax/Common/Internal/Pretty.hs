@@ -34,7 +34,6 @@ prettyLit (LBool b) = anBold $ anCol Blue (if b then "true" else "false")
 prettyLit (LChar c) = anCol Green . squotes $ pretty c
 
 prettyTy :: PlumeType -> Doc AnsiStyle
-prettyTy (TVar t) = anBold $ pretty t
 prettyTy (TId n) = anCol Magenta $ pretty n
 prettyTy (TFunction ts t) = hsep (map prettyTy ts) <+> "->" <+> prettyTy t
 prettyTy (TApp t ts) = prettyTy t <+> hsep (map prettyTy ts)

@@ -12,7 +12,6 @@ import Prelude hiding (intercalate, unwords)
 
 data PlumeType
   = TId Text
-  | TVar Text
   | TApp PlumeType [PlumeType]
 
 pattern TFunction, (:->:) :: [PlumeType] -> PlumeType -> PlumeType
