@@ -6,4 +6,5 @@ data TypedPattern t
   = PVariable Text t
   | PLiteral Literal
   | PConstructor Text [TypedPattern t]
+  | PWildcard
   deriving (Eq)
