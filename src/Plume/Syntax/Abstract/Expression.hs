@@ -17,6 +17,7 @@ data AbstractExpression t
   | ELiteral Literal
   | EApplication (AbstractExpression t) [AbstractExpression t]
   | EDeclaration
+      (Maybe [Text])
       (Annotation (Maybe t))
       (AbstractExpression t)
       (Maybe (AbstractExpression t))

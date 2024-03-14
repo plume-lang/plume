@@ -27,8 +27,9 @@ substitute (name, expr) (AST.EVariable n)
 substitute _ (AST.ELiteral l) = AST.ELiteral l
 substitute (name, expr) (AST.EApplication e es) =
   AST.EApplication (substitute (name, expr) e) (map (substitute (name, expr)) es)
-substitute (name, expr) (AST.EDeclaration ann e me) =
+substitute (name, expr) (AST.EDeclaration g ann e me) =
   AST.EDeclaration
+    g
     ann
     (substitute (name, expr) e)
     (fmap (substitute (name, expr)) me)
