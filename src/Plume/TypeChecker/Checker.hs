@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Plume.TypeChecker.Checker where
@@ -13,6 +14,7 @@ import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Common.Pattern qualified as Pre
 import Plume.Syntax.Common.Type qualified as Pre
+import Plume.Syntax.Concrete (Position)
 import Plume.TypeChecker.Constraints.Definition
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.Monad.Type qualified as Post
@@ -225,3 +227,12 @@ mapAndUnzip3M f =
         return (b : bs, c : cs, d : ds)
     )
     ([], [], [])
+
+runSynthesize
+  :: (MonadIO m)
+  => [Pre.Expression]
+  -> m (Either (TypeError, Maybe Position) [Expression])
+runSynthesize e = do
+  runExceptT (mapM synthesize e) >>= \case
+    Left err -> return (Left err)
+    Right xs -> return (Right (map snd xs))
