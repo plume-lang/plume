@@ -44,3 +44,6 @@ test<A, B>(x: A): B ->
 print(@bruh)
 
 print(x.show())
+
+extends (x: int)
+  show(): str -> x.to_string()
