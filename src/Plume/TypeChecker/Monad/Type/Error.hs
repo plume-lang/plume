@@ -11,6 +11,7 @@ data TypeError
   | UnificationMismatch [PlumeType] [PlumeType]
   | NotAFunction PlumeType
   | CompilerError Text
+  | EmptyMatch
 
 instance Throwable PlumeType where
   showError (TVar i) = show i
@@ -45,3 +46,4 @@ instance Throwable TypeError where
   showError (NotAFunction t) =
     "Not a function " <> showError t
   showError (CompilerError t) = "Compiler error " <> show t
+  showError EmptyMatch = "Empty match"
