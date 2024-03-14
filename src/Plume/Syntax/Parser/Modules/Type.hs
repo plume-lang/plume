@@ -22,8 +22,7 @@ tPrimitive =
 -- and ret is the function type return type
 tFunction :: Parser PlumeType
 tFunction = do
-  args <- parens (tType `sepBy` comma)
-  _ <- symbol "->"
+  args <- try $ parens (tType `sepBy` comma) <* symbol "->"
   TFunction args <$> tType
 
 -- (t1, t2, ..., tn) where t1, t2, ..., tn are the tuple type elements. There are tuple
@@ -65,9 +64,9 @@ tType =
     [ -- Try may be used here because function type starts with the same
       -- syntax as tuple
       try tFunction
+    , tTuple
     , tPrimitive
     , tList
-    , tTuple
     , -- Try may be used here because type application starts with an identifier
       -- just like type identifier
       try tCon

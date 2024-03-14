@@ -109,6 +109,12 @@ reservedWords =
   , "case"
   , "return"
   , "extends"
+  , -- Primitive types
+    "int"
+  , "str"
+  , "char"
+  , "float"
+  , "bool"
   ]
 
 notSpace :: Parser ()

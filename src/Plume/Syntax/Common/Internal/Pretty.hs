@@ -35,5 +35,6 @@ prettyLit (LChar c) = anCol Green . squotes $ pretty c
 
 prettyTy :: PlumeType -> Doc AnsiStyle
 prettyTy (TId n) = anCol Magenta $ pretty n
-prettyTy (TFunction ts t) = hsep (map prettyTy ts) <+> "->" <+> prettyTy t
+prettyTy (TFunction ts t) = parens (hsep . punctuate comma $ map prettyTy ts) <+> "->" <+> prettyTy t
+prettyTy (TTuple ts) = parens (hsep . punctuate comma $ map prettyTy ts)
 prettyTy (TApp t ts) = prettyTy t <+> hsep (map prettyTy ts)

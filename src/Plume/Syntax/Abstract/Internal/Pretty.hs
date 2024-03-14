@@ -46,7 +46,7 @@ prettyExpr (EConditionBranch e1' e2' e3') =
       Just e3'' -> anCol Blue "\nelse " <> prettyExpr e3''
 prettyExpr (EClosure as t e) =
   ppArgs as t
-    <+> "->"
+    <+> "=>"
     <+> prettyExpr e
  where
   ppArgs [x :@: Nothing] Nothing = pretty x
@@ -63,11 +63,11 @@ prettyExpr (ESwitch e ps) =
     <+> line
     <> indent 2 (vsep (map prettyCase ps))
  where
-  prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "->" <+> prettyExpr e'
+  prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "=>" <+> prettyExpr e'
 prettyExpr (EReturn e) = anCol Blue "return" <+> prettyExpr e
 prettyExpr (ETypeExtension ann ems) =
   anCol Blue "extends"
-    <+> ansiPretty ann
+    <+> parens (ansiPretty ann)
     <+> line
     <> indent 2 (vsep (map prettyExtMember ems))
 

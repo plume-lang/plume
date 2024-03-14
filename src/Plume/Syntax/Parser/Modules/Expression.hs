@@ -121,7 +121,7 @@ eClosure = eLocated $ do
   (args, ret) <- try $ do
     args <- clArguments
     ret <- optional (symbol ":" *> tType)
-    _ <- symbol "->"
+    _ <- symbol "=>"
     return (args, ret)
   EClosure args ret <$> indentOrInline
  where
@@ -152,7 +152,7 @@ eExtFunction = do
     name <- identifier
     args <- parens (annotated `sepBy` comma)
     ret <- optional (symbol ":" *> tType)
-    _ <- symbol "->"
+    _ <- symbol "=>"
     return (name, args, ret)
   ExtDeclaration
     Nothing
@@ -171,7 +171,7 @@ eFunctionDefinition = eLocated $ do
     generics <- optional (angles (identifier `sepBy` comma))
     arguments <- parens (annotated `sepBy` comma)
     ret <- optional (symbol ":" *> tType)
-    _ <- symbol "->"
+    _ <- symbol "=>"
     return (name, generics, arguments, ret)
   body <- indentOrInline
   return
@@ -181,7 +181,7 @@ eCasePattern :: Parser (Pattern, Expression)
 eCasePattern = do
   _ <- reserved "case"
   pattern' <- parsePattern
-  _ <- symbol "->"
+  _ <- symbol "=>"
   body <- indentOrInline
   return (pattern', body)
 
@@ -202,7 +202,7 @@ eMacroFunction = eLocated $ do
   (name, args) <- try $ do
     name <- char '@' *> identifier
     args <- parens (identifier `sepBy` comma)
-    _ <- symbol "->"
+    _ <- symbol "=>"
     return (name, args)
   EMacroFunction name args <$> indentOrInline
 
@@ -267,7 +267,7 @@ eExpression = makeExprParser eTerm ([postfixOperators] : operators)
 
               -- Optional syntaxic sugar for callback argument
               lambdaArg <- optional $ do
-                _ <- symbol "->"
+                _ <- symbol "=>"
                 EClosure [] Nothing <$> indentOrInline
 
               return \e -> EApplication e (arguments ++ maybeToList lambdaArg)

@@ -76,7 +76,7 @@ prettyExpr _ (EConditionBranch e1' e2' e3') =
       Just e3'' -> anCol Blue "\nelse " <> prettyExpr 0 e3''
 prettyExpr _ (EClosure as t e) =
   ppArgs as t
-    <+> "->\n"
+    <+> "=>\n"
     <+> indent 2 (prettyExpr 0 e)
  where
   ppArgs [x :@: Nothing] Nothing = pretty x
@@ -93,7 +93,7 @@ prettyExpr _ (EMacroFunction n args e) =
   anCol Yellow "@"
     <> anCol Yellow (pretty n)
       <+> parens (hsep . punctuate comma $ map pretty args)
-      <+> "->"
+      <+> "=>"
       <+> prettyExpr 0 e
 prettyExpr _ (EMacroVariable n) = anCol Yellow "@" <> anCol Yellow (pretty n)
 prettyExpr _ (EMacroApplication n es) =
@@ -106,12 +106,12 @@ prettyExpr _ (ESwitch e ps) =
     <+> line
     <> indent 2 (vsep (map prettyCase ps))
  where
-  prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "->" <+> prettyExpr 0 e'
+  prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "=>" <+> prettyExpr 0 e'
 prettyExpr _ (EProperty n e) = parens $ prettyExpr 0 e <> "." <> anItalic (pretty n)
 prettyExpr _ (EReturn e) = anCol Blue "return" <+> prettyExpr 0 e
 prettyExpr _ (ETypeExtension a es) =
   anCol Blue "extends"
-    <+> ansiPretty a
+    <+> parens (ansiPretty a)
     <+> line
     <> indent 2 (vsep (map prettyExt es))
 
