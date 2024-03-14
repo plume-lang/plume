@@ -45,6 +45,22 @@ library
         Plume.Syntax.Translation.ConcreteToAbstract.UFCS
         Plume.Syntax.Translation.Substitution
 
+        Plume.TypeChecker.TLIR
+        Plume.TypeChecker.TLIR.Syntax
+        Plume.TypeChecker.TLIR.Synonyms
+        Plume.TypeChecker.TLIR.Modules.Pattern
+
+        Plume.TypeChecker.Monad
+        Plume.TypeChecker.Monad.Type
+        Plume.TypeChecker.Monad.State
+        Plume.TypeChecker.Monad.Substitution
+        Plume.TypeChecker.Monad.Type.Scheme
+        Plume.TypeChecker.Monad.Type.Error
+
+        Plume.TypeChecker.Constraints.Definition
+        Plume.TypeChecker.Constraints.Unification
+        Plume.TypeChecker.Constraints.Solver
+
         System.IO.Pretty
 
         Control.Monad.IO
