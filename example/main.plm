@@ -38,6 +38,9 @@ print(factorial(5)) // rest
 @print("Thomas")
 @print(@bruh)
 
+test<A, B>(x: A): B -> 
+  return x
+
 print(@bruh)
 
 print(x.show())
