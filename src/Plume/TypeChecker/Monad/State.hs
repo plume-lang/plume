@@ -1,6 +1,8 @@
 module Plume.TypeChecker.Monad.State where
 
 import Data.Map qualified as Map
+import Plume.Syntax.Concrete (Position)
+import Plume.TypeChecker.Constraints.Definition
 import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.Monad.Type.Scheme
 
@@ -11,6 +13,8 @@ data CheckerState = CheckerState
   , variables :: Environment
   , types :: Environment
   , returnType :: PlumeType
+  , constraints :: [TypeConstraint]
+  , position :: Maybe Position
   }
 
 emptyState :: CheckerState
@@ -20,4 +24,6 @@ emptyState =
     , variables = Map.empty
     , types = Map.empty
     , returnType = TUnit
+    , constraints = []
+    , position = Nothing
     }

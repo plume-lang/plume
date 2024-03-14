@@ -2,7 +2,8 @@ module Plume.TypeChecker.Constraints.Definition where
 
 import Data.Set qualified as S
 import Plume.Syntax.Concrete (Position)
-import Plume.TypeChecker.Monad
+import Plume.TypeChecker.Monad.Substitution
+import Plume.TypeChecker.Monad.Type
 
 data ConstraintConstructor
   = PlumeType :~: PlumeType
