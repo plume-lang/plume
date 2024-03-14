@@ -45,5 +45,13 @@ print(@bruh)
 
 print(x.show())
 
+// declare show<A>(x: A): str
+// declare add<A>(x: A, y: A): A
+
 extends (x: int)
   show(): str => x.to_string()
+
+print(7.show())
+
+// print<A extends (show, add)>(x: A): () =>
+//   @print("test")
