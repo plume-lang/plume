@@ -1,10 +1,11 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Plume.TypeChecker.Monad (
   module Monad,
   MonadChecker,
   Inference,
-  checkerST,
   fresh,
   freshTVar,
   instantiate,
@@ -12,9 +13,9 @@ module Plume.TypeChecker.Monad (
   local,
 ) where
 
+import Control.Monad.Except
 import Data.Map qualified as Map
 import Data.Set qualified as Set
-import GHC.IO hiding (liftIO)
 import Plume.TypeChecker.Monad.State as Monad
 import Plume.TypeChecker.Monad.Substitution as Monad
 import Plume.TypeChecker.Monad.Type as Monad
@@ -22,12 +23,8 @@ import Plume.TypeChecker.Monad.Type.Error as Monad
 import Plume.TypeChecker.Monad.Type.Scheme as Monad
 import Prelude hiding (local)
 
-type MonadChecker m = MonadIO m
+type MonadChecker m = (MonadIO m, MonadError TypeError m)
 type Inference m from to = (MonadChecker m) => from -> m (PlumeType, to)
-
-checkerST :: IORef CheckerState
-{-# NOINLINE checkerST #-}
-checkerST = unsafePerformIO $ newIORef emptyState
 
 fresh :: (MonadIO m) => m Int
 fresh = liftIO $ do

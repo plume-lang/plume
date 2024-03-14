@@ -1,6 +1,10 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+
 module Plume.TypeChecker.Monad.State where
 
 import Data.Map qualified as Map
+import GHC.IO
+import GHC.Records
 import Plume.Syntax.Concrete (Position)
 import Plume.TypeChecker.Constraints.Definition
 import Plume.TypeChecker.Monad.Type
@@ -15,7 +19,12 @@ data CheckerState = CheckerState
   , returnType :: PlumeType
   , constraints :: [TypeConstraint]
   , position :: Maybe Position
+  , generics :: Map Text Int
   }
+
+checkerST :: IORef CheckerState
+{-# NOINLINE checkerST #-}
+checkerST = unsafePerformIO $ newIORef emptyState
 
 emptyState :: CheckerState
 emptyState =
@@ -26,4 +35,14 @@ emptyState =
     , returnType = TUnit
     , constraints = []
     , position = Nothing
+    , generics = Map.empty
     }
+
+search
+  :: forall l v m
+   . (HasField l CheckerState (Map Text v), MonadIO m)
+  => Text
+  -> m (Maybe v)
+search k = do
+  v <- readIORef checkerST
+  return $ Map.lookup k (getField @l v)
