@@ -56,6 +56,7 @@ library
         Plume.TypeChecker.Monad.Substitution
         Plume.TypeChecker.Monad.Type.Scheme
         Plume.TypeChecker.Monad.Type.Error
+        Plume.TypeChecker.Monad.Type.Conversion
 
         Plume.TypeChecker.Constraints.Definition
         Plume.TypeChecker.Constraints.Unification
@@ -68,8 +69,6 @@ library
         Control.Monad.IO
         Control.Monad.Parser
         Control.Monad.Exception
-
-        GHC.Records
 
     hs-source-dirs:     src
     default-language:   GHC2021
