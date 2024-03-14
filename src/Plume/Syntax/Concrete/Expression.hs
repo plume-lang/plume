@@ -41,6 +41,7 @@ data ConcreteExpression t
   | EBinary BinaryOperator (ConcreteExpression t) (ConcreteExpression t)
   | EPrefix PrefixOperator (ConcreteExpression t)
   | EDeclaration
+      (Maybe [Text])
       (Annotation (Maybe t))
       (ConcreteExpression t)
       (Maybe (ConcreteExpression t))

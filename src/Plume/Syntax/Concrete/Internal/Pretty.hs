@@ -54,13 +54,18 @@ prettyExpr _ (EApplication e es) =
     <> parens (hsep . punctuate comma $ map (prettyExpr 0) es)
 prettyExpr _ (EVariable v) = anItalic $ pretty v
 prettyExpr _ (ELiteral l) = ansiPretty l
-prettyExpr _ (EDeclaration a e1' e2') =
-  typeAnnotation a
-    <+> "="
-    <+> prettyExpr 0 e1'
-    <+> case e2' of
-      Nothing -> ""
-      Just e2'' -> anCol Blue "\nin" <+> prettyExpr 0 e2''
+prettyExpr _ (EDeclaration generics a e1' e2') =
+  gen
+    <> typeAnnotation a
+      <+> "="
+      <+> prettyExpr 0 e1'
+      <+> case e2' of
+        Nothing -> ""
+        Just e2'' -> anCol Blue "\nin" <+> prettyExpr 0 e2''
+ where
+  gen = case generics of
+    Nothing -> ""
+    Just gs -> "forall " <> hsep (map pretty gs) <> ". "
 prettyExpr _ (EConditionBranch e1' e2' e3') =
   anCol Blue "if"
     <+> prettyExpr 0 e1'
