@@ -100,6 +100,12 @@ flat = concatMap $ \case
   Single a -> [a]
   Empty -> []
 
+mapSpreadable :: (a -> b) -> Spreadable [a] a -> Spreadable [b] b
+mapSpreadable f = \case
+  Spread a -> Spread $ map f a
+  Single a -> Single $ f a
+  Empty -> Empty
+
 -- Monadic version of the concatMap function.
 concatMapM :: (Monad m) => (a -> m [b]) -> [a] -> m [b]
 concatMapM f = fmap concat . mapM f
