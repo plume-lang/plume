@@ -1,0 +1,4 @@
+native print<A>(x: A): ()
+
+print("test")
+
