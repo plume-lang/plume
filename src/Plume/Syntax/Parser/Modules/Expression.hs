@@ -38,7 +38,7 @@ annotated = Annotation <$> identifier <*> ty
 -- it is a single line expression
 indentOrInline :: Parser Expression
 indentOrInline = do
-  eBlock parseStatement <|> eLocated eExpression
+  eBlock parseStatement <|> eExpression
 
 -- Actual parsing functions
 
@@ -61,7 +61,7 @@ eParenthized = parens eExpression
 -- So variables cannot have spaces, quotes, double quotes, some open-close
 -- symbols (like brackets, braces, angles, parenthesis) and unicode characters
 eVariable :: Parser Expression
-eVariable = eLocated $ EVariable <$> identifier <* notFollowedBy (oneOf forbiddenChars)
+eVariable = EVariable <$> identifier <* notFollowedBy (oneOf forbiddenChars)
 
 forbiddenChars :: [Char]
 forbiddenChars = [':']
@@ -70,7 +70,7 @@ forbiddenChars = [':']
 -- variable type, e1 is variable's actual value and e2 is the optional return
 -- value of this "statement" (which becomes an expression)
 eDeclaration :: Parser Expression
-eDeclaration = eLocated $ do
+eDeclaration = do
   var <-
     try $
       Annotation
@@ -93,7 +93,7 @@ parser False = eExpression
 -- if e1 then e2 else e3 where e1 is the condition, e2 is the "then" branch and
 -- e2 is the "else" branch
 eConditionBranch :: Bool -> Parser Expression
-eConditionBranch isStatement = eLocated $ do
+eConditionBranch isStatement = do
   ilevel <- ask
   _ <- reserved "if"
   cond <- eExpression
@@ -105,7 +105,7 @@ eConditionBranch isStatement = eLocated $ do
   return (EConditionBranch cond thenBr elseBr)
 
 eReturn :: Parser Expression
-eReturn = eLocated $ do
+eReturn = do
   _ <- reserved "return"
   EReturn <$> eExpression
 
@@ -117,7 +117,7 @@ eReturn = eLocated $ do
 -- specified, which results in the following form: x -> e where x is the
 -- closure argument name and e the closure body expression
 eClosure :: Parser Expression
-eClosure = eLocated $ do
+eClosure = do
   (args, ret) <- try $ do
     args <- clArguments
     ret <- optional (symbol ":" *> tType)
@@ -134,7 +134,7 @@ eClosure = eLocated $ do
   clPolyArg = parens (annotated `sepBy` comma)
 
 eExtension :: Parser Expression
-eExtension = eLocated $ do
+eExtension = do
   _ <- reserved "extends"
   ty <- parens ((:@:) <$> (identifier <* colon) <*> tType)
   members <- indent eExtensionMember
@@ -160,12 +160,22 @@ eExtFunction = do
     . EClosure args ret
     <$> indentOrInline
 
+eNativeFunction :: Parser Expression
+eNativeFunction = do
+  _ <- reserved "native"
+  name <- identifier
+  gens <- option [] (angles (identifier `sepBy` comma))
+  args <- parens ((optional (identifier >> colon) *> tType) `sepBy` comma)
+  ret <- symbol ":" *> tType
+  let funTy = args :->: ret
+  return (ENativeFunction name gens funTy)
+
 -- name(a: t1, b: t2, ..., z: tn): ret -> e where name is the function name,
 -- parenthesized elements are function arguments, ret is function return type
 -- and e function body. This is a sugared form that combines both variable
 -- declaration and closure expression
 eFunctionDefinition :: Parser Expression
-eFunctionDefinition = eLocated $ do
+eFunctionDefinition = do
   (name, generics, arguments, ret) <- try $ do
     name <- identifier
     generics <- optional (angles (identifier `sepBy` comma))
@@ -186,19 +196,19 @@ eCasePattern = do
   return (pattern', body)
 
 eSwitch :: Parser Expression
-eSwitch = eLocated $ do
+eSwitch = do
   _ <- reserved "switch"
   cond <- eExpression
   branches <- indent eCasePattern
   return (ESwitch cond branches)
 
 eMacro :: Parser Expression
-eMacro = eLocated $ do
+eMacro = do
   name <- try $ char '@' *> identifier <* symbol "="
   EMacro name <$> indentOrInline
 
 eMacroFunction :: Parser Expression
-eMacroFunction = eLocated $ do
+eMacroFunction = do
   (name, args) <- try $ do
     name <- char '@' *> identifier
     args <- parens (identifier `sepBy` comma)
@@ -207,27 +217,28 @@ eMacroFunction = eLocated $ do
   EMacroFunction name args <$> indentOrInline
 
 eMacroVariable :: Parser Expression
-eMacroVariable = eLocated $ EMacroVariable <$> (char '@' *> identifier)
+eMacroVariable = EMacroVariable <$> (char '@' *> identifier)
 
 eMacroApplication :: Parser Expression
-eMacroApplication = eLocated $ do
+eMacroApplication = do
   name <- char '@' *> identifier
   args <- parens (eExpression `sepBy` comma)
   return (EMacroApplication name args)
 
 parseStatement :: Parser Expression
 parseStatement =
-  choice
-    [ eReturn
-    , eConditionBranch True
-    , eDeclaration
-    , eFunctionDefinition
-    , eExpression
-    ]
+  eLocated $
+    choice
+      [ eReturn
+      , eConditionBranch True
+      , eDeclaration
+      , eFunctionDefinition
+      , eExpression
+      ]
 
 -- Main expression parsing function
 eExpression :: Parser Expression
-eExpression = makeExprParser eTerm ([postfixOperators] : operators)
+eExpression = eLocated $ makeExprParser eTerm ([postfixOperators] : operators)
  where
   eTerm =
     choice
@@ -277,19 +288,21 @@ eExpression = makeExprParser eTerm ([postfixOperators] : operators)
           ]
 
 tRequire :: Parser Expression
-tRequire = eLocated $ do
+tRequire = do
   _ <- reserved "require"
   ERequire <$> stringLiteral
 
 parseToplevel :: Parser Expression
 parseToplevel =
-  choice
-    [ tRequire
-    , eExtension
-    , eMacroFunction
-    , eMacro
-    , parseStatement
-    ]
+  eLocated $
+    choice
+      [ tRequire
+      , eNativeFunction
+      , eExtension
+      , eMacroFunction
+      , eMacro
+      , parseStatement
+      ]
 
 parseProgram :: Parser Program
 parseProgram = many (nonIndented parseToplevel <* optional indentSc)

@@ -66,6 +66,7 @@ data ConcreteExpression t
       [(Pattern, ConcreteExpression t)]
   | EReturn (ConcreteExpression t)
   | ETypeExtension (Annotation t) [ExtensionMember t]
+  | ENativeFunction Text [Text] t
 
 data ExtensionMember t
   = ExtDeclaration

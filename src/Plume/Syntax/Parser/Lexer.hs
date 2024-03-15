@@ -109,6 +109,7 @@ reservedWords =
   , "case"
   , "return"
   , "extends"
+  , "native"
   , -- Primitive types
     "int"
   , "str"
