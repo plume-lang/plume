@@ -6,6 +6,7 @@ module Plume.TypeChecker.Monad (
   module Monad,
   MonadChecker,
   Inference,
+  Result,
   fresh,
   freshTVar,
   instantiate,
@@ -18,6 +19,7 @@ import Control.Monad.Except
 import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Plume.Syntax.Concrete (Position)
+import Plume.Syntax.Translation.Generics (Spreadable)
 import Plume.TypeChecker.Monad.State as Monad
 import Plume.TypeChecker.Monad.Substitution as Monad
 import Plume.TypeChecker.Monad.Type as Monad
@@ -25,8 +27,10 @@ import Plume.TypeChecker.Monad.Type.Error as Monad
 import Plume.TypeChecker.Monad.Type.Scheme as Monad
 import Prelude hiding (gets, local)
 
+type Result a = Spreadable [a] a
+
 type MonadChecker m = (MonadIO m, MonadError (TypeError, Maybe Position) m)
-type Inference m from to = (MonadChecker m) => from -> m (PlumeType, to)
+type Inference m from to = (MonadChecker m) => from -> m (PlumeType, Result to)
 
 fresh :: (MonadIO m) => m Int
 fresh = liftIO $ do
