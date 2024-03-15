@@ -21,6 +21,15 @@ interpretSpreadable (Spread [e]) = e
 interpretSpreadable (Spread es) = AST.EBlock es
 interpretSpreadable Empty = AST.EBlock []
 
+spanProperty
+  :: CST.Expression -> Maybe (CST.Expression -> CST.Expression, CST.Expression)
+spanProperty = go
+ where
+  go :: CST.Expression -> Maybe (CST.Expression -> CST.Expression, CST.Expression)
+  go (CST.EProperty e p) = Just (id, CST.EProperty e p)
+  go (CST.ELocated e p) = Just ((`CST.ELocated` p), e)
+  go _ = Nothing
+
 concreteToAbstract
   :: CST.Expression
   -> TranslatorReader Error AST.Expression
@@ -28,15 +37,13 @@ concreteToAbstract (CST.EVariable n) = transRet . Right $ AST.EVariable n
 concreteToAbstract (CST.ELiteral l) = transRet . Right $ AST.ELiteral l
 concreteToAbstract e@(CST.EBinary {}) = convertOperation concreteToAbstract e
 concreteToAbstract e@(CST.EPrefix {}) = convertOperation concreteToAbstract e
-concreteToAbstract e@(CST.EApplication (CST.EProperty _ _) _) =
-  convertUFCS concreteToAbstract e
-concreteToAbstract (CST.EApplication e es) = do
-  -- Checking if the first expression is alone, meaning that it is not
-  -- composed of multiple elements (like a spread element), and unwraping
-  -- Spreadable if it is.
-  e' <- shouldBeAlone <$> concreteToAbstract e
-  es' <- fmap flat . sequence <$> mapM concreteToAbstract es
-  transRet $ AST.EApplication <$> e' <*> es'
+concreteToAbstract (CST.EApplication e args)
+  | Just (_, e') <- spanProperty e = do
+      convertUFCS concreteToAbstract (CST.EApplication e' args)
+  | otherwise = do
+      e' <- shouldBeAlone <$> concreteToAbstract e
+      es' <- fmap flat . sequence <$> mapM concreteToAbstract args
+      transRet $ AST.EApplication <$> e' <*> es'
 concreteToAbstract (CST.EDeclaration g ann e me) = do
   -- Declaration and body value cannot be spread elements, so we need to
   -- check if they are alone and unwrap them if they are.
@@ -114,6 +121,8 @@ concreteToAbstract (CST.ETypeExtension ann ems) = do
   ems' <-
     fmap flat . sequence <$> mapM concreteToAbstractExtensionMember ems
   transRet $ AST.ETypeExtension ann <$> ems'
+concreteToAbstract (CST.ENativeFunction n gens t) =
+  transRet . Right $ AST.ENativeFunction n gens t
 
 concreteToAbstractExtensionMember
   :: CST.ExtensionMember Common.PlumeType

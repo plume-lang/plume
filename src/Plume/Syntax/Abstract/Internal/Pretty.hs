@@ -70,6 +70,14 @@ prettyExpr (ETypeExtension ann ems) =
     <+> parens (ansiPretty ann)
     <+> line
     <> indent 2 (vsep (map prettyExtMember ems))
+prettyExpr (ENativeFunction n gens (args :->: ret)) =
+  anCol Blue "native"
+    <+> pretty n
+    <+> angles (hsep . punctuate comma $ map pretty gens)
+    <+> parens (hsep . punctuate comma $ map ansiPretty args)
+    <+> ":"
+    <+> prettyTy ret
+prettyExpr (ENativeFunction {}) = error "ENativeFunction: invalid type"
 
 prettyExtMember :: ExtensionMember PlumeType -> Doc AnsiStyle
 prettyExtMember (ExtDeclaration g ann e) =

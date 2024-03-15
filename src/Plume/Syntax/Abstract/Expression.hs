@@ -34,6 +34,7 @@ data AbstractExpression t
   | ESwitch (AbstractExpression t) [(Pattern, AbstractExpression t)]
   | EReturn (AbstractExpression t)
   | ETypeExtension (Annotation t) [ExtensionMember t]
+  | ENativeFunction Text [Text] t
   deriving (Eq)
 
 data ExtensionMember t
