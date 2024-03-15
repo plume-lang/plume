@@ -21,3 +21,7 @@ solve ((pos, t1 :~: t2) : xs) = do
 solve ((pos, _ `Extends` _) : _) =
   throwError (CompilerError "Not implemented", pos)
 solve ((_, Hole _) : xs) = solve xs
+
+runSolver
+  :: Environment -> [TypeConstraint] -> Either (TypeError, Position) Substitution
+runSolver env xs = runExcept $ runReaderT (solve xs) env

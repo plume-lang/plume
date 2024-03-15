@@ -16,6 +16,7 @@ import Plume.Syntax.Common.Pattern qualified as Pre
 import Plume.Syntax.Common.Type qualified as Pre
 import Plume.Syntax.Concrete (Position)
 import Plume.TypeChecker.Constraints.Definition
+import Plume.TypeChecker.Constraints.Solver qualified as Solver
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.Monad.Type qualified as Post
 import Plume.TypeChecker.Monad.Type.Conversion
@@ -37,6 +38,16 @@ unify (t1, t2) = do
       s <- readIORef checkerST
       writeIORef checkerST (s {constraints = s.constraints ++ [(p, t1 :~: t2)]})
     Nothing -> throw (CompilerError "No position found")
+
+insert
+  :: forall l m a
+   . (MonadChecker m, HasField l CheckerState (M.Map Text a))
+  => Text
+  -> a
+  -> m ()
+insert k v = do
+  s <- readIORef checkerST
+  writeIORef checkerST (setField @l s (M.insert k v (getField @l s)))
 
 withVariables :: (MonadChecker m) => [(Text, Scheme)] -> m a -> m a
 withVariables vars =
@@ -60,7 +71,13 @@ with'
   => (a -> a)
   -> m b
   -> m b
-with' f = local (\s -> setField @l s (f (getField @l s)))
+with' f m = do
+  old <- readIORef checkerST
+  writeIORef checkerST (setField @l old (f (getField @l old)))
+  a <- m
+  new <- readIORef checkerST
+  writeIORef checkerST (setField @l new (getField @l old))
+  return a
 
 createAnnotation :: Text -> (a -> b) -> a -> Annotation b
 createAnnotation name f = (name :@:) . f
@@ -77,7 +94,7 @@ synthesize' (Pre.EVariable name) = do
       return (inst, Post.EVariable name inst)
     Nothing -> throw (UnboundVariable name)
 synthesize' (Pre.EApplication f xs) = do
-  (t, f') <- local id $ synthesize f
+  (t, f') <- synthesize f
   (ts, xs') <- mapAndUnzipM synthesize xs
   ret <- freshTVar
   unify (t, ts :->: ret)
@@ -129,7 +146,7 @@ synthesize' (Pre.EBlock es) = do
     return (ret, es')
   return (ret, Post.EBlock es')
 synthesize' (Pre.ELocated e p) = do
-  (t, e') <- local (\s -> s {position = Just p}) $ synthesize e
+  (t, e') <- with @"position" (Just p) $ synthesize' e
   return (t, Post.ELocated e' p)
 synthesize' (Pre.EReturn e) = do
   (t, e') <- synthesize e
@@ -156,11 +173,20 @@ synthesize' (Pre.EDeclaration gens (Annotation name ty) value body) = do
         ( ret
         , Post.EDeclaration
             (Annotation name ty')
+            genericTys
             value'
             (Just body'')
         )
-    Nothing ->
-      return (ty', Post.EDeclaration (Annotation name ty') value' Nothing)
+    Nothing -> do
+      insert @"variables" name (Forall genericTys ty')
+      return
+        ( ty'
+        , Post.EDeclaration
+            (Annotation name ty')
+            genericTys
+            value'
+            Nothing
+        )
 synthesize' (Pre.ESwitch e cases) = do
   (t, e') <- synthesize e
   (cases', ts) <-
@@ -180,6 +206,12 @@ synthesize' (Pre.ESwitch e cases) = do
 
   return (ret, Post.ESwitch e' cases')
 synthesize' (Pre.ETypeExtension {}) = throw (CompilerError "Type extensions are not supported yet")
+synthesize' (Pre.ENativeFunction name gens ty) = do
+  gens' <- mapM (const fresh) gens
+  let genericList = zip gens gens'
+  ty' <- withGenerics genericList $ convert ty
+  insert @"variables" name (Forall gens' ty')
+  return (ty', Post.ENativeFunction name gens' ty')
 
 synthesizePat
   :: (MonadChecker m)
@@ -233,6 +265,10 @@ runSynthesize
   => [Pre.Expression]
   -> m (Either (TypeError, Maybe Position) [Expression])
 runSynthesize e = do
-  runExceptT (mapM synthesize e) >>= \case
+  runExceptT (mapM synthesize' e) >>= \case
     Left err -> return (Left err)
-    Right xs -> return (Right (map snd xs))
+    Right xs -> do
+      cnsts <- gets constraints
+      let sub = Solver.runSolver mempty cnsts
+          exprs = map snd xs
+      return $ first (fmap Just) $ apply <$> sub <*> pure exprs
