@@ -3,7 +3,9 @@ module Plume.TypeChecker.Monad.Type.Error where
 import Control.Monad.Exception
 import Data.Text qualified as T
 import Plume.Syntax.Concrete (Position)
+import Plume.Syntax.Internal.Pretty.ANSI
 import Plume.TypeChecker.Monad.Type
+import Prettyprinter.Render.Terminal
 import Text.Megaparsec (SourcePos (..), unPos)
 
 data TypeError
@@ -15,11 +17,6 @@ data TypeError
   | CompilerError Text
   | EmptyMatch
 
-instance Throwable PlumeType where
-  showError (TVar i) = show i
-  showError (TApp t1 t2) = showError t1 <> "<" <> T.intercalate "," (map showError t2) <> ">"
-  showError (TId t) = "TId " <> show t
-
 instance (Throwable a) => Throwable [a] where
   showError [] = ""
   showError xs = case last' of
@@ -29,6 +26,12 @@ instance (Throwable a) => Throwable [a] where
     init' = fromMaybe [] $ viaNonEmpty init xs
     last' = viaNonEmpty last xs
     first' = T.intercalate "," (map showError init')
+
+instance Throwable PlumeType where
+  showError t =
+    renderStrict $
+      layoutPretty defaultLayoutOptions $
+        ansiPretty t
 
 instance Throwable TypeError where
   showError (UnificationFail t1 t2) =

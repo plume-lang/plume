@@ -2,7 +2,9 @@ module Plume.TypeChecker.Monad.Substitution where
 
 import Data.Map qualified as M
 import Data.Set qualified as S
+import Plume.Syntax.Common.Annotation
 import Plume.TypeChecker.Monad.Type
+import Plume.TypeChecker.TLIR
 
 type Substitution = M.Map Int PlumeType
 
@@ -37,3 +39,37 @@ instance Types PlumeType where
 instance (Types a) => Types (M.Map Text a) where
   free = free . M.elems
   apply s = M.map (apply s)
+
+instance (Types a) => Types (TypedExpression a) where
+  free = error "Not implemented"
+
+  apply s (EVariable n t) = EVariable n (apply s t)
+  apply s (EApplication e1 e2) = EApplication (apply s e1) (apply s e2)
+  apply s (EClosure anns t e) = EClosure (apply s anns) (apply s t) (apply s e)
+  apply s (ELocated e p) = ELocated (apply s e) p
+  apply s (ESwitch e ps) = ESwitch (apply s e) (apply s ps)
+  apply s (EReturn e) = EReturn (apply s e)
+  apply s (EDeclaration gens ann e1 e2) = EDeclaration (apply s gens) (apply s ann) (apply s e1) (apply s e2)
+  apply s (EConditionBranch e1 e2 e3) = EConditionBranch (apply s e1) (apply s e2) (apply s e3)
+  apply s (EBlock es) = EBlock (apply s es)
+  apply _ (ELiteral l) = ELiteral l
+  apply s (ENativeFunction n gens t) = ENativeFunction n (apply s gens) (apply s t)
+
+instance (Types a) => Types (Annotation a) where
+  free = error "Not implemented"
+  apply s (Annotation a t) = a :@: apply s t
+
+instance (Types a) => Types (TypedPattern a) where
+  free = error "Not implemented"
+  apply s (PVariable n t) = PVariable n (apply s t)
+  apply _ (PLiteral l) = PLiteral l
+  apply s (PConstructor p1 p2) = PConstructor p1 (apply s p2)
+  apply _ PWildcard = PWildcard
+
+instance Types Int where
+  free = mempty
+  apply = const id
+
+instance (Types a, Types b) => Types (a, b) where
+  free (a, b) = free a `S.union` free b
+  apply s (a, b) = (apply s a, apply s b)

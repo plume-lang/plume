@@ -48,7 +48,9 @@ local f m = do
   old <- readIORef checkerST
   writeIORef checkerST (f old)
   a <- m
-  writeIORef checkerST old
+  modifyIORef'
+    checkerST
+    (\s -> s {tvarCounter = s.tvarCounter, constraints = s.constraints})
   return a
 
 generalize :: Environment -> PlumeType -> Scheme

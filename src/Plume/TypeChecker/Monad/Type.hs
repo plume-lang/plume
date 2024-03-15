@@ -2,6 +2,10 @@
 
 module Plume.TypeChecker.Monad.Type where
 
+import Plume.Syntax.Internal.Pretty.ANSI
+import Prettyprinter.Render.Terminal
+import Prelude hiding (intercalate)
+
 data PlumeType
   = TId Text
   | TVar Int
@@ -28,3 +32,13 @@ pattern TString = TId "str"
 pattern TChar = TId "char"
 pattern TFloat = TId "float"
 pattern TUnit = TTuple []
+
+prettyTy :: PlumeType -> Doc AnsiStyle
+prettyTy (TId n) = anCol Magenta $ pretty n
+prettyTy (TFunction ts t) = parens (hsep . punctuate comma $ map prettyTy ts) <+> "->" <+> prettyTy t
+prettyTy (TList t) = brackets $ prettyTy t
+prettyTy (TTuple ts) = parens (hsep . punctuate comma $ map prettyTy ts)
+prettyTy (TApp t ts) = prettyTy t <> angles (hsep . punctuate comma $ map prettyTy ts)
+prettyTy (TVar i) = anCol Yellow $ "a" <> pretty i
+
+instance ANSIPretty PlumeType where ansiPretty = prettyTy
