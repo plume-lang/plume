@@ -54,6 +54,7 @@ instance (Types a) => Types (TypedExpression a) where
   apply s (EBlock es) = EBlock (apply s es)
   apply _ (ELiteral l) = ELiteral l
   apply s (ENativeFunction n gens t) = ENativeFunction n (apply s gens) (apply s t)
+  apply s (EExtVariable v t) = EExtVariable v (apply s t)
 
 instance (Types a) => Types (Annotation a) where
   free = error "Not implemented"

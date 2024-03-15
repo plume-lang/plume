@@ -23,7 +23,16 @@ data CheckerState = CheckerState
   , constraints :: [TypeConstraint]
   , position :: Maybe Position
   , generics :: Map Text Int
+  , extensions :: Map Extension Scheme
   }
+
+data Extension = Extension {name :: Text, value :: PlumeType}
+
+instance Ord Extension where
+  compare (Extension n1 _) (Extension n2 _) = compare n1 n2
+
+instance Eq Extension where
+  (Extension n1 t) == (Extension n2 t') = n1 == n2 && t == t'
 
 checkerST :: IORef CheckerState
 {-# NOINLINE checkerST #-}
@@ -39,6 +48,7 @@ emptyState =
     , constraints = []
     , position = Nothing
     , generics = Map.empty
+    , extensions = Map.empty
     }
 
 search
@@ -73,3 +83,6 @@ instance HasField "constraints" CheckerState [TypeConstraint] where
 
 instance HasField "tvarCounter" CheckerState Int where
   hasField c = (\x -> c {tvarCounter = x}, tvarCounter c)
+
+instance HasField "extensions" CheckerState (Map Extension Scheme) where
+  hasField c = (\x -> c {extensions = x}, extensions c)

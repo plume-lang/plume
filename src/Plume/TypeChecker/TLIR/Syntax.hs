@@ -7,6 +7,7 @@ import Plume.TypeChecker.TLIR.Modules.Pattern
 
 data TypedExpression t
   = EVariable Text t
+  | EExtVariable Text t
   | ELiteral Literal
   | EApplication (TypedExpression t) [TypedExpression t]
   | EDeclaration
