@@ -49,6 +49,7 @@ library
         Plume.TypeChecker.TLIR.Syntax
         Plume.TypeChecker.TLIR.Synonyms
         Plume.TypeChecker.TLIR.Modules.Pattern
+        Plume.TypeChecker.TLIR.Internal.Pretty
 
         Plume.TypeChecker.Monad
         Plume.TypeChecker.Monad.Type
