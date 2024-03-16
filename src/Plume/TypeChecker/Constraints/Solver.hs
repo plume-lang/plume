@@ -130,6 +130,19 @@ findWithKey p m = do
   let m' = M.toList m
   find (p . fst) m'
 
+findWithKeyM
+  :: (Ord k, Monad m) => (k -> a -> m Bool) -> Map k a -> m (Maybe (k, a))
+findWithKeyM f m = do
+  let m' = M.toList m
+  findM (uncurry f) m'
+
+findM :: (Monad m) => (a -> m Bool) -> [a] -> m (Maybe a)
+findM f xs = do
+  ys <- filterM f xs
+  return $ case ys of
+    [] -> Nothing
+    y : _ -> Just y
+
 findMatchingExtension
   :: (MonadSolver m)
   => (Extension -> m Bool)
