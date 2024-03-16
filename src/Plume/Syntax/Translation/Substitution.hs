@@ -52,10 +52,14 @@ substitute (name, expr) (AST.ESwitch e ps) =
     | name `S.notMember` ftv p = (p, substitute (name, expr) e')
     | otherwise = (p, e')
 substitute (name, expr) (AST.EReturn e) = AST.EReturn (substitute (name, expr) e)
-substitute (name, expr) (AST.ETypeExtension ann ems)
+substitute (name, expr) (AST.ETypeExtension g ann ems)
   | name `S.notMember` ftv ann =
-      AST.ETypeExtension ann (map (substituteExt (name, expr)) ems)
-  | otherwise = AST.ETypeExtension ann ems
+      AST.ETypeExtension g ann (map (substituteExt (name, expr)) ems)
+  | otherwise = AST.ETypeExtension g ann ems
+substitute _ (AST.ENativeFunction n gens t) =
+  AST.ENativeFunction n gens t
+substitute _ (AST.EGenericProperty g n ts t) =
+  AST.EGenericProperty g n ts t
 
 substituteExt
   :: (Text, AST.Expression)

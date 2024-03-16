@@ -42,6 +42,25 @@ indentOrInline = do
 
 -- Actual parsing functions
 
+gGeneric :: Parser PlumeGeneric
+gGeneric =
+  choice
+    [ try gExtends
+    , gVar
+    ]
+
+gVar :: Parser PlumeGeneric
+gVar = GVar <$> identifier
+
+gExtends :: Parser PlumeGeneric
+gExtends = do
+  var <- identifier
+  _ <- reserved "extends"
+  GExtends var
+    <$> ( parens (identifier `sepBy` comma)
+            <|> ((: []) <$> identifier)
+        )
+
 -- { e1; e2; ...; en } where e1, e2, ..., en are expressions
 eBlock :: Parser Expression -> Parser Expression
 eBlock p = eLocated $ do
@@ -81,7 +100,7 @@ eDeclaration = do
   ilevel <- ask
   expr <- indentOrInline
   body <- optional (indentSameOrInline ilevel $ reserved "in" *> eExpression)
-  return (EDeclaration Nothing var expr body)
+  return (EDeclaration [] var expr body)
 
 stmtOrExpr :: Bool -> (Parser a -> Parser (Maybe a))
 stmtOrExpr isStatement = if isStatement then optional else (Just <$>)
@@ -135,10 +154,12 @@ eClosure = do
 
 eExtension :: Parser Expression
 eExtension = do
-  _ <- reserved "extends"
+  _ <- reserved "extend"
+  gens <- option [] $ angles (gGeneric `sepBy` comma)
   ty <- parens ((:@:) <$> (identifier <* colon) <*> tType)
+  _ <- reserved "with"
   members <- indent eExtensionMember
-  return (ETypeExtension ty members)
+  return (ETypeExtension gens ty members)
 
 eExtensionMember :: Parser (ExtensionMember PlumeType)
 eExtensionMember =
@@ -148,17 +169,27 @@ eExtensionMember =
 
 eExtFunction :: Parser (ExtensionMember PlumeType)
 eExtFunction = do
-  (name, args, ret) <- try $ do
+  (name, gens, args, ret) <- try $ do
     name <- identifier
+    gens <- option [] $ angles (gGeneric `sepBy` comma)
     args <- parens (annotated `sepBy` comma)
     ret <- optional (symbol ":" *> tType)
     _ <- symbol "=>"
-    return (name, args, ret)
+    return (name, gens, args, ret)
   ExtDeclaration
-    Nothing
+    gens
     (name :@: Nothing)
     . EClosure args ret
     <$> indentOrInline
+
+eGenericProperty :: Parser Expression
+eGenericProperty = do
+  _ <- reserved "property"
+  gens <- option [] $ angles (gGeneric `sepBy` comma)
+  (ty, name) <- (,) <$> tType <* char '.' <*> identifier
+  args <- parens ((optional (identifier >> colon) *> tType) `sepBy` comma)
+  ret <- symbol ":" *> tType
+  return (EGenericProperty gens name (ty : args) ret)
 
 eNativeFunction :: Parser Expression
 eNativeFunction = do
@@ -178,7 +209,7 @@ eFunctionDefinition :: Parser Expression
 eFunctionDefinition = do
   (name, generics, arguments, ret) <- try $ do
     name <- identifier
-    generics <- optional (angles (identifier `sepBy` comma))
+    generics <- option [] (angles (gGeneric `sepBy` comma))
     arguments <- parens (annotated `sepBy` comma)
     ret <- optional (symbol ":" *> tType)
     _ <- symbol "=>"
@@ -297,6 +328,7 @@ parseToplevel =
   eLocated $
     choice
       [ tRequire
+      , eGenericProperty
       , eNativeFunction
       , eExtension
       , eMacroFunction

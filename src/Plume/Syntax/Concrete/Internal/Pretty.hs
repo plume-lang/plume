@@ -55,17 +55,13 @@ prettyExpr _ (EApplication e es) =
 prettyExpr _ (EVariable v) = anItalic $ pretty v
 prettyExpr _ (ELiteral l) = ansiPretty l
 prettyExpr _ (EDeclaration generics a e1' e2') =
-  gen
+  ansiPretty generics
     <> typeAnnotation a
       <+> "="
       <+> prettyExpr 0 e1'
       <+> case e2' of
         Nothing -> ""
         Just e2'' -> anCol Blue "\nin" <+> prettyExpr 0 e2''
- where
-  gen = case generics of
-    Nothing -> ""
-    Just gs -> "forall " <> hsep (map pretty gs) <> ". "
 prettyExpr _ (EConditionBranch e1' e2' e3') =
   anCol Blue "if"
     <+> prettyExpr 0 e1'
@@ -109,10 +105,11 @@ prettyExpr _ (ESwitch e ps) =
   prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "=>" <+> prettyExpr 0 e'
 prettyExpr _ (EProperty n e) = parens $ prettyExpr 0 e <> "." <> anItalic (pretty n)
 prettyExpr _ (EReturn e) = anCol Blue "return" <+> prettyExpr 0 e
-prettyExpr _ (ETypeExtension a es) =
+prettyExpr _ (ETypeExtension gens a es) =
   anCol Blue "extends"
-    <+> parens (ansiPretty a)
-    <+> line
+    <> angles (hsep . punctuate comma $ map ansiPretty gens)
+      <+> parens (ansiPretty a)
+      <+> line
     <> indent 2 (vsep (map prettyExt es))
 prettyExpr _ (ENativeFunction n gens (args :->: ret)) =
   anCol Blue "native"
@@ -122,14 +119,17 @@ prettyExpr _ (ENativeFunction n gens (args :->: ret)) =
       <+> ":"
       <+> ansiPretty ret
 prettyExpr _ (ENativeFunction {}) = error "ENativeFunction: invalid type"
+prettyExpr _ (EGenericProperty gens n ts t) =
+  anCol Blue "property"
+    <> angles (hsep . punctuate comma $ map ansiPretty gens)
+      <+> anItalic (pretty n)
+    <> parens (hsep . punctuate comma $ map ansiPretty ts)
+      <+> ":"
+      <+> ansiPretty t
 
 prettyExt :: ExtensionMember PlumeType -> Doc AnsiStyle
 prettyExt (ExtDeclaration gs a e1') =
-  gen
+  ansiPretty gs
     <> typeAnnotation a
       <+> "="
       <+> prettyExpr 0 e1'
- where
-  gen = case gs of
-    Nothing -> ""
-    Just gs' -> "forall " <> hsep (map pretty gs') <> ". "

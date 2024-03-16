@@ -108,8 +108,11 @@ reservedWords =
   , "switch"
   , "case"
   , "return"
-  , "extends"
+  , "extend"
   , "native"
+  , "property"
+  , "with"
+  , "extends"
   , -- Primitive types
     "int"
   , "str"

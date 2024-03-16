@@ -117,12 +117,14 @@ concreteToAbstract (CST.EReturn e) = do
   -- them into a block.
   e' <- fmap interpretSpreadable <$> concreteToAbstract e
   transRet $ AST.EReturn <$> e'
-concreteToAbstract (CST.ETypeExtension ann ems) = do
+concreteToAbstract (CST.ETypeExtension g ann ems) = do
   ems' <-
     fmap flat . sequence <$> mapM concreteToAbstractExtensionMember ems
-  transRet $ AST.ETypeExtension ann <$> ems'
+  transRet $ AST.ETypeExtension g ann <$> ems'
 concreteToAbstract (CST.ENativeFunction n gens t) =
   transRet . Right $ AST.ENativeFunction n gens t
+concreteToAbstract (CST.EGenericProperty g n ts t) =
+  transRet . Right $ AST.EGenericProperty g n ts t
 
 concreteToAbstractExtensionMember
   :: CST.ExtensionMember Common.PlumeType

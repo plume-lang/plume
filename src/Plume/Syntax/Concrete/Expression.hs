@@ -11,6 +11,7 @@ import Data.Text hiding (map)
 import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Common.Pattern
+import Plume.Syntax.Common.Type
 import Text.Megaparsec.Pos
 import Prelude hiding (intercalate)
 
@@ -41,7 +42,7 @@ data ConcreteExpression t
   | EBinary BinaryOperator (ConcreteExpression t) (ConcreteExpression t)
   | EPrefix PrefixOperator (ConcreteExpression t)
   | EDeclaration
-      (Maybe [Text])
+      [PlumeGeneric]
       (Annotation (Maybe t))
       (ConcreteExpression t)
       (Maybe (ConcreteExpression t))
@@ -65,12 +66,13 @@ data ConcreteExpression t
       (ConcreteExpression t)
       [(Pattern, ConcreteExpression t)]
   | EReturn (ConcreteExpression t)
-  | ETypeExtension (Annotation t) [ExtensionMember t]
+  | EGenericProperty [PlumeGeneric] Text [t] t
+  | ETypeExtension [PlumeGeneric] (Annotation t) [ExtensionMember t]
   | ENativeFunction Text [Text] t
 
 data ExtensionMember t
   = ExtDeclaration
-      (Maybe [Text])
+      [PlumeGeneric]
       (Annotation (Maybe t))
       (ConcreteExpression t)
 

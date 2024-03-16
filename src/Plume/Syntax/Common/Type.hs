@@ -14,6 +14,11 @@ data PlumeType
   = TId Text
   | TApp PlumeType [PlumeType]
 
+data PlumeGeneric
+  = GVar Text
+  | GExtends Text [Text]
+  deriving (Eq)
+
 pattern TFunction, (:->:) :: [PlumeType] -> PlumeType -> PlumeType
 pattern TFunction args ret = TApp (TApp (TId "->") [ret]) args
 pattern xs :->: ret = TFunction xs ret

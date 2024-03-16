@@ -11,6 +11,12 @@ instance ANSIPretty Literal where ansiPretty = prettyLit
 
 instance ANSIPretty PlumeType where ansiPretty = prettyTy
 
+instance ANSIPretty PlumeGeneric where ansiPretty = prettyGen
+
+instance {-# OVERLAPS #-} ANSIPretty [PlumeGeneric] where
+  ansiPretty [] = mempty
+  ansiPretty gs = angles $ hsep (punctuate comma (map ansiPretty gs))
+
 instance (ANSIPretty t) => ANSIPretty (Annotation t) where
   ansiPretty (Annotation name value) =
     anItalic (pretty name)
@@ -38,3 +44,10 @@ prettyTy (TId n) = anCol Magenta $ pretty n
 prettyTy (TFunction ts t) = parens (hsep . punctuate comma $ map prettyTy ts) <+> "->" <+> prettyTy t
 prettyTy (TTuple ts) = parens (hsep . punctuate comma $ map prettyTy ts)
 prettyTy (TApp t ts) = prettyTy t <+> hsep (map prettyTy ts)
+
+prettyGen :: PlumeGeneric -> Doc AnsiStyle
+prettyGen (GVar n) = anCol Yellow $ "a" <> pretty n
+prettyGen (GExtends n tys) =
+  anCol Yellow (pretty n)
+    <+> anCol Blue "extends"
+    <+> hsep (punctuate comma (map pretty tys))

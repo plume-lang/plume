@@ -24,7 +24,7 @@ prettyExpr (EApplication e es) =
 prettyExpr (EVariable v) = anItalic $ pretty v
 prettyExpr (ELiteral l) = prettyLit l
 prettyExpr (EDeclaration generics a e1' e2') =
-  gen
+  ansiPretty generics
     <> typeAnnotation a
       <+> "="
       <+> prettyExpr e1'
@@ -32,10 +32,6 @@ prettyExpr (EDeclaration generics a e1' e2') =
               Nothing -> ""
               Just e2'' -> anCol Blue "\nin" <+> prettyExpr e2''
           )
- where
-  gen = case generics of
-    Nothing -> ""
-    Just gs -> "forall " <> hsep (punctuate comma (map pretty gs)) <> ". "
 prettyExpr (EConditionBranch e1' e2' e3') =
   anCol Blue "if"
     <+> prettyExpr e1'
@@ -65,10 +61,11 @@ prettyExpr (ESwitch e ps) =
  where
   prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "=>" <+> prettyExpr e'
 prettyExpr (EReturn e) = anCol Blue "return" <+> prettyExpr e
-prettyExpr (ETypeExtension ann ems) =
+prettyExpr (ETypeExtension gens ann ems) =
   anCol Blue "extends"
-    <+> parens (ansiPretty ann)
-    <+> line
+    <> angles (hsep . punctuate comma $ map ansiPretty gens)
+      <+> parens (ansiPretty ann)
+      <+> line
     <> indent 2 (vsep (map prettyExtMember ems))
 prettyExpr (ENativeFunction n gens (args :->: ret)) =
   anCol Blue "native"
@@ -78,14 +75,17 @@ prettyExpr (ENativeFunction n gens (args :->: ret)) =
     <+> ":"
     <+> prettyTy ret
 prettyExpr (ENativeFunction {}) = error "ENativeFunction: invalid type"
+prettyExpr (EGenericProperty gens n ts t) =
+  anCol Blue "property"
+    <+> ansiPretty gens
+    <+> pretty n
+    <+> angles (hsep . punctuate comma $ map ansiPretty ts)
+    <+> ":"
+    <+> prettyTy t
 
 prettyExtMember :: ExtensionMember PlumeType -> Doc AnsiStyle
 prettyExtMember (ExtDeclaration g ann e) =
-  gen
+  ansiPretty g
     <> typeAnnotation ann
       <+> "="
       <+> prettyExpr e
- where
-  gen = case g of
-    Nothing -> ""
-    Just gs -> "forall " <> hsep (punctuate comma (map pretty gs)) <> ". "

@@ -17,7 +17,7 @@ data AbstractExpression t
   | ELiteral Literal
   | EApplication (AbstractExpression t) [AbstractExpression t]
   | EDeclaration
-      (Maybe [Text])
+      [PlumeGeneric]
       (Annotation (Maybe t))
       (AbstractExpression t)
       (Maybe (AbstractExpression t))
@@ -33,13 +33,14 @@ data AbstractExpression t
   | ELocated (AbstractExpression t) Position
   | ESwitch (AbstractExpression t) [(Pattern, AbstractExpression t)]
   | EReturn (AbstractExpression t)
-  | ETypeExtension (Annotation t) [ExtensionMember t]
+  | ETypeExtension [PlumeGeneric] (Annotation t) [ExtensionMember t]
   | ENativeFunction Text [Text] t
+  | EGenericProperty [PlumeGeneric] Text [t] t
   deriving (Eq)
 
 data ExtensionMember t
   = ExtDeclaration
-      (Maybe [Text])
+      [PlumeGeneric]
       (Annotation (Maybe t))
       (AbstractExpression t)
   deriving (Eq)
