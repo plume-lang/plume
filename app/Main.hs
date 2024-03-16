@@ -4,7 +4,7 @@ import Control.Monad.Exception
 import Data.Text.IO
 import Plume.Syntax.Parser
 import Plume.Syntax.Translation.ConcreteToAbstract
-import Plume.TypeChecker.Checker hiding (with)
+import Plume.TypeChecker.Checker
 import Plume.TypeChecker.TLIR.Internal.Pretty ()
 import System.IO.Pretty
 import Prelude hiding (readFile)
