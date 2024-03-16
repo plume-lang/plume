@@ -10,6 +10,7 @@ data TypedExpression t
   = EVariable Text t
   | EExtVariable Text t
   | ELiteral Literal
+  | EList [TypedExpression t]
   | EApplication (TypedExpression t) [TypedExpression t]
   | EDeclaration
       (Annotation t)
