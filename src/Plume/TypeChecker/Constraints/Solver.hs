@@ -1,3 +1,6 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module Plume.TypeChecker.Constraints.Solver where
 
 import Control.Monad.Except
@@ -7,52 +10,101 @@ import Plume.Syntax.Concrete (Position)
 import Plume.TypeChecker.Constraints.Definition
 import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.Monad
-import Prelude hiding (gets)
+import Prelude hiding (elem, gets, optional)
+
+type MonadSolver m = (MonadIO m, MonadError (TypeError, Maybe Position) m)
 
 solve
-  :: (MonadIO m, MonadError (TypeError, Position) m)
+  :: (MonadSolver m)
   => [TypeConstraint]
   -> m Substitution
 solve [] = return mempty
 solve ((pos, t1 :~: t2) : xs) = do
   let s1 = mgu t1 t2
   case s1 of
-    Left err -> throwError (err, pos)
+    Left err -> throwError (err, Just pos)
     Right s1' -> do
       let s2 = solve $ map (second (apply s1')) xs
       compose s1' <$> s2
 solve ((pos, Extends extType extFunName appTy) : xs) = do
-  exts <- gets extensions
-  let foundScheme = findWithMgu exts (Extension extFunName extType)
-  case foundScheme of
-    Right scheme -> do
-      t <- instantiate scheme
-      let s1 = mgu t appTy
-      case s1 of
-        Left err -> throwError (err, pos)
-        Right s1' -> do
-          s2 <- solve $ map (second (apply s1')) xs
-          return $ s1' `compose` s2
-    Left err -> throwError (err, pos)
-solve ((_, Hole _) : xs) = solve xs
+  scheme <- solveExtension pos (extFunName, extType)
+  (t, _) <- instantiate scheme
 
-findWithMgu :: Map Extension Scheme -> Extension -> Either TypeError Scheme
-findWithMgu exts (Extension name t1) = do
-  found <-
-    lookupWith
-      exts
-      ( \(Extension n t2) -> do
-          if n == name
-            then do
-              let s = mgu t1 t2
-              case s of
-                Left _ -> return False
-                Right _ -> return True
-            else return False
+  let s1 = mgu t appTy
+  case s1 of
+    Left err -> throwError (err, Just pos)
+    Right s1' -> do
+      s2 <- solve $ map (second (apply s1')) xs
+      return $ s1' `compose` s2
+solve ((_, Hole _) : xs) = solve xs
+solve ((pos, ExtensionExists name t) : xs) = do
+  void $ solveExtension pos (name, t)
+  solve xs
+
+solveExtension :: (MonadSolver m) => Position -> (Text, PlumeType) -> m Scheme
+solveExtension p (name, t) = with @"position" (Just p) $ do
+  isGeneric <- isTypeExtensionGeneric (name, t)
+  findWithMgu (Extension name t isGeneric)
+
+isTypeExtensionGeneric :: (MonadSolver m) => (Text, PlumeType) -> m Bool
+isTypeExtensionGeneric (name, t) = do
+  let genericError = throw (NoGenericExtensionFound t)
+  case t of
+    TVar n -> do
+      exts' <- search @"extendedGenerics" n
+      case exts' of
+        Just tys ->
+          unless (name `elem` tys) genericError
+        Nothing ->
+          whenM (doesExtensionHaveGeneralOne name) genericError
+      return (isJust exts')
+    _ -> return False
+
+doesExtensionHaveGeneralOne :: (MonadSolver m) => Text -> m Bool
+doesExtensionHaveGeneralOne name = do
+  exts <- gets extensions
+
+  let res =
+        findWithKey
+          ( \(Extension n t b) ->
+              n == name
+                && (case t of TVar _ -> True; _ -> False)
+                && not b
+          )
+          exts
+
+  return $ isJust res
+
+doesExtensionHaveGenericOne :: (MonadSolver m) => Text -> m Bool
+doesExtensionHaveGenericOne name = do
+  exts <- gets extensions
+
+  let res = findWithKey (\(Extension n _ isGeneric) -> n == name && isGeneric) exts
+
+  return $ isJust res
+
+findWithMgu :: (MonadSolver m) => Extension -> m Scheme
+findWithMgu e@(Extension name t1 isGeneric1) = do
+  exts <- gets extensions
+  (_, found) <-
+    findMatchingExtension
+      ( \(Extension n t2 isGeneric2) -> do
+          case (t1, t2) of
+            (TVar _, TVar _)
+              | isGeneric2 && isGeneric1 -> do
+                  return (n == name && isRight (mgu t1 t2))
+            _
+              | not isGeneric2 && not isGeneric1 ->
+                  return (n == name && isRight (mgu t1 t2))
+            _ -> return False
       )
-  case found of
-    Just scheme -> return scheme
-    Nothing -> Left $ CompilerError "Extension not found"
+      exts
+      e
+
+  return found
+
+optional :: (MonadSolver m) => m a -> m (Maybe a)
+optional m = catchError (Just <$> m) (\_ -> return Nothing)
 
 findMin :: (Ord k) => Map k v -> Maybe k
 findMin m = case M.keys m of
@@ -66,6 +118,39 @@ lookupWith m f = do
   return $ case k of
     Just k' -> M.lookup k' xs
     Nothing -> Nothing
+
+chooseMaybeGeneric
+  :: (Eq k, Ord k, Monad m) => Map k v -> (k -> m Bool) -> m (Map k v)
+chooseMaybeGeneric m f =
+  filterWithKeyM (\k _ -> f k) m
+
+findWithKey
+  :: (Ord k) => (k -> Bool) -> Map k a -> Maybe (k, a)
+findWithKey p m = do
+  let m' = M.toList m
+  find (p . fst) m'
+
+findMatchingExtension
+  :: (MonadSolver m)
+  => (Extension -> m Bool)
+  -> Map Extension Scheme
+  -> Extension
+  -> m (Extension, Scheme)
+findMatchingExtension f m ext = do
+  let m' = M.toList m
+  case m' of
+    [] -> throw (NoExtensionFound ext.name ext.value)
+    (k@(Extension n _ _), v) : xs -> do
+      b <- f k
+      res <- filterWithKeyM (\k' _ -> f k') $ M.fromList xs
+      if b
+        then
+          if M.null res
+            then return (k, v)
+            else do
+              let extNames = map ((.value)) $ M.keys res
+              throw (MultipleExtensionsFound n extNames)
+        else findMatchingExtension f (M.fromList xs) ext
 
 filterWithKeyM
   :: (Ord k, Monad m) => (k -> v -> m Bool) -> Map k v -> m (Map k v)
@@ -81,5 +166,13 @@ filterWithKeyM f m = do
   return $ M.fromList xs
 
 runSolver
-  :: (MonadIO m) => [TypeConstraint] -> m (Either (TypeError, Position) Substitution)
-runSolver = runExceptT . solve
+  :: (MonadIO m)
+  => [TypeConstraint]
+  -> m (Either (TypeError, Maybe Position) Substitution)
+runSolver xs =
+  runExceptT
+    ( do
+        s1 <- solve xs
+        extCons <- gets extensionConstraints
+        compose s1 <$> solve (map (second $ apply s1) extCons)
+    )
