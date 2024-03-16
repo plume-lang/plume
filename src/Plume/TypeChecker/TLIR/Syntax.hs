@@ -3,6 +3,7 @@ module Plume.TypeChecker.TLIR.Syntax where
 import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Concrete.Expression (Position)
+import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR.Modules.Pattern
 
 data TypedExpression t
@@ -12,7 +13,7 @@ data TypedExpression t
   | EApplication (TypedExpression t) [TypedExpression t]
   | EDeclaration
       (Annotation t)
-      [Int]
+      [PlumeGeneric]
       (TypedExpression t)
       (Maybe (TypedExpression t))
   | EConditionBranch
@@ -27,5 +28,5 @@ data TypedExpression t
   | ELocated (TypedExpression t) Position
   | ESwitch (TypedExpression t) [(TypedPattern t, TypedExpression t)]
   | EReturn (TypedExpression t)
-  | ENativeFunction Text [Int] t
+  | ENativeFunction Text [PlumeGeneric] t
   deriving (Eq)

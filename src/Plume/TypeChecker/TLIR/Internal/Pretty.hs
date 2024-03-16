@@ -36,7 +36,7 @@ prettyExpr (EDeclaration a generics e1' e2') =
               Just e2'' -> anCol Blue "\nin" <+> prettyExpr e2''
           )
  where
-  gen = "forall " <> hsep (punctuate comma (map pretty generics)) <> ". "
+  gen = "forall " <> hsep (punctuate comma (map ansiPretty generics)) <> ". "
   arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
 prettyExpr (EConditionBranch e1' e2' e3') =
   anCol Blue "if"
@@ -70,7 +70,7 @@ prettyExpr (EReturn e) = anCol Blue "return" <+> prettyExpr e
 prettyExpr (ENativeFunction n gens (args :->: ret)) =
   anCol Blue "native"
     <+> pretty n
-    <+> angles (hsep . punctuate comma $ map pretty gens)
+    <+> angles (hsep . punctuate comma $ map ansiPretty gens)
     <+> parens (hsep . punctuate comma $ map ansiPretty args)
     <+> ":"
     <+> prettyTy ret
