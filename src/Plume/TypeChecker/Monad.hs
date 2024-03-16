@@ -38,7 +38,8 @@ import Prelude hiding (gets, local)
 type Result a = Spreadable [a] a
 
 type MonadChecker m = (MonadIO m, MonadError (TypeError, Maybe Position) m)
-type Inference m from to = (MonadChecker m) => from -> m (PlumeType, Result to)
+type Inference m from to =
+  (MonadChecker m) => from -> m (PlumeType, Result to, [Qualified])
 
 fresh :: (MonadIO m) => m Int
 fresh = liftIO $ do
@@ -53,11 +54,12 @@ extract :: PlumeGeneric -> Int
 extract (GVar n) = n
 extract (GExtends n _) = n
 
-instantiate :: (MonadIO m) => Scheme -> m (PlumeType, Substitution)
+instantiate :: (MonadIO m) => Scheme -> m (PlumeType, Substitution, [Qualified])
 instantiate (Forall vars t) = do
   vars' <- mapM (const freshTVar) vars
-  let s = Map.fromList $ zip (map extract vars) vars'
-   in return (apply s t, s)
+  let s = Map.fromList $ zip vars vars'
+   in case apply s t of
+        qs :=>: t' -> return (t', s, qs)
 
 local :: (MonadChecker m) => (CheckerState -> CheckerState) -> m a -> m a
 local f m = do
@@ -77,10 +79,10 @@ local f m = do
     )
   return a
 
-generalize :: Environment -> PlumeType -> Scheme
-generalize env t = Forall (map GVar vars) t
+generalize :: Environment -> [Qualified] -> PlumeType -> Scheme
+generalize env qs t = Forall vars (qs :=>: t)
  where
-  vars = Set.toList (free t Set.\\ free env)
+  vars = Set.toList ((free t <> free qs) Set.\\ free env)
 
 gets :: (MonadIO m) => (CheckerState -> a) -> m a
 gets f = f <$> readIORef checkerST

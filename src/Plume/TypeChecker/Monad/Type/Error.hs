@@ -58,7 +58,7 @@ instance Throwable TypeError where
       show (length xs)
         <> " "
         <> (if length xs == 1 then "argument" else "arguments")
-        <> (if length xs > 0 then " in " <> showError xs else "")
+        <> (if not (null xs) then " in " <> showError xs else "")
   showError (NotAFunction t) =
     "Not a function " <> showError t
   showError (CompilerError t) = "Compiler error " <> show t

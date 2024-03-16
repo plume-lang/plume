@@ -66,7 +66,7 @@ getScheme n = do
   s <- gets extensions
   let found =
         findWithKey
-          (\(Extension name _ gen) -> name == n && gen)
+          (\(Extension name _ gen _) -> name == n && gen)
           s
   case found of
     Just (_, scheme) -> return scheme

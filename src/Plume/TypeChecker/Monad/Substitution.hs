@@ -51,6 +51,7 @@ instance (Types a) => Types (TypedExpression a) where
   free = error "Not implemented"
 
   apply s (EVariable n t) = EVariable n (apply s t)
+  apply s (EList es) = EList (apply s es)
   apply s (EApplication e1 e2) = EApplication (apply s e1) (apply s e2)
   apply s (EClosure anns t e) = EClosure (apply s anns) (apply s t) (apply s e)
   apply s (ELocated e p) = ELocated (apply s e) p

@@ -28,14 +28,23 @@ data CheckerState = CheckerState
   , extensionConstraints :: [TypeConstraint]
   }
 
-data Extension = Extension {name :: Text, value :: PlumeType, isGeneric :: Bool}
+data Extension = Extension
+  { name :: Text
+  , value :: PlumeType
+  , isGeneric :: Bool
+  , superExtensions :: [Extension]
+  }
   deriving (Show)
 
 instance Ord Extension where
-  compare (Extension n1 t1 _) (Extension n2 t2 _) = compare n1 n2 <> compare t1 t2
+  compare (Extension n1 t1 _ se1) (Extension n2 t2 _ se2) = compare n1 n2 <> compare t1 t2 <> compare se1 se2
 
 instance Eq Extension where
-  (Extension n1 t b) == (Extension n2 t' b') = n1 == n2 && t == t' && b == b'
+  (Extension n1 t b se1) == (Extension n2 t' b' se2) =
+    n1 == n2
+      && t == t'
+      && b == b'
+      && se1 == se2
 
 checkerST :: IORef CheckerState
 {-# NOINLINE checkerST #-}
