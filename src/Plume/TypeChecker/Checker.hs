@@ -8,7 +8,6 @@ module Plume.TypeChecker.Checker where
 import Control.Monad.Except
 import Data.Foldable
 import Data.Map qualified as M
-import GHC.Records
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Literal
@@ -22,15 +21,10 @@ import Plume.TypeChecker.Monad
 import Plume.TypeChecker.Monad.Type qualified as Post
 import Plume.TypeChecker.Monad.Type.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
-import System.IO.Pretty
 import Prelude hiding (gets, local)
 
 type Expression = Post.TypedExpression Post.PlumeType
 type Pattern = Post.TypedPattern Post.PlumeType
-
-throw :: (MonadChecker m) => TypeError -> m a
-throw err =
-  throwError . (err,) =<< position <$> readIORef checkerST
 
 unify :: (MonadChecker m) => ConstraintConstructor -> m ()
 unify c = do
@@ -41,45 +35,15 @@ unify c = do
       writeIORef checkerST (s {constraints = s.constraints ++ [(p, c)]})
     Nothing -> throw (CompilerError "No position found")
 
-insert
-  :: forall l m a k
-   . (MonadChecker m, HasField l CheckerState (M.Map k a), Ord k)
-  => k
-  -> a
-  -> m ()
-insert k v = do
+unify' :: (MonadChecker m) => ConstraintConstructor -> m ()
+unify' c = do
   s <- readIORef checkerST
-  writeIORef checkerST (setField @l s (M.insert k v (getField @l s)))
-
-withVariables :: (MonadChecker m) => [(Text, Scheme)] -> m a -> m a
-withVariables vars =
-  with' @"variables" (fromList vars <>)
-
-withReturnType :: (MonadChecker m) => PlumeType -> m a -> m a
-withReturnType ret =
-  with @"returnType" ret
-
-withGenerics :: (MonadChecker m) => [(Text, Int)] -> m a -> m a
-withGenerics gens =
-  with' @"generics" (fromList gens <>)
-
-with
-  :: forall l a m b. (MonadChecker m, HasField l CheckerState a) => a -> m b -> m b
-with v = with' @l (const v)
-
-with'
-  :: forall l a m b
-   . (MonadChecker m, HasField l CheckerState a)
-  => (a -> a)
-  -> m b
-  -> m b
-with' f m = do
-  old <- readIORef checkerST
-  writeIORef checkerST (setField @l old (f (getField @l old)))
-  a <- m
-  new <- readIORef checkerST
-  writeIORef checkerST (setField @l new (getField @l old))
-  return a
+  case s.position of
+    Just p ->
+      writeIORef
+        checkerST
+        (s {extensionConstraints = s.extensionConstraints ++ [(p, c)]})
+    Nothing -> throw (CompilerError "No position found")
 
 shouldBeAlone
   :: (MonadChecker m) => m (PlumeType, Result to) -> m (PlumeType, to)
@@ -118,23 +82,68 @@ lookupWith m f = do
   let newMap = M.filterWithKey (\k'' _ -> f k'') m
   findMin newMap >>= flip M.lookup newMap
 
+getGenericName :: Pre.PlumeGeneric -> Text
+getGenericName (Pre.GVar n) = n
+getGenericName (Pre.GExtends n _) = n
+
 getVariable
   :: (MonadChecker m) => Text -> m (Maybe PlumeType)
 getVariable name = do
   t <- search @"variables" name
   case t of
-    Just t' -> Just <$> instantiate t'
+    Just t' -> do
+      instantiated <- checkExtensions t'
+      return (Just instantiated)
     Nothing -> do
       isExtension name >>= \case
         True -> return Nothing
         False -> throw (UnboundVariable name)
+
+getExtensions :: [PlumeGeneric] -> Map Int [Text]
+getExtensions gens =
+  M.fromList $
+    mapMaybe
+      (\case GVar _ -> Nothing; GExtends n tys -> Just (n, tys))
+      gens
+
+mapWithKeyM :: (Monad m, Ord k) => (k -> a -> m b) -> Map k a -> m (Map k b)
+mapWithKeyM f m = M.fromList <$> mapM (\(k, v) -> (k,) <$> f k v) (M.toList m)
+
+checkForInstance :: (MonadChecker m) => Map PlumeType [Text] -> m ()
+checkForInstance m = do
+  void $
+    mapWithKeyM
+      ( \k v -> do
+          mapM_ (unify' . flip ExtensionExists k) v
+      )
+      m
+
+checkExtensions :: (MonadChecker m) => Scheme -> m PlumeType
+checkExtensions t'@(Forall gens _) = do
+  (instantiated, s) <- instantiate t'
+  let m = getExtensions gens
+  let subExt =
+        M.fromList . M.elems $
+          M.mapMaybeWithKey
+            (\k v -> case M.lookup k m of Just tys -> Just (v, tys); Nothing -> Nothing)
+            s
+  checkForInstance subExt
+  return instantiated
+
+applyOnGeneric :: Substitution -> PlumeGeneric -> PlumeGeneric
+applyOnGeneric s (GVar n) = case M.lookup n s of
+  Just (TVar t) -> GVar t
+  _ -> GVar n
+applyOnGeneric s (GExtends n tys) = case M.lookup n s of
+  Just (TVar t) -> GExtends t tys
+  _ -> GExtends n tys
 
 synthesize' :: Inference m Pre.Expression Expression
 synthesize' (Pre.EVariable name) = do
   t <- search @"variables" name
   case t of
     Just t' -> do
-      inst <- instantiate t'
+      inst <- checkExtensions t'
       return (inst, G.Single $ Post.EVariable name inst)
     Nothing -> throw (UnboundVariable name)
 synthesize' (Pre.EApplication f xs)
@@ -217,20 +226,20 @@ synthesize' (Pre.EReturn e) = do
   unify (t :~: ret)
   return (ret, G.Single $ Post.EReturn e')
 synthesize' (Pre.EDeclaration gens (Annotation name ty) value body) = do
-  (genericTys, genericNames) <- case gens of
-    Just gens' -> (,gens') <$> mapM (const fresh) gens'
-    Nothing -> return ([], [])
-  let generics'' = zip genericNames genericTys
+  (genericTys, genericNames) <-
+    (,map getGenericName gens) <$> mapM convert gens
+  let generics'' = zip genericNames (map extract genericTys)
   ty' <- fromType ty
   (t, value') <-
-    withVariables [(name, Forall genericTys ty')] $
+    withVariables [(name, Forall [] ty')] $
       withGenerics generics'' $
         synthesize value
-  unify (t :~: ty')
+  unify (ty' :~: t)
+  let sch = if null genericTys then Forall [] ty' else Forall genericTys t
   case body of
     Just body' -> do
       (ret, body'') <-
-        withVariables [(name, Forall genericTys ty')] $
+        withVariables [(name, sch)] $
           synthesize body'
       return
         ( ret
@@ -242,9 +251,9 @@ synthesize' (Pre.EDeclaration gens (Annotation name ty) value body) = do
               (Just body'')
         )
     Nothing -> do
-      insert @"variables" name (Forall genericTys ty')
+      insert @"variables" name sch
       return
-        ( ty'
+        ( TUnit
         , G.Single $
             Post.EDeclaration
               (Annotation name ty')
@@ -270,33 +279,55 @@ synthesize' (Pre.ESwitch e cases) = do
   forM_ xs $ unify . (ret :~:)
 
   return (ret, G.Single $ Post.ESwitch e' cases')
-synthesize' (Pre.ETypeExtension (Annotation x t) members) = do
-  t' <- convert t
-  (members', schemes) <-
-    unzip
-      <$> withVariables
-        [(x, Forall [] t')]
-        (mapM (`synthesizeExtMember` (x, t')) members)
-  let schemes' = map (\(name, s) -> (Extension name t', s)) schemes
+synthesize' (Pre.ETypeExtension generics (Annotation x t) members) = do
+  generics' :: [Post.PlumeGeneric] <- mapM convert generics
+  let gensInt = zipWith (curry $ bimap getGenericName extract) generics generics'
+  (t', (members', schemes)) <- withGenerics gensInt $ do
+    t' <- convert t
+    res <-
+      unzip
+        <$> withVariables
+          [(x, Forall [] t')]
+          (mapM (`synthesizeExtMember` (x, t', generics')) members)
+    return (t', res)
+  let schemes' = map (\(name, s) -> (Extension name t' False, s)) schemes
   mapM_ (uncurry $ insert @"extensions") schemes'
   return (Post.TUnit, G.Spread members')
 synthesize' (Pre.ENativeFunction name gens ty) = do
   gens' <- mapM (const fresh) gens
   let genericList = zip gens gens'
   ty' <- withGenerics genericList $ convert ty
-  insert @"variables" name (Forall gens' ty')
-  return (ty', G.Single $ Post.ENativeFunction name gens' ty')
+  insert @"variables" name (Forall (map GVar gens') ty')
+  return (ty', G.Single $ Post.ENativeFunction name (map GVar gens') ty')
+synthesize' (Pre.EGenericProperty gens name tys ty) = do
+  gens' <- mapM convert gens
+  let genericList = zip (map getGenericName gens) (fmap extract gens')
+
+  (tys', ty') <- withGenerics genericList $ do
+    tys' <- mapM (convert @Pre.PlumeType @Post.PlumeType) tys
+    ty' <- withGenerics genericList $ convert ty
+    return (tys', ty')
+
+  case tys' of
+    [] -> throw (TypeMissing name)
+    (extTy : _) -> do
+      let funTy = tys' :->: ty'
+      let sch = Forall gens' funTy
+      insert @"extensions" (Extension name extTy True) sch
+      return
+        ( ty'
+        , G.Empty
+        )
 
 synthesizeExtMember
   :: (MonadChecker m)
   => Pre.ExtensionMember Pre.PlumeType
-  -> (Text, PlumeType)
+  -> (Text, PlumeType, [PlumeGeneric])
   -> m (Expression, (Text, Scheme))
-synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure args ret e)) var = do
-  (genericTys, genericNames) <- case gens of
-    Just gens' -> (,gens') <$> mapM (const fresh) gens'
-    Nothing -> return ([], [])
-  let generics'' = zip genericNames genericTys
+synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure args ret e)) (extName, extTy, extGens) = do
+  let var = (extName, extTy)
+  (genericTys, genericNames) <- (,map getGenericName gens) <$> mapM convert gens
+  let generics'' = zipWith (curry $ second extract) genericNames genericTys
 
   ret' <- fromType ret
   args' <- mapM (fromType . annotationValue) args
@@ -314,8 +345,6 @@ synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure a
 
   unify (t :~: ret')
 
-  liftIO $ ppPrint (t, ret')
-
   let args''' = zipWith Annotation (map annotationName args) args'
 
   let funTy = (snd var : args') :->: ret'
@@ -326,7 +355,7 @@ synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure a
         genericTys
         (Post.EClosure (uncurry Annotation var : args''') ret' body')
         Nothing
-    , (name, Forall genericTys funTy)
+    , (name, Forall (extGens ++ genericTys) funTy)
     )
 synthesizeExtMember _ _ = throw (CompilerError "Invalid extension member")
 
@@ -338,7 +367,7 @@ synthesizePat (Pre.PVariable name) = do
   t <- search @"types" name
   case t of
     Just t' -> do
-      inst <- instantiate t'
+      inst <- fst <$> instantiate t'
       return (inst, Post.PVariable name inst, mempty)
     Nothing -> do
       ty <- freshTVar
@@ -359,7 +388,7 @@ synthesizePat (Pre.PConstructor name pats) = do
   tv <- freshTVar
   case consTy of
     Just t -> do
-      inst <- instantiate t
+      inst <- fst <$> instantiate t
       (ts, pats', vars) <- mapAndUnzip3M synthesizePat pats
       unify (inst :~: ts :->: tv)
       return (tv, Post.PConstructor name pats', mconcat vars)
@@ -388,4 +417,4 @@ runSynthesize e = do
       cnsts <- gets constraints
       sub <- Solver.runSolver cnsts
       let exprs = G.flat $ map snd xs
-      return $ first (fmap Just) $ apply <$> sub <*> pure exprs
+      return $ apply <$> sub <*> pure exprs
