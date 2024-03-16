@@ -26,6 +26,14 @@ import Prelude hiding (gets, local)
 type Expression = Post.TypedExpression Post.PlumeType
 type Pattern = Post.TypedPattern Post.PlumeType
 
+getGenericProperty :: (MonadChecker m) => Text -> m (Maybe PlumeType)
+getGenericProperty name = do
+  exts <- gets extensions
+  let t = findWithKey (\(Extension n _ b) -> n == name && b) exts
+  case t of
+    Just (_, sch) -> Just . fst <$> instantiate sch
+    _ -> return Nothing
+
 unify :: (MonadChecker m) => ConstraintConstructor -> m ()
 unify c = do
   pos <- position <$> readIORef checkerST
@@ -280,7 +288,7 @@ synthesize' (Pre.ESwitch e cases) = do
 
   return (ret, G.Single $ Post.ESwitch e' cases')
 synthesize' (Pre.ETypeExtension generics (Annotation x t) members) = do
-  generics' :: [Post.PlumeGeneric] <- mapM convert generics
+  generics' <- mapM convert generics
   let gensInt = zipWith (curry $ bimap getGenericName extract) generics generics'
   (t', (members', schemes)) <- withGenerics gensInt $ do
     t' <- convert t
@@ -288,7 +296,13 @@ synthesize' (Pre.ETypeExtension generics (Annotation x t) members) = do
       unzip
         <$> withVariables
           [(x, Forall [] t')]
-          (mapM (`synthesizeExtMember` (x, t', generics')) members)
+          ( do
+              mapM
+                ( \em -> do
+                    synthesizeExtMember em (x, t', generics')
+                )
+                members
+          )
     return (t', res)
   let schemes' = map (\(name, s) -> (Extension name t' False, s)) schemes
   mapM_ (uncurry $ insert @"extensions") schemes'
@@ -348,6 +362,12 @@ synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure a
   let args''' = zipWith Annotation (map annotationName args) args'
 
   let funTy = (snd var : args') :->: ret'
+
+  genProp <- getGenericProperty name
+
+  case genProp of
+    Just t' -> unify (t' :~: funTy)
+    Nothing -> return ()
 
   return
     ( Post.EDeclaration
