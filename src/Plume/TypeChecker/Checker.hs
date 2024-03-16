@@ -7,6 +7,7 @@ module Plume.TypeChecker.Checker where
 
 import Control.Monad.Except
 import Data.Foldable
+import Data.List qualified as L
 import Data.Map qualified as M
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Common.Annotation
@@ -21,10 +22,14 @@ import Plume.TypeChecker.Monad
 import Plume.TypeChecker.Monad.Type qualified as Post
 import Plume.TypeChecker.Monad.Type.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
-import Prelude hiding (gets, local)
+import Prelude hiding (gets, local, (++))
+import Prelude qualified as P
 
 type Expression = Post.TypedExpression Post.PlumeType
 type Pattern = Post.TypedPattern Post.PlumeType
+
+(++) :: (Eq a) => [a] -> [a] -> [a]
+(++) xs ys = L.nub $ xs P.++ ys
 
 generateQualified :: [PlumeGeneric] -> [Qualified]
 generateQualified =
@@ -281,7 +286,7 @@ synthesize' (Pre.EDeclaration gens (Annotation name ty) value body) = do
               genericTys
               value'
               (Just body'')
-        , if null genericTys then qs' ++ qs'' else qs
+        , L.nub (qs' ++ qs'' ++ qs)
         )
     Nothing -> do
       insert @"variables" name sch
@@ -293,7 +298,7 @@ synthesize' (Pre.EDeclaration gens (Annotation name ty) value body) = do
               genericTys
               value'
               Nothing
-        , if null genericTys then qs' else qs
+        , L.nub (qs' ++ qs)
         )
 synthesize' (Pre.ESwitch e cases) = do
   (t, e', qs) <- synthesize e
@@ -334,15 +339,7 @@ synthesize' (Pre.ETypeExtension generics (Annotation x t) members) = do
                 members
           )
     return (t', res)
-  let superExtensions =
-        concat $
-          mapMaybe
-            ( \case
-                GExtends n tys -> Just $ map (\ty -> Extension ty (TVar n) False []) tys
-                _ -> Nothing
-            )
-            generics'
-  let schemes' = map (\(name, s) -> (Extension name t' False superExtensions, s)) schemes
+  let schemes' = map (\(name, s) -> (Extension name t' False [], s)) schemes
   mapM_ (uncurry $ insert @"extensions") schemes'
   return (Post.TUnit, G.Spread members', [])
 synthesize' (Pre.ENativeFunction name gens ty) = do
@@ -366,16 +363,8 @@ synthesize' (Pre.EGenericProperty gens name tys ty) = do
     (extTy : _) -> do
       let funTy = tys' :->: ty'
       let sch = Forall (map extract gens') (qs :=>: funTy)
-      let superExtensions =
-            concat $
-              mapMaybe
-                ( \case
-                    GExtends n exts -> Just $ map (\ext -> Extension ext (TVar n) False []) exts
-                    _ -> Nothing
-                )
-                gens'
 
-      insert @"extensions" (Extension name extTy True superExtensions) sch
+      insert @"extensions" (Extension name extTy True []) sch
       return
         ( ty'
         , G.Empty
@@ -424,7 +413,7 @@ synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure a
 
   genProp <- getGenericProperty name
 
-  let finalQs = qs <> qs'
+  let finalQs = qs ++ qs'
 
   case genProp of
     Just (t', _) -> do

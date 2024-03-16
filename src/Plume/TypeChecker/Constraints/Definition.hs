@@ -10,7 +10,7 @@ data ConstraintConstructor
   | Extends PlumeType Text PlumeType
   | Hole PlumeType
   | ExtensionExists Text PlumeType
-  deriving (Show)
+  deriving (Show, Eq)
 
 infix 4 :~:
 

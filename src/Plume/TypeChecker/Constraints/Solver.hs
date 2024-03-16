@@ -35,20 +35,39 @@ solve ((pos, Extends extType extFunName appTy) : xs) = do
   case s1 of
     Left err -> throwError (err, Just pos)
     Right s1' -> do
+      let qs' = nub qs
       let extConstraints =
             map
               ( \case
                   ty `Has` n -> (pos, ExtensionExists n ty)
               )
-              (apply s1' qs)
+              (apply s1' qs')
 
       s <- solve extConstraints
       s2 <- solve $ map (second (apply s1')) xs
       return $ s1' `compose` s2 `compose` s
 solve ((_, Hole _) : xs) = solve xs
 solve ((pos, ExtensionExists name t) : xs) = do
-  void $ solveExtension pos (name, t)
-  solve xs
+  sch <- solveExtension pos (name, t)
+  (t', _, qs) <- instantiate sch
+  case t' of
+    ((extTy : _) :->: _) -> do
+      let s1 = mgu t extTy
+      case s1 of
+        Left err -> throwError (err, Just pos)
+        Right s1' -> do
+          let qs' = nub qs
+          let extConstraints =
+                map
+                  ( \case
+                      ty `Has` n -> (pos, ExtensionExists n ty)
+                  )
+                  (apply s1' qs')
+          s <- solve extConstraints
+          let s' = s `compose` s1'
+          s2 <- solve $ map (second (apply s')) xs
+          return $ s2 `compose` s'
+    _ -> throwError (NoExtensionFound name t, Just pos)
 
 solveExtension :: (MonadSolver m) => Position -> (Text, PlumeType) -> m Scheme
 solveExtension p (name, t) = with @"position" (Just p) $ do
@@ -195,7 +214,7 @@ runSolver xs =
   runExceptT
     ( do
         s1 <- solve xs
-        extCons <- gets extensionConstraints
+        extCons <- nub <$> gets extensionConstraints
         compose s1 <$> solve (map (second $ apply s1) extCons)
     )
 

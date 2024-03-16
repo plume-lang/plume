@@ -15,7 +15,7 @@ data Scheme
 
 data Qualified
   = PlumeType `Has` Text
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Qualifier
   = [Qualified] :=>: PlumeType
