@@ -23,16 +23,19 @@ data CheckerState = CheckerState
   , constraints :: [TypeConstraint]
   , position :: Maybe Position
   , generics :: Map Text Int
+  , extendedGenerics :: Map Int [Text]
   , extensions :: Map Extension Scheme
+  , extensionConstraints :: [TypeConstraint]
   }
 
-data Extension = Extension {name :: Text, value :: PlumeType}
+data Extension = Extension {name :: Text, value :: PlumeType, isGeneric :: Bool}
+  deriving (Show)
 
 instance Ord Extension where
-  compare (Extension n1 _) (Extension n2 _) = compare n1 n2
+  compare (Extension n1 t1 _) (Extension n2 t2 _) = compare n1 n2 <> compare t1 t2
 
 instance Eq Extension where
-  (Extension n1 t) == (Extension n2 t') = n1 == n2 && t == t'
+  (Extension n1 t b) == (Extension n2 t' b') = n1 == n2 && t == t' && b == b'
 
 checkerST :: IORef CheckerState
 {-# NOINLINE checkerST #-}
@@ -48,16 +51,19 @@ emptyState =
     , constraints = []
     , position = Nothing
     , generics = Map.empty
+    , extendedGenerics = Map.empty
     , extensions = Map.empty
+    , extensionConstraints = []
     }
 
 search
-  :: forall l v m
-   . ( HasField l CheckerState (Map Text v)
+  :: forall l v m k
+   . ( HasField l CheckerState (Map k v)
      , MonadIO m
+     , Ord k
      , MonadError (TypeError, Maybe Position) m
      )
-  => Text
+  => k
   -> m (Maybe v)
 search k = do
   v <- readIORef checkerST
@@ -86,3 +92,18 @@ instance HasField "tvarCounter" CheckerState Int where
 
 instance HasField "extensions" CheckerState (Map Extension Scheme) where
   hasField c = (\x -> c {extensions = x}, extensions c)
+
+instance HasField "extendedGenerics" CheckerState (Map Int [Text]) where
+  hasField c = (\x -> c {extendedGenerics = x}, extendedGenerics c)
+
+instance HasField "extensionConstraints" CheckerState [TypeConstraint] where
+  hasField c = (\x -> c {extensionConstraints = x}, extensionConstraints c)
+
+instance HasField "name" Extension Text where
+  hasField c = (\x -> c {name = x}, name c)
+
+instance HasField "value" Extension PlumeType where
+  hasField c = (\x -> c {value = x}, value c)
+
+instance HasField "isGeneric" Extension Bool where
+  hasField c = (\x -> c {isGeneric = x}, isGeneric c)

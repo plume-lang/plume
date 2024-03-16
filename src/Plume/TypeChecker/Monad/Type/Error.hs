@@ -16,6 +16,10 @@ data TypeError
   | NotAFunction PlumeType
   | CompilerError Text
   | EmptyMatch
+  | NoExtensionFound Text PlumeType
+  | MultipleExtensionsFound Text [PlumeType]
+  | NoGenericExtensionFound PlumeType
+  | TypeMissing Text
 
 instance (Throwable a) => Throwable [a] where
   showError [] = ""
@@ -52,6 +56,13 @@ instance Throwable TypeError where
     "Not a function " <> showError t
   showError (CompilerError t) = "Compiler error " <> show t
   showError EmptyMatch = "Empty match"
+  showError (NoExtensionFound n t) =
+    "No extension found for " <> show n <> " on type " <> showError t
+  showError (MultipleExtensionsFound n ts) =
+    "Multiple extensions found for " <> show n <> " on types " <> showError ts
+  showError (NoGenericExtensionFound t) =
+    "No generic extension found for type " <> showError t
+  showError (TypeMissing t) = "Type missing " <> show t <> " in type extension"
 
 instance (Throwable a) => Throwable (a, Maybe Position) where
   showError (err, pos) =

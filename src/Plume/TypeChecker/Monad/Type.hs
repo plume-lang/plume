@@ -2,6 +2,7 @@
 
 module Plume.TypeChecker.Monad.Type where
 
+import Data.Text (intercalate)
 import Plume.Syntax.Internal.Pretty.ANSI
 import Prettyprinter.Render.Terminal
 import Prelude hiding (intercalate)
@@ -10,7 +11,17 @@ data PlumeType
   = TId Text
   | TVar Int
   | TApp PlumeType [PlumeType]
-  deriving (Eq)
+  deriving (Eq, Ord, Show)
+
+instance ToText PlumeType where
+  toText (TId n) = n
+  toText (TVar i) = "a" <> show i
+  toText (TApp t ts) = toText t <> "<" <> intercalate ", " (map toText ts) <> ">"
+
+data PlumeGeneric
+  = GVar Int
+  | GExtends Int [Text]
+  deriving (Eq, Show)
 
 pattern TFunction, (:->:) :: [PlumeType] -> PlumeType -> PlumeType
 pattern TFunction args ret = TApp (TApp (TId "->") [ret]) args
@@ -42,3 +53,12 @@ prettyTy (TApp t ts) = prettyTy t <> angles (hsep . punctuate comma $ map pretty
 prettyTy (TVar i) = anCol Yellow $ "a" <> pretty i
 
 instance ANSIPretty PlumeType where ansiPretty = prettyTy
+
+prettyGen :: PlumeGeneric -> Doc AnsiStyle
+prettyGen (GVar n) = anCol Yellow $ "a" <> pretty n
+prettyGen (GExtends n tys) =
+  anCol Yellow (pretty n)
+    <+> anCol Blue "extends"
+    <+> hsep (punctuate comma (map pretty tys))
+
+instance ANSIPretty PlumeGeneric where ansiPretty = prettyGen

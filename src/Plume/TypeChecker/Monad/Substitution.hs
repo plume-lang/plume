@@ -36,6 +36,13 @@ instance Types PlumeType where
   free (TApp t1 t2) = free t1 `S.union` free t2
   free _ = S.empty
 
+instance Types PlumeGeneric where
+  apply _ (GVar i) = GVar i
+  apply _ (GExtends i ts) = GExtends i ts
+
+  free (GVar i) = S.singleton i
+  free (GExtends i _) = S.singleton i
+
 instance (Types a) => Types (M.Map Text a) where
   free = free . M.elems
   apply s = M.map (apply s)
