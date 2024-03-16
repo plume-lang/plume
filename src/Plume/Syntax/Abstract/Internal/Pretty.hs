@@ -82,6 +82,7 @@ prettyExpr (EGenericProperty gens n ts t) =
     <+> angles (hsep . punctuate comma $ map ansiPretty ts)
     <+> ":"
     <+> prettyTy t
+prettyExpr (EList es) = brackets (hsep . punctuate comma $ map prettyExpr es)
 
 prettyExtMember :: ExtensionMember PlumeType -> Doc AnsiStyle
 prettyExtMember (ExtDeclaration g ann e) =

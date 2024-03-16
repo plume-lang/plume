@@ -125,6 +125,12 @@ concreteToAbstract (CST.ENativeFunction n gens t) =
   transRet . Right $ AST.ENativeFunction n gens t
 concreteToAbstract (CST.EGenericProperty g n ts t) =
   transRet . Right $ AST.EGenericProperty g n ts t
+concreteToAbstract (CST.EList es) = do
+  -- Lists can be composed of spread elements, so we need to flatten
+  -- the list of expressions into a single expression.
+  es' <-
+    fmap flat . sequence <$> mapM concreteToAbstract es
+  transRet $ AST.EList <$> es'
 
 concreteToAbstractExtensionMember
   :: CST.ExtensionMember Common.PlumeType

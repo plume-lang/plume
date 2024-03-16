@@ -38,6 +38,7 @@ data PrefixOperator
 data ConcreteExpression t
   = EVariable Text
   | ELiteral Literal
+  | EList [ConcreteExpression t]
   | EApplication (ConcreteExpression t) [ConcreteExpression t]
   | EBinary BinaryOperator (ConcreteExpression t) (ConcreteExpression t)
   | EPrefix PrefixOperator (ConcreteExpression t)

@@ -15,6 +15,7 @@ import Prelude hiding (intercalate)
 data AbstractExpression t
   = EVariable Text
   | ELiteral Literal
+  | EList [AbstractExpression t]
   | EApplication (AbstractExpression t) [AbstractExpression t]
   | EDeclaration
       [PlumeGeneric]

@@ -126,6 +126,7 @@ prettyExpr _ (EGenericProperty gens n ts t) =
     <> parens (hsep . punctuate comma $ map ansiPretty ts)
       <+> ":"
       <+> ansiPretty t
+prettyExpr _ (EList es) = brackets (hsep . punctuate comma $ map (prettyExpr 0) es)
 
 prettyExt :: ExtensionMember PlumeType -> Doc AnsiStyle
 prettyExt (ExtDeclaration gs a e1') =

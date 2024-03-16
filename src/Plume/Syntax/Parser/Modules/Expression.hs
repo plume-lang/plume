@@ -123,6 +123,9 @@ eConditionBranch isStatement = do
     indentOrInline
   return (EConditionBranch cond thenBr elseBr)
 
+eList :: Parser Expression
+eList = EList <$> brackets (eExpression `sepBy` comma)
+
 eReturn :: Parser Expression
 eReturn = do
   _ <- reserved "return"
@@ -274,6 +277,7 @@ eExpression = eLocated $ makeExprParser eTerm ([postfixOperators] : operators)
   eTerm =
     choice
       [ parseLiteral eExpression
+      , eList
       , try eMacroApplication
       , eMacroVariable
       , eSwitch
