@@ -1,4 +1,6 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module Plume.Syntax.Parser.Modules.Expression where
 
@@ -221,6 +223,18 @@ eFunctionDefinition = do
   return
     (EDeclaration generics (name :@: Nothing) (EClosure arguments ret body) Nothing)
 
+eOperatorFunctionDefinition :: Parser Expression
+eOperatorFunctionDefinition = do
+  void $ reserved "operator"
+  name <- operator
+  generics <- option [] (angles (gGeneric `sepBy` comma))
+  arguments <- parens (annotated `sepBy` comma)
+  ret <- optional (symbol ":" *> tType)
+  _ <- symbol "=>"
+  body <- indentOrInline
+  return
+    (EDeclaration generics (name :@: Nothing) (EClosure arguments ret body) Nothing)
+
 eCasePattern :: Parser (Pattern, Expression)
 eCasePattern = do
   _ <- reserved "case"
@@ -266,13 +280,40 @@ parseStatement =
       [ eReturn
       , eConditionBranch True
       , eDeclaration
+      , eOperatorFunctionDefinition
       , eFunctionDefinition
       , eExpression
       ]
 
+sortCustomOperators :: [CustomOperator] -> [[Operator Parser Expression]]
+sortCustomOperators ops = do
+  let ops' = sortBy (\x y -> compare x.precedence y.precedence) ops
+  map ((: []) . parseOperator) ops'
+ where
+  parseOperator :: CustomOperator -> Operator Parser Expression
+  parseOperator (CustomOperator name _ CPrefix) =
+    prefix name (CustomPrefix name)
+  parseOperator (CustomOperator name _ CPostfix) =
+    postfix name (CustomPostfix name)
+  parseOperator (CustomOperator name _ ty)
+    | ty `elem` [CInfixN, CInfixL, CInfixR] =
+        binary name (CustomInfix name)
+    | otherwise =
+        error "Invalid operator type"
+
+pattern CustomInfix :: Text -> Expression -> Expression -> Expression
+pattern CustomInfix name e1 e2 = EApplication (EVariable name) [e1, e2]
+
+pattern CustomPrefix, CustomPostfix :: Text -> Expression -> Expression
+pattern CustomPrefix name e = EApplication (EVariable name) [e]
+pattern CustomPostfix name e = EApplication (EVariable name) [e]
+
 -- Main expression parsing function
 eExpression :: Parser Expression
-eExpression = eLocated $ makeExprParser eTerm ([postfixOperators] : operators)
+eExpression = eLocated $ do
+  customOps <- readIORef customOperators
+  let customs = sortCustomOperators customOps
+  makeExprParser eTerm ([postfixOperators] : operators ++ customs)
  where
   eTerm =
     choice
@@ -327,18 +368,39 @@ tRequire = do
   _ <- reserved "require"
   ERequire <$> stringLiteral
 
-parseToplevel :: Parser Expression
-parseToplevel =
-  eLocated $
+tCustomOperator :: Parser ()
+tCustomOperator = do
+  opTy <-
     choice
-      [ tRequire
-      , eGenericProperty
-      , eNativeFunction
-      , eExtension
-      , eMacroFunction
-      , eMacro
-      , parseStatement
+      [ reserved "infix" $> CInfixN
+      , reserved "infixl" $> CInfixL
+      , reserved "infixr" $> CInfixR
+      , reserved "prefix" $> CPrefix
+      , reserved "postfix" $> CPostfix
       ]
+  prec <- option 0 $ fromInteger <$> integer
+  name <- operator
+  let op = CustomOperator name prec opTy
+  modifyIORef' customOperators (op :)
+
+parseToplevel :: Parser (Maybe Expression)
+parseToplevel =
+  try (tCustomOperator $> Nothing)
+    <|> ( Just
+            <$> eLocated
+              ( choice
+                  [ tRequire
+                  , eGenericProperty
+                  , eNativeFunction
+                  , eExtension
+                  , eMacroFunction
+                  , eMacro
+                  , parseStatement
+                  ]
+              )
+        )
 
 parseProgram :: Parser Program
-parseProgram = many (nonIndented parseToplevel <* optional indentSc)
+parseProgram =
+  catMaybes
+    <$> many (nonIndented parseToplevel <* optional indentSc)

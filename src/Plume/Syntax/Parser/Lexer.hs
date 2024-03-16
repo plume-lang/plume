@@ -1,3 +1,5 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+
 module Plume.Syntax.Parser.Lexer where
 
 import Control.Monad.Parser
@@ -8,6 +10,22 @@ import Text.Megaparsec hiding (many, some)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 import Prelude hiding (modify)
+
+data OperatorType
+  = CInfixL
+  | CInfixR
+  | CInfixN
+  | CPrefix
+  | CPostfix
+  deriving (Show, Eq)
+
+data CustomOperator
+  = CustomOperator
+  { customOperator :: Text
+  , precedence :: Int
+  , opType :: OperatorType
+  }
+  deriving (Show)
 
 lineComment :: Parser ()
 lineComment = L.skipLineComment "//"
@@ -113,12 +131,18 @@ reservedWords =
   , "property"
   , "with"
   , "extends"
+  , "operator"
   , -- Primitive types
     "int"
   , "str"
   , "char"
   , "float"
   , "bool"
+  , "infix"
+  , "prefix"
+  , "postfix"
+  , "infixl"
+  , "infixr"
   ]
 
 notSpace :: Parser ()
@@ -156,11 +180,62 @@ isTabIndent :: IORef (Maybe Bool)
 {-# NOINLINE isTabIndent #-}
 isTabIndent = unsafePerformIO $ newIORef Nothing
 
+customOperators :: IORef [CustomOperator]
+{-# NOINLINE customOperators #-}
+customOperators = unsafePerformIO $ newIORef []
+
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
 
 symbol :: Text -> Parser Text
 symbol = lexeme . L.symbol sc
+
+validOperators :: [Char]
+validOperators =
+  [ '!'
+  , '#'
+  , '$'
+  , '%'
+  , '&'
+  , '*'
+  , '+'
+  , '.'
+  , '/'
+  , '<'
+  , '='
+  , '>'
+  , '?'
+  , '@'
+  , '^'
+  , '|'
+  , '-'
+  , '~'
+  ]
+
+reservedOperators :: [Text]
+reservedOperators =
+  [ "+"
+  , "-"
+  , "*"
+  , "/"
+  , "%"
+  , "<"
+  , ">"
+  , "=="
+  , "!="
+  , ">="
+  , "<="
+  ]
+
+operator :: Parser Text
+operator = do
+  op <-
+    pack
+      <$> lexeme
+        ( (:) <$> oneOf validOperators <*> many (oneOf validOperators)
+        )
+  guard (op `notElem` reservedOperators)
+  return op
 
 reserved :: Text -> Parser Text
 reserved keyword = do
