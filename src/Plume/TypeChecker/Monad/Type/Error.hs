@@ -23,6 +23,7 @@ data TypeError
 
 instance (Throwable a) => Throwable [a] where
   showError [] = ""
+  showError [x] = showError x
   showError xs = case last' of
     Just x -> first' <> " and " <> showError x
     Nothing -> first'
@@ -48,10 +49,16 @@ instance Throwable TypeError where
   showError (UnboundVariable v) =
     "Unbound variable " <> show v
   showError (UnificationMismatch ts1 ts2) =
-    "Unification mismatch "
-      <> showError ts1
-      <> " with "
-      <> showError ts2
+    "Argument quantity mismatch between "
+      <> showLength ts1
+      <> " and "
+      <> showLength ts2
+   where
+    showLength xs =
+      show (length xs)
+        <> " "
+        <> (if length xs == 1 then "argument" else "arguments")
+        <> (if length xs > 0 then " in " <> showError xs else "")
   showError (NotAFunction t) =
     "Not a function " <> showError t
   showError (CompilerError t) = "Compiler error " <> show t
