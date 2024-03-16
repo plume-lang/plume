@@ -1,4 +1,18 @@
 native print<A>(x: A): ()
 
-print("test")
+property<A> A.show(): ()
+property<A> A.output(): ()
+property<A> A.add(x: A): A
 
+extend (x: int) with
+  output(): () => print(x)
+  add(c: int): int => c
+
+extend (x: str) with
+  output(): () => print(x)
+
+test<T extends (output, add)>(x: T): () => 
+  x.add(x).output()
+
+test(7) // success
+test("tset") // error (no add extension on str)
