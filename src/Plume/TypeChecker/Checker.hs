@@ -53,11 +53,10 @@ getGenericProperty name = do
 
 unify :: (MonadChecker m) => ConstraintConstructor -> m ()
 unify c = do
-  pos <- position <$> readIORef checkerST
-  case pos of
+  st <- readIORef checkerST
+  case st.position of
     Just p -> do
-      s <- readIORef checkerST
-      writeIORef checkerST (s {constraints = s.constraints ++ [(p, c)]})
+      writeIORef checkerST (st {constraints = st.constraints ++ [(p, c)]})
     Nothing -> throw (CompilerError "No position found")
 
 unify' :: (MonadChecker m) => ConstraintConstructor -> m ()
@@ -136,6 +135,24 @@ getExtensions gens =
 mapWithKeyM :: (Monad m, Ord k) => (k -> a -> m b) -> Map k a -> m (Map k b)
 mapWithKeyM f m = M.fromList <$> mapM (\(k, v) -> (k,) <$> f k v) (M.toList m)
 
+getConstraints :: (MonadChecker m) => m a -> m (a, [TypeConstraint])
+getConstraints m = do
+  old <- readIORef checkerST
+  a <- m
+  s <- readIORef checkerST
+  writeIORef
+    checkerST
+    ( old
+        { constraints = removeNewEntries s.constraints old.constraints
+        , tvarCounter = s.tvarCounter
+        , extendedGenerics = s.extendedGenerics
+        }
+    )
+  return (a, s.constraints L.\\ old.constraints)
+
+removeNewEntries :: (Eq a) => [a] -> [a] -> [a]
+removeNewEntries xs ys = xs L.\\ (xs L.\\ ys)
+
 checkForInstance :: (MonadChecker m) => Map PlumeType [Text] -> m ()
 checkForInstance m = do
   void $
@@ -151,20 +168,12 @@ checkExtensions t'@(Forall _ _) = do
   mapM_ (\(ty `Has` n) -> unify' (ExtensionExists n ty)) qs
   return (instantiated, qs)
 
-applyOnGeneric :: Substitution -> PlumeGeneric -> PlumeGeneric
-applyOnGeneric s (GVar n) = case M.lookup n s of
-  Just (TVar t) -> GVar t
-  _ -> GVar n
-applyOnGeneric s (GExtends n tys) = case M.lookup n s of
-  Just (TVar t) -> GExtends t tys
-  _ -> GExtends n tys
-
 synthesize' :: Inference m Pre.Expression Expression
 synthesize' (Pre.EVariable name) = do
   t <- search @"variables" name
   case t of
     Just t' -> do
-      (inst, qs) <- checkExtensions t'
+      (inst, _, qs) <- instantiate t'
       return (inst, G.Single $ Post.EVariable name inst, qs)
     Nothing -> throw (UnboundVariable name)
 synthesize' (Pre.EApplication f xs)
@@ -210,13 +219,14 @@ synthesize' (Pre.EClosure args ret body) = do
           (\n -> (n,) . Forall [] . ([] :=>:))
           (map annotationName args)
           args'
+
   (t, body', qs) <-
     withVariables args'' $
       withReturnType ret' $
         synthesize body
   unify (t :~: ret')
   return
-    ( args' :->: t
+    ( args' :->: ret'
     , G.Single $
         Post.EClosure
           (zipWith Annotation (map annotationName args) args')
@@ -264,15 +274,33 @@ synthesize' (Pre.EDeclaration gens (Annotation name ty) value body) = do
 
   let generics'' = zip genericNames (map extract genericTys)
   ty' <- fromType ty
-  (t, value', qs') <-
-    withVariables [(name, Forall [] (qs :=>: ty'))] $
-      withGenerics generics'' $
-        synthesize value
+  let none x = (x, [])
+  ((t, value', qs'), cs) <-
+    (if not (null genericTys) then getConstraints else (\x -> none <$> x)) $
+      withVariables [(name, Forall [] (qs :=>: ty'))] $
+        withGenerics generics'' $
+          synthesize value
+
   unify (ty' :~: t)
-  let sch =
-        if null genericTys
-          then Forall [] (qs' :=>: ty')
-          else Forall (map extract genericTys) (qs :=>: t)
+
+  (sch, sub) <-
+    if null genericTys
+      then return (Forall [] (qs :=>: ty'), mempty)
+      else do
+        sub <- Solver.solve cs
+        let appliedGens = apply sub genericTys
+        let appliedTy = apply sub t
+        let appliedQs = apply sub qs
+        modifyIORef'
+          checkerST
+          ( \s ->
+              s
+                { variables = apply sub s.variables
+                , extensionConstraints = map (second $ apply sub) s.extensionConstraints
+                }
+          )
+        return (Forall (map extract appliedGens) (appliedQs :=>: appliedTy), sub)
+
   case body of
     Just body' -> do
       (ret, body'', qs'') <-
@@ -292,9 +320,9 @@ synthesize' (Pre.EDeclaration gens (Annotation name ty) value body) = do
       insert @"variables" name sch
       return
         ( TUnit
-        , G.Single $
+        , G.Single . apply sub $
             Post.EDeclaration
-              (Annotation name ty')
+              (Annotation name t)
               genericTys
               value'
               Nothing
@@ -405,7 +433,7 @@ synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure a
         withReturnType ret' $
           synthesize e
 
-  unify (t :~: ret')
+  unify (ret' :~: t)
 
   let args''' = zipWith Annotation (map annotationName args) args'
 
@@ -416,8 +444,7 @@ synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure a
   let finalQs = qs ++ qs'
 
   case genProp of
-    Just (t', _) -> do
-      unify (t' :~: funTy)
+    Just (t', _) -> unify (t' :~: funTy)
     Nothing -> return ()
 
   return
@@ -483,11 +510,16 @@ runSynthesize
   => [Pre.Expression]
   -> m (Either (TypeError, Maybe Position) [Expression])
 runSynthesize e = do
-  runExceptT (mapM synthesize' e) >>= \case
-    Left err -> return (Left err)
-    Right xs -> do
-      cnsts <- gets constraints
-      sub <- Solver.runSolver cnsts
-      let (_, xs', _) = unzip3 xs
-      let exprs = G.flat xs'
-      return $ apply <$> sub <*> pure exprs
+  runExceptT
+    ( do
+        exprs <- mapM synthesize' e
+        let (_, es, _) = unzip3 exprs
+        let es' = G.flat es
+
+        cs <- gets constraints
+        sub <- Solver.runSolver' cs
+
+        -- mapM_ traceShowM (M.toList sub)
+
+        return $ apply sub es'
+    )

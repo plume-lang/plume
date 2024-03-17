@@ -25,8 +25,8 @@ solve ((pos, t1 :~: t2) : xs) = do
   case s1 of
     Left err -> throwError (err, Just pos)
     Right s1' -> do
-      let s2 = solve $ map (second (apply s1')) xs
-      compose s1' <$> s2
+      s2 <- solve $ map (second (apply s1')) xs
+      pure $ compose s1' s2
 solve ((pos, Extends extType extFunName appTy) : xs) = do
   scheme <- solveExtension pos (extFunName, extType)
   (t, _, qs) <- instantiate scheme
@@ -210,13 +210,14 @@ runSolver
   :: (MonadIO m)
   => [TypeConstraint]
   -> m (Either (TypeError, Maybe Position) Substitution)
-runSolver xs =
-  runExceptT
-    ( do
-        s1 <- solve xs
-        extCons <- nub <$> gets extensionConstraints
-        compose s1 <$> solve (map (second $ apply s1) extCons)
-    )
+runSolver = runExceptT . runSolver'
+
+runSolver' :: (MonadSolver m) => [TypeConstraint] -> m Substitution
+runSolver' xs = do
+  -- mapM_ (traceShowM . snd) xs
+  s1 <- solve xs
+  extCons <- nub <$> gets extensionConstraints
+  compose s1 <$> solve (map (second $ apply s1) extCons)
 
 dischargeExtension :: Extension -> [Extension]
 dischargeExtension (Extension name t isGen superExts) =

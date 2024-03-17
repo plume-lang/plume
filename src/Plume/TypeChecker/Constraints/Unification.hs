@@ -30,10 +30,7 @@ mguMany
   -> Either TypeError Substitution
 mguMany [] [] = Right M.empty
 mguMany (t1 : t1s) (t2 : t2s) = do
-  let s1 = mgu t1 t2
-  case s1 of
-    Left err -> Left err
-    Right s1' -> do
-      let s2 = mguMany (apply s1' t1s) (apply s1' t2s)
-      compose s1' <$> s2
+  s1 <- mgu t1 t2
+  s2 <- mguMany (apply s1 t1s) (apply s1 t2s)
+  return $ compose s2 s1
 mguMany t1s t2s = Left (UnificationMismatch t1s t2s)

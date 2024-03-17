@@ -37,8 +37,12 @@ instance Types PlumeType where
   free _ = S.empty
 
 instance Types PlumeGeneric where
-  apply _ (GVar i) = GVar i
-  apply _ (GExtends i ts) = GExtends i ts
+  apply s (GVar i) = case M.lookup i s of
+    Just (TVar t) -> GVar t
+    _ -> GVar i
+  apply s (GExtends i ts) = case M.lookup i s of
+    Just (TVar t) -> GExtends t ts
+    _ -> GExtends i ts
 
   free (GVar i) = S.singleton i
   free (GExtends i _) = S.singleton i
