@@ -52,7 +52,19 @@ instance (Types a) => Types (M.Map Text a) where
   apply s = M.map (apply s)
 
 instance (Types a) => Types (TypedExpression a) where
-  free = error "Not implemented"
+  free (EVariable _ t) = free t
+  free (EList es) = free es
+  free (EApplication e1 e2) = free e1 `S.union` free e2
+  free (EClosure anns t e) = free anns `S.union` free t `S.union` free e
+  free (ELocated e _) = free e
+  free (ESwitch e ps) = free e `S.union` free ps
+  free (EReturn e) = free e
+  free (EDeclaration gens ann e1 e2) = ((free ann `S.union` free e1) S.\\ free gens) `S.union` free e2
+  free (EConditionBranch e1 e2 e3) = free e1 `S.union` free e2 `S.union` free e3
+  free (EBlock es) = free es
+  free (ELiteral _) = S.empty
+  free (ENativeFunction _ gens t) = free t S.\\ free gens
+  free (EExtVariable _ t) = free t
 
   apply s (EVariable n t) = EVariable n (apply s t)
   apply s (EList es) = EList (apply s es)
@@ -69,11 +81,15 @@ instance (Types a) => Types (TypedExpression a) where
   apply s (EExtVariable v t) = EExtVariable v (apply s t)
 
 instance (Types a) => Types (Annotation a) where
-  free = error "Not implemented"
+  free (Annotation _ t) = free t
   apply s (Annotation a t) = a :@: apply s t
 
 instance (Types a) => Types (TypedPattern a) where
-  free = error "Not implemented"
+  free (PVariable _ t) = free t
+  free (PConstructor _ p2) = free p2
+  free PWildcard = S.empty
+  free (PLiteral _) = S.empty
+
   apply s (PVariable n t) = PVariable n (apply s t)
   apply _ (PLiteral l) = PLiteral l
   apply s (PConstructor p1 p2) = PConstructor p1 (apply s p2)

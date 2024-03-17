@@ -26,7 +26,7 @@ solve ((pos, t1 :~: t2) : xs) = do
     Left err -> throwError (err, Just pos)
     Right s1' -> do
       s2 <- solve $ map (second (apply s1')) xs
-      pure $ compose s1' s2
+      pure $ compose s2 s1'
 solve ((pos, Extends extType extFunName appTy) : xs) = do
   scheme <- solveExtension pos (extFunName, extType)
   (t, _, qs) <- instantiate scheme

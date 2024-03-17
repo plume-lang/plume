@@ -9,6 +9,7 @@ import Control.Monad.Except
 import Data.Foldable
 import Data.List qualified as L
 import Data.Map qualified as M
+import Data.Set qualified as S
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Literal
@@ -276,7 +277,7 @@ synthesize' (Pre.EDeclaration gens (Annotation name ty) value body) = do
   ty' <- fromType ty
   let none x = (x, [])
   ((t, value', qs'), cs) <-
-    (if not (null genericTys) then getConstraints else (\x -> none <$> x)) $
+    (if not (null genericTys) then getConstraints else (none <$>)) $
       withVariables [(name, Forall [] (qs :=>: ty'))] $
         withGenerics generics'' $
           synthesize value
@@ -285,7 +286,7 @@ synthesize' (Pre.EDeclaration gens (Annotation name ty) value body) = do
 
   (sch, sub) <-
     if null genericTys
-      then return (Forall [] (qs :=>: ty'), mempty)
+      then return (Forall [] (qs' :=>: ty'), mempty)
       else do
         sub <- Solver.solve cs
         let appliedGens = apply sub genericTys
@@ -314,7 +315,7 @@ synthesize' (Pre.EDeclaration gens (Annotation name ty) value body) = do
               genericTys
               value'
               (Just body'')
-        , L.nub (qs' ++ qs'' ++ qs)
+        , L.nub qs''
         )
     Nothing -> do
       insert @"variables" name sch
@@ -326,7 +327,7 @@ synthesize' (Pre.EDeclaration gens (Annotation name ty) value body) = do
               genericTys
               value'
               Nothing
-        , L.nub (qs' ++ qs)
+        , []
         )
 synthesize' (Pre.ESwitch e cases) = do
   (t, e', qs) <- synthesize e
@@ -427,33 +428,63 @@ synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure a
           (map annotationName args)
           args'
 
-  (t, body', qs') <-
-    withGenerics generics'' $
-      withVariables args'' $
-        withReturnType ret' $
-          synthesize e
+  let none x = (x, [])
+  ((t, body', qs'), cs) <-
+    (if not (null genericTys) then getConstraints else (none <$>)) $
+      withGenerics generics'' $
+        withVariables args'' $
+          withReturnType ret' $
+            synthesize e
 
   unify (ret' :~: t)
 
-  let args''' = zipWith Annotation (map annotationName args) args'
-
   let funTy = (snd var : args') :->: ret'
 
-  genProp <- getGenericProperty name
-
   let finalQs = qs ++ qs'
+
+  (sch@(Forall _ (_ :=>: newFunTy)), sub) <-
+    if null genericTys
+      then return (Forall (map extract extGens) (qs' :=>: funTy), mempty)
+      else do
+        sub <- Solver.solve cs
+        let appliedGens = apply sub (extGens ++ genericTys)
+        let appliedTy = apply sub funTy
+        let appliedQs = apply sub finalQs
+        modifyIORef'
+          checkerST
+          ( \s ->
+              s
+                { variables = apply sub s.variables
+                , extensionConstraints = map (second $ apply sub) s.extensionConstraints
+                }
+          )
+        return (Forall (map extract appliedGens) (appliedQs :=>: appliedTy), sub)
+
+  genProp <- getGenericProperty name
 
   case genProp of
     Just (t', _) -> unify (t' :~: funTy)
     Nothing -> return ()
 
+  let appliedNewGens = apply sub (extGens ++ genericTys)
+  let args''' =
+        zipWith
+          Annotation
+          (map annotationName args)
+          ( case newFunTy of
+              (newFunArgs :->: _) -> newFunArgs
+              _ -> args'
+          )
+  let newRet = case newFunTy of
+        (_ :->: newRet') -> newRet'
+        _ -> ret'
   return
     ( Post.EDeclaration
-        (Annotation name funTy)
-        (extGens ++ genericTys)
-        (Post.EClosure (uncurry Annotation var : args''') ret' body')
+        (Annotation name newFunTy)
+        appliedNewGens
+        (Post.EClosure (uncurry Annotation var : args''') newRet body')
         Nothing
-    , (name, Forall (map extract $ extGens ++ genericTys) (finalQs :=>: funTy))
+    , (name, sch)
     )
 synthesizeExtMember _ _ = throw (CompilerError "Invalid extension member")
 
@@ -513,13 +544,21 @@ runSynthesize e = do
   runExceptT
     ( do
         exprs <- mapM synthesize' e
-        let (_, es, _) = unzip3 exprs
+        let (_, es, qs) = unzip3 exprs
         let es' = G.flat es
 
         cs <- gets constraints
         sub <- Solver.runSolver' cs
 
-        -- mapM_ traceShowM (M.toList sub)
+        let es'' = apply sub es'
 
-        return $ apply sub es'
+        let freedTys = free es''
+        let freedQs = free $ apply sub qs
+
+        let freed = freedTys <> freedQs
+
+        unless (null freed) $
+          throw (UnboundTypeVariable (S.findMin freed))
+
+        return es''
     )

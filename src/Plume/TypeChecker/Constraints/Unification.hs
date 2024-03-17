@@ -17,7 +17,7 @@ mgu
   -> Either TypeError Substitution
 mgu (TVar i) t = variable i t
 mgu t (TVar i) = variable i t
-mgu (TApp t1 t2) (TApp t3 t4) = mguMany (t1 : t2) (t3 : t4)
+mgu (TApp t1 t2) (TApp t3 t4) = mguMany (t2 ++ [t1]) (t4 ++ [t3])
 mgu t1@(TId n) t2@(TId n') =
   if n == n'
     then Right M.empty

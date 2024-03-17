@@ -20,6 +20,7 @@ data TypeError
   | MultipleExtensionsFound Text [PlumeType]
   | NoGenericExtensionFound PlumeType
   | TypeMissing Text
+  | UnboundTypeVariable Int
 
 instance (Throwable a) => Throwable [a] where
   showError [] = ""
@@ -70,6 +71,7 @@ instance Throwable TypeError where
   showError (NoGenericExtensionFound t) =
     "No generic extension found for type " <> showError t
   showError (TypeMissing t) = "Type missing " <> show t <> " in type extension"
+  showError (UnboundTypeVariable i) = "Unbound type variable " <> showError (TVar i)
 
 instance (Throwable a) => Throwable (a, Maybe Position) where
   showError (err, pos) =
