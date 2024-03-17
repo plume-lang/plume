@@ -16,5 +16,9 @@ infixr 5 $
 
 operator $ <A, B>(f: (A) -> B, x: A): B => f(x)
 
+compose<A, B, C>(f: (B) -> C, g: (A) -> B): (A) -> C => 
+  (x: A) => f(g(x))
+
 print([1, 2].test())
-test $ [1, 2]
+x = compose(print, test)
+x([1, 2])
