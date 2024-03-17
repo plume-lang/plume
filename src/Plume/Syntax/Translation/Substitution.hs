@@ -60,6 +60,7 @@ substitute _ (AST.ENativeFunction n gens t) =
   AST.ENativeFunction n gens t
 substitute _ (AST.EGenericProperty g n ts t) =
   AST.EGenericProperty g n ts t
+substitute e (AST.EList es) = AST.EList (map (substitute e) es)
 
 substituteExt
   :: (Text, AST.Expression)
