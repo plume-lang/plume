@@ -7,4 +7,4 @@ data TypedPattern t
   | PLiteral Literal
   | PConstructor Text [TypedPattern t]
   | PWildcard
-  deriving (Eq)
+  deriving (Eq, Show)

@@ -214,7 +214,6 @@ runSolver = runExceptT . runSolver'
 
 runSolver' :: (MonadSolver m) => [TypeConstraint] -> m Substitution
 runSolver' xs = do
-  -- mapM_ (traceShowM . snd) xs
   s1 <- solve xs
   extCons <- nub <$> gets extensionConstraints
   compose s1 <$> solve (map (second $ apply s1) extCons)

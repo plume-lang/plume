@@ -475,15 +475,14 @@ synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure a
               (newFunArgs :->: _) -> newFunArgs
               _ -> args'
           )
-  let newRet = case newFunTy of
-        (_ :->: newRet') -> newRet'
-        _ -> ret'
+
   return
-    ( Post.EDeclaration
+    ( Post.EExtensionDeclaration
         (Annotation name newFunTy)
+        (snd var)
         appliedNewGens
-        (Post.EClosure (uncurry Annotation var : args''') newRet body')
-        Nothing
+        (uncurry Annotation var : args''')
+        body'
     , (name, sch)
     )
 synthesizeExtMember _ _ = throw (CompilerError "Invalid extension member")

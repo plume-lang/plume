@@ -17,6 +17,12 @@ data TypedExpression t
       [PlumeGeneric]
       (TypedExpression t)
       (Maybe (TypedExpression t))
+  | EExtensionDeclaration
+      (Annotation t)
+      t
+      [PlumeGeneric]
+      [Annotation t]
+      (TypedExpression t)
   | EConditionBranch
       (TypedExpression t)
       (TypedExpression t)
