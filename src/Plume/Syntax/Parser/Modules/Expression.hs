@@ -286,8 +286,10 @@ sortCustomOperators ops = do
   parseOperator (CustomOperator name _ CPostfix) =
     postfix name (CustomPostfix name)
   parseOperator (CustomOperator name _ ty)
-    | ty `elem` [CInfixN, CInfixL, CInfixR] =
-        binary name (CustomInfix name)
+    | ty `elem` [CInfixN, CInfixL, CInfixR] = case ty of
+        CInfixN -> binary name (CustomInfix name)
+        CInfixL -> InfixL (CustomInfix name <$ symbol name)
+        CInfixR -> InfixR (CustomInfix name <$ symbol name)
     | otherwise =
         error "Invalid operator type"
 
