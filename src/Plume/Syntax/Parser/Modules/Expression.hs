@@ -175,7 +175,7 @@ eExtensionMember =
 eExtFunction :: Parser (ExtensionMember PlumeType)
 eExtFunction = do
   (name, gens, args, ret) <- try $ do
-    name <- identifier
+    name <- try identifier <|> (reserved "operator" *> operator)
     gens <- option [] $ angles (gGeneric `sepBy` comma)
     args <- parens (annotated `sepBy` comma)
     ret <- optional (symbol ":" *> tType)
@@ -191,7 +191,10 @@ eGenericProperty :: Parser Expression
 eGenericProperty = do
   _ <- reserved "property"
   gens <- option [] $ angles (gGeneric `sepBy` comma)
-  (ty, name) <- (,) <$> tType <* char '.' <*> identifier
+  (ty, name) <-
+    (,)
+      <$> (tType <* char '.')
+      <*> (try identifier <|> (reserved "operator" *> operator))
   args <- parens ((optional (identifier >> colon) *> tType) `sepBy` comma)
   ret <- symbol ":" *> tType
   return (EGenericProperty gens name (ty : args) ret)
@@ -213,24 +216,12 @@ eNativeFunction = do
 eFunctionDefinition :: Parser Expression
 eFunctionDefinition = do
   (name, generics, arguments, ret) <- try $ do
-    name <- identifier
+    name <- try identifier <|> (reserved "operator" *> operator)
     generics <- option [] (angles (gGeneric `sepBy` comma))
     arguments <- parens (annotated `sepBy` comma)
     ret <- optional (symbol ":" *> tType)
     _ <- symbol "=>"
     return (name, generics, arguments, ret)
-  body <- indentOrInline
-  return
-    (EDeclaration generics (name :@: Nothing) (EClosure arguments ret body) Nothing)
-
-eOperatorFunctionDefinition :: Parser Expression
-eOperatorFunctionDefinition = do
-  void $ reserved "operator"
-  name <- operator
-  generics <- option [] (angles (gGeneric `sepBy` comma))
-  arguments <- parens (annotated `sepBy` comma)
-  ret <- optional (symbol ":" *> tType)
-  _ <- symbol "=>"
   body <- indentOrInline
   return
     (EDeclaration generics (name :@: Nothing) (EClosure arguments ret body) Nothing)
@@ -280,7 +271,6 @@ parseStatement =
       [ eReturn
       , eConditionBranch True
       , eDeclaration
-      , eOperatorFunctionDefinition
       , eFunctionDefinition
       , eExpression
       ]
@@ -313,7 +303,7 @@ eExpression :: Parser Expression
 eExpression = eLocated $ do
   customOps <- readIORef customOperators
   let customs = sortCustomOperators customOps
-  makeExprParser eTerm ([postfixOperators] : operators ++ customs)
+  makeExprParser eTerm ([postfixOperators] : customs ++ operators)
  where
   eTerm =
     choice
@@ -372,9 +362,9 @@ tCustomOperator :: Parser ()
 tCustomOperator = do
   opTy <-
     choice
-      [ reserved "infix" $> CInfixN
-      , reserved "infixl" $> CInfixL
+      [ reserved "infixl" $> CInfixL
       , reserved "infixr" $> CInfixR
+      , reserved "infix" $> CInfixN
       , reserved "prefix" $> CPrefix
       , reserved "postfix" $> CPostfix
       ]

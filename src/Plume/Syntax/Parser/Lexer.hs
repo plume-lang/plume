@@ -225,6 +225,9 @@ reservedOperators =
   , "!="
   , ">="
   , "<="
+  , "=>"
+  , "->"
+  , ":"
   ]
 
 operator :: Parser Text
@@ -267,12 +270,13 @@ identifierHelper :: Bool -> Parser Text
 identifierHelper isLexed = do
   let lex = if isLexed then lexeme else id
   r <-
-    pack
-      <$> lex
-        ( (:)
-            <$> (letterChar <|> oneOf ("_" :: String))
-            <*> many (alphaNumChar <|> oneOf ("_" :: String))
-        )
+    lex
+      ( pack
+          <$> ( (:)
+                  <$> (letterChar <|> oneOf ("_" :: String))
+                  <*> many (alphaNumChar <|> oneOf ("_" :: String))
+              )
+      )
 
   -- Guarding parsed result and failing when reserved word is parsed
   -- (such as reserved keyword)
@@ -284,7 +288,7 @@ identifier :: Parser Text
 identifier = identifierHelper True
 
 field :: Parser Text
-field = identifierHelper False
+field = identifierHelper False <|> operator
 
 -- How many times a parser can be applied. It returns the number of
 -- times the parser was applied.
