@@ -65,6 +65,10 @@ library
 
         Plume.TypeChecker.Checker
 
+        Plume.Compiler.ClosureConversion.Syntax
+        Plume.Compiler.ClosureConversion.Free
+        Plume.Compiler.ClosureConversion.Conversion
+
         System.IO.Pretty
 
         Control.Monad.IO
