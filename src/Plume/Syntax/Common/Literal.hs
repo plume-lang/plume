@@ -12,4 +12,4 @@ data Literal
   | LString Text
   | LChar Char
   | LFloat Double
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
