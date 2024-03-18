@@ -21,3 +21,6 @@ reset = delete
 
 initialize :: (Monoid a, MonadIO m) => m (IORef a)
 initialize = liftIO $ newIORef mempty
+
+runIOReader :: env -> IOReader env a -> IO a
+runIOReader = flip runReaderT
