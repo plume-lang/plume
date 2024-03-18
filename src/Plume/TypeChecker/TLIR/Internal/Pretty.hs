@@ -76,6 +76,14 @@ prettyExpr (ENativeFunction n gens (args :->: ret)) =
     <+> prettyTy ret
 prettyExpr (ENativeFunction {}) = error "ENativeFunction: invalid type"
 prettyExpr (EList es) = brackets (hsep $ punctuate comma $ map prettyExpr es)
+prettyExpr (EExtensionDeclaration (Annotation name _) extTy gens args body) =
+  anCol Blue "extension"
+    <+> pretty name
+    <+> prettyTy extTy
+    <+> angles (hsep . punctuate comma $ map ansiPretty gens)
+    <+> parens (ansiPretty args)
+    <+> "="
+    <+> prettyExpr body
 
 prettyPat :: Pattern -> Doc AnsiStyle
 prettyPat (PVariable v t) = pretty v <> colon <+> prettyTy t

@@ -189,17 +189,21 @@ synthesize' (Pre.EApplication f xs)
             (ret, G.Single $ Post.EApplication (Post.EVariable n t) xs', qs ++ concat qs')
         _ -> do
           (ts, xs', qs') <- mapAndUnzip3M synthesize xs
-          case ts of
-            [] -> throw (UnboundVariable n)
-            (t : ts') -> do
+          case (ts, xs') of
+            ([], []) -> throw (UnboundVariable n)
+            (t : ts', extVar : restArgs) -> do
               ret <- freshTVar
-              let extTy = (t : ts') :->: ret
+              let extTy = [t] :->: (ts' :->: ret)
               unify (Extends t n extTy)
               return
                 ( ret
-                , G.Single $ Post.EApplication (Post.EExtVariable n extTy) xs'
+                , G.Single $
+                    Post.EApplication
+                      (Post.EApplication (Post.EExtVariable n extTy) [extVar])
+                      restArgs
                 , (t `Has` n) : concat qs'
                 )
+            _ -> throw (CompilerError "Invalid application")
   | otherwise = do
       (t, f', qs) <- synthesize f
       (ts, xs', qs') <- mapAndUnzip3M synthesize xs
@@ -389,8 +393,8 @@ synthesize' (Pre.EGenericProperty gens name tys ty) = do
 
   case tys' of
     [] -> throw (TypeMissing name)
-    (extTy : _) -> do
-      let funTy = tys' :->: ty'
+    (extTy : rest) -> do
+      let funTy = [extTy] :->: (rest :->: ty')
       let sch = Forall (map extract gens') (qs :=>: funTy)
 
       insert @"extensions" (Extension name extTy True []) sch
@@ -438,7 +442,7 @@ synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure a
 
   unify (ret' :~: t)
 
-  let funTy = (snd var : args') :->: ret'
+  let funTy = [snd var] :->: (args' :->: ret')
 
   let finalQs = qs ++ qs'
 
@@ -472,7 +476,7 @@ synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure a
           Annotation
           (map annotationName args)
           ( case newFunTy of
-              (newFunArgs :->: _) -> newFunArgs
+              (_ :->: (newFunArgs :->: _)) -> newFunArgs
               _ -> args'
           )
 
@@ -481,8 +485,8 @@ synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure a
         (Annotation name newFunTy)
         (snd var)
         appliedNewGens
-        (uncurry Annotation var : args''')
-        body'
+        (uncurry Annotation var)
+        (Post.EClosure args''' ret' body')
     , (name, sch)
     )
 synthesizeExtMember _ _ = throw (CompilerError "Invalid extension member")

@@ -21,7 +21,7 @@ data TypedExpression t
       (Annotation t)
       t
       [PlumeGeneric]
-      [Annotation t]
+      (Annotation t)
       (TypedExpression t)
   | EConditionBranch
       (TypedExpression t)

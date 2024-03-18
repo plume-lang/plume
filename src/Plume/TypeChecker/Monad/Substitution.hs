@@ -65,6 +65,13 @@ instance (Types a) => Types (TypedExpression a) where
   free (ELiteral _) = S.empty
   free (ENativeFunction _ gens t) = free t S.\\ free gens
   free (EExtVariable _ t) = free t
+  free (EExtensionDeclaration name extTy gens args body) =
+    ( free extTy
+        `S.union` free args
+        `S.union` free body
+        `S.union` free name
+    )
+      S.\\ free gens
 
   apply s (EVariable n t) = EVariable n (apply s t)
   apply s (EList es) = EList (apply s es)
@@ -79,6 +86,13 @@ instance (Types a) => Types (TypedExpression a) where
   apply _ (ELiteral l) = ELiteral l
   apply s (ENativeFunction n gens t) = ENativeFunction n (apply s gens) (apply s t)
   apply s (EExtVariable v t) = EExtVariable v (apply s t)
+  apply s (EExtensionDeclaration name extTy gens args body) =
+    EExtensionDeclaration
+      name
+      (apply s extTy)
+      (apply s gens)
+      (apply s args)
+      (apply s body)
 
 instance (Types a) => Types (Annotation a) where
   free (Annotation _ t) = free t
