@@ -65,8 +65,8 @@ closeClosure args e = do
   let substBody = substituteMany (M.toList envProps) e
 
   let body = case substBody of
-        Post.CSBlock es -> Post.CSBlock (envDecl <> es)
-        _ -> Post.CSBlock (envDecl <> [e])
+        Post.CSExpr (Post.CEBlock es) -> Post.CEBlock (envDecl <> es)
+        _ -> Post.CEBlock (envDecl <> [e])
 
   let lambdaDict =
         Post.CEDictionary $
@@ -74,7 +74,7 @@ closeClosure args e = do
 
   modifyIORef'
     closedFunctions
-    (Post.CPFunction name (name <> "_env" : args) body :)
+    (Post.CPFunction name (name <> "_env" : args) (Post.CSExpr body) :)
 
   return lambdaDict
 
@@ -106,26 +106,25 @@ closeExpression (Pre.EDeclaration (Annotation n _) _ _ Nothing) =
   error n
 closeExpression (Pre.EConditionBranch e1 e2 e3) = do
   e1' <- closeExpression e1
-  e2' <- closeStatement e2
+  e2' <- closeExpression e2
   e3' <- case e3 of
-    Just e3' -> closeStatement e3'
+    Just e3' -> closeExpression e3'
     Nothing -> error "TODO: Implement this."
   pure $ Post.CEConditionBranch e1' e2' e3'
 closeExpression (Pre.EClosure args _ e) = do
   let args' = map (.annotationName) args
   closeClosure args' =<< closeStatement e
-closeExpression (Pre.EBlock _) =
-  error "Should not encounter block in closure conversion."
+closeExpression (Pre.EBlock es) = Post.CEBlock <$> traverse closeStatement es
 closeExpression (Pre.ESwitch e cases) = do
   e' <- closeExpression e
   cases' <-
-    traverse (\(p, body) -> (,) <$> closePattern p <*> closeStatement body) cases
+    traverse (\(p, body) -> (,) <$> closePattern p <*> closeExpression body) cases
   pure $ Post.CESwitch e' cases'
 closeExpression (Pre.EReturn e) = closeExpression e
-closeExpression (Pre.ENativeFunction name _ _) = pure $ Post.CENativeFunction name 0
 closeExpression (Pre.ELocated e _) = closeExpression e
 closeExpression (Pre.EExtensionDeclaration {}) =
   error "Should not encounter extension declaration in closure conversion."
+closeExpression (Pre.ENativeFunction {}) = error "Should not encounter native function in closure conversion."
 
 closePattern
   :: (MonadClosure m) => Pre.TypedPattern t -> m Post.ClosedPattern
@@ -139,7 +138,6 @@ closePattern Pre.PWildcard = pure Post.CPWildcard
 closeStatement
   :: (MonadClosure m) => Pre.TypedExpression PlumeType -> m Post.ClosedStatement
 closeStatement (Pre.EReturn e) = Post.CSReturn <$> closeExpression e
-closeStatement (Pre.EBlock es) = Post.CSBlock <$> traverse closeStatement es
 closeStatement (Pre.EDeclaration (Annotation name _) _ e1 Nothing) = do
   e1' <- closeExpression e1
   pure $ Post.CSDeclaration name e1'
@@ -153,9 +151,11 @@ closeProgram (Pre.EDeclaration (Annotation name _) _ (Pre.EClosure args _ e) _) 
   e' <- closeStatement e
   pure $ Post.CPFunction name args' e'
 closeProgram (Pre.ELocated e _) = closeProgram e
-closeProgram (Pre.EExtensionDeclaration (Annotation name _) ty _ args e) = do
+closeProgram (Pre.EExtensionDeclaration (Annotation name _) ty _ arg e) = do
   e' <- closeStatement e
-  pure $ Post.CPExtFunction ty name (map (.annotationName) args) e'
+  pure $ Post.CPExtFunction ty name arg.annotationName e'
+closeProgram (Pre.ENativeFunction name _ (args :->: _)) =
+  pure $ Post.CPNativeFunction name (length args)
 closeProgram e = Post.CPStatement <$> closeStatement e
 
 runClosureConversion

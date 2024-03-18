@@ -23,10 +23,10 @@ instance Free ClosedExpr where
   free (CEDeclaration x e1 e2) = S.insert x (free e1 <> free e2)
   free (CEConditionBranch e1 e2 e3) = free e1 <> free e2 <> free e3
   free (CESwitch e cases) = free e <> free cases
-  free (CEReturn e) = free e
-  free (CENativeFunction _ _) = S.empty
   free (CEDictionary es) = free es
   free (CEProperty e _) = free e
+  free (CETypeOf e) = free e
+  free (CEBlock ss) = free ss
 
 instance Free ClosedPattern where
   free (CPVariable x) = S.singleton x
@@ -37,13 +37,13 @@ instance Free ClosedPattern where
 instance Free ClosedStatement where
   free (CSExpr e) = free e
   free (CSReturn e) = free e
-  free (CSBlock ss) = free ss
   free (CSDeclaration x e) = S.insert x (free e)
 
 instance Free ClosedProgram where
   free (CPFunction n args e) = free e S.\\ (S.fromList args <> S.singleton n)
   free (CPStatement s) = free s
-  free (CPExtFunction _ n args e) = free e S.\\ (S.fromList args <> S.singleton n)
+  free (CPExtFunction _ n args e) = free e S.\\ (S.singleton args <> S.singleton n)
+  free (CPNativeFunction _ _) = S.empty
 
 instance (Free a) => Free (Map k a) where
   free = foldMap free
@@ -51,10 +51,10 @@ instance (Free a) => Free (Map k a) where
 instance (Free a) => Free (IntMap a) where
   free = foldMap free
 
-class Substitutable a where
-  substitute :: (Text, ClosedExpr) -> a -> a
+class Substitutable a b where
+  substitute :: (Text, b) -> a -> a
 
-instance Substitutable ClosedExpr where
+instance Substitutable ClosedExpr ClosedExpr where
   substitute (name, expr) (CEVar x)
     | x == name = expr
     | otherwise = CEVar x
@@ -73,27 +73,30 @@ instance Substitutable ClosedExpr where
     CESwitch (substitute (name, expr) e) (map proceed cases)
    where
     proceed (p, e') = (p, substitute (name, expr) e')
-  substitute (name, expr) (CEReturn e) = CEReturn (substitute (name, expr) e)
-  substitute _ (CENativeFunction n gens) = CENativeFunction n gens
   substitute (name, expr) (CEDictionary es) = CEDictionary (fmap (substitute (name, expr)) es)
   substitute (name, expr) (CEProperty e i) = CEProperty (substitute (name, expr) e) i
+  substitute e (CETypeOf e') = CETypeOf (substitute e e')
+  substitute e (CEBlock es) = CEBlock (map (substitute e) es)
 
-instance Substitutable ClosedStatement where
-  substitute e (CSBlock es) = CSBlock (map (substitute e) es)
+instance Substitutable ClosedStatement ClosedExpr where
   substitute e (CSExpr e') = CSExpr (substitute e e')
   substitute e (CSReturn e') = CSReturn (substitute e e')
   substitute (name, expr) (CSDeclaration x e) =
     CSDeclaration x (substitute (name, expr) e)
 
-instance Substitutable ClosedProgram where
+instance Substitutable ClosedProgram ClosedExpr where
   substitute e (CPStatement s) = CPStatement (substitute e s)
   substitute e (CPFunction name args body) =
     CPFunction name args (substitute e body)
   substitute e (CPExtFunction t name args body) =
     CPExtFunction t name args (substitute e body)
+  substitute _ p@(CPNativeFunction _ _) = p
 
-instance Substitutable ClosedPattern where
+instance Substitutable ClosedPattern ClosedExpr where
   substitute _ p = p
 
-substituteMany :: (Substitutable a) => [(Text, ClosedExpr)] -> a -> a
+instance (Substitutable a b) => Substitutable [a] b where
+  substitute = fmap . substitute
+
+substituteMany :: (Substitutable a b) => [(Text, b)] -> a -> a
 substituteMany = foldr ((.) . substitute) id

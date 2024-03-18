@@ -3,20 +3,18 @@ module Plume.Compiler.ClosureConversion.Syntax where
 import Plume.Syntax.Common.Literal
 import Plume.TypeChecker.Monad.Type
 
-deriving instance Ord Literal
-
 data ClosedExpr
   = CEVar Text
   | CEApplication ClosedExpr [ClosedExpr]
   | CELiteral Literal
   | CEList [ClosedExpr]
   | CEDeclaration Text ClosedExpr ClosedExpr
-  | CEConditionBranch ClosedExpr ClosedStatement ClosedStatement
-  | CESwitch ClosedExpr [(ClosedPattern, ClosedStatement)]
-  | CEReturn ClosedExpr
-  | CENativeFunction Text Int
+  | CEConditionBranch ClosedExpr ClosedExpr ClosedExpr
+  | CESwitch ClosedExpr [(ClosedPattern, ClosedExpr)]
   | CEDictionary (IntMap ClosedExpr)
+  | CEBlock [ClosedStatement]
   | CEProperty ClosedExpr Int
+  | CETypeOf ClosedExpr
   deriving (Eq, Show, Ord)
 
 data ClosedPattern
@@ -29,12 +27,12 @@ data ClosedPattern
 data ClosedStatement
   = CSExpr ClosedExpr
   | CSReturn ClosedExpr
-  | CSBlock [ClosedStatement]
   | CSDeclaration Text ClosedExpr
   deriving (Eq, Show, Ord)
 
 data ClosedProgram
   = CPFunction Text [Text] ClosedStatement
-  | CPExtFunction PlumeType Text [Text] ClosedStatement
+  | CPExtFunction PlumeType Text Text ClosedStatement
   | CPStatement ClosedStatement
+  | CPNativeFunction Text Int
   deriving (Eq, Show, Ord)
