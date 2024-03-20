@@ -28,6 +28,7 @@ data ClosedStatement
   = CSExpr ClosedExpr
   | CSReturn ClosedExpr
   | CSDeclaration Text ClosedExpr
+  | CSConditionBranch ClosedExpr ClosedStatement ClosedStatement
   deriving (Eq, Show, Ord)
 
 data ClosedProgram

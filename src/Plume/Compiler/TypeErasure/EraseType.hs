@@ -19,6 +19,7 @@ eraseStatement :: Pre.ClosedStatement -> Post.UntypedStatement
 eraseStatement (Pre.CSExpr e) = Post.USExpr (eraseExpr e)
 eraseStatement (Pre.CSReturn e) = Post.USReturn (eraseExpr e)
 eraseStatement (Pre.CSDeclaration n e) = Post.USDeclaration n (eraseExpr e)
+eraseStatement (Pre.CSConditionBranch e1 e2 e3) = Post.USConditionBranch (eraseExpr e1) (eraseStatement e2) (eraseStatement e3)
 
 eraseExpr :: Pre.ClosedExpr -> Post.UntypedExpr
 eraseExpr (Pre.CEVar x) = Post.UEVar x

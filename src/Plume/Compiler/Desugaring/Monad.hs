@@ -23,5 +23,5 @@ freshName = do
   pure $ "var" <> show i
 
 createBlock :: [ANFResult DesugaredStatement] -> [DesugaredStatement]
-createBlock ((stmt, xs) : xss) = stmt : xs ++ createBlock xss
+createBlock ((x, stmts) : xss) = stmts ++ x : createBlock xss
 createBlock [] = []

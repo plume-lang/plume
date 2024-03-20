@@ -58,6 +58,11 @@ desugarStatement = \case
   Pre.USDeclaration n e -> do
     (e', stmts) <- desugarExpr e
     return [(Post.DSDeclaration n e', stmts)]
+  Pre.USConditionBranch x y z -> do
+    (x', stmts1) <- desugarExpr x
+    ys <- desugarStatement y
+    zs <- desugarStatement z
+    return [(Post.DSConditionBranch x' (createBlock ys) (createBlock zs), stmts1)]
 
 desugarProgram :: Pre.UntypedProgram -> IO [Post.DesugaredProgram]
 desugarProgram = \case

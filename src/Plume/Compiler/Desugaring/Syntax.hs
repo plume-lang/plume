@@ -21,11 +21,13 @@ data DesugaredStatement
   = DSExpr DesugaredExpr
   | DSReturn DesugaredExpr
   | DSDeclaration Text DesugaredExpr
+  | DSConditionBranch DesugaredExpr [DesugaredStatement] [DesugaredStatement]
   deriving (Eq, Show, Ord)
 
 data DesugaredProgram
   = DPFunction Text [Text] [DesugaredStatement]
   | DPStatement DesugaredStatement
+  | DPDeclaration Text DesugaredExpr
   | DPNativeFunction Text Int
   deriving (Eq, Show, Ord)
 
@@ -35,6 +37,8 @@ instance Substitutable DesugaredStatement DesugaredExpr where
   substitute (name, expr) (DSDeclaration n e)
     | n == name = DSDeclaration n expr
     | otherwise = DSDeclaration n (substitute (name, expr) e)
+  substitute s (DSConditionBranch e1 e2 e3) =
+    DSConditionBranch (substitute s e1) (substitute s e2) (substitute s e3)
 
 instance Substitutable DesugaredExpr DesugaredExpr where
   substitute s (DEVar x)

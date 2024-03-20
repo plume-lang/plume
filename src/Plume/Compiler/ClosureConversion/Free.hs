@@ -1,5 +1,8 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Plume.Compiler.ClosureConversion.Free where
 
+import Data.Foldable
 import Data.Set qualified as S
 import Plume.Compiler.ClosureConversion.Syntax
 
@@ -20,13 +23,26 @@ instance Free ClosedExpr where
   free (CEApplication f args) = free f <> free args
   free (CELiteral _) = S.empty
   free (CEList es) = free es
-  free (CEDeclaration x e1 e2) = S.insert x (free e1 <> free e2)
+  free (CEDeclaration x e1 e2) = (free e1 <> free e2) S.\\ S.singleton x
   free (CEConditionBranch e1 e2 e3) = free e1 <> free e2 <> free e3
   free (CESwitch e cases) = free e <> free cases
   free (CEDictionary es) = free es
   free (CEProperty e _) = free e
   free (CETypeOf e) = free e
-  free (CEBlock ss) = free ss
+  free (CEBlock ss) = freeBody ss
+
+freeBody :: [ClosedStatement] -> S.Set Text
+freeBody body =
+  fst $
+    foldl
+      ( \(acc, excluded) -> \case
+          CSDeclaration n e ->
+            (acc `S.union` free e S.\\ S.singleton n, excluded `S.union` S.singleton n)
+          x ->
+            (acc `S.union` free x S.\\ excluded, excluded)
+      )
+      (S.empty, S.empty)
+      body
 
 instance Free ClosedPattern where
   free (CPVariable x) = S.singleton x
@@ -37,7 +53,7 @@ instance Free ClosedPattern where
 instance Free ClosedStatement where
   free (CSExpr e) = free e
   free (CSReturn e) = free e
-  free (CSDeclaration x e) = S.insert x (free e)
+  free (CSDeclaration x e) = free e S.\\ S.singleton x
 
 instance Free ClosedProgram where
   free (CPFunction n args e) = free e S.\\ (S.fromList args <> S.singleton n)

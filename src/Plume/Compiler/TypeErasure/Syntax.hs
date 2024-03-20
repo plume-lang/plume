@@ -27,6 +27,7 @@ data UntypedStatement
   = USExpr UntypedExpr
   | USReturn UntypedExpr
   | USDeclaration Text UntypedExpr
+  | USConditionBranch UntypedExpr UntypedStatement UntypedStatement
   deriving (Eq, Show, Ord)
 
 data UntypedProgram
