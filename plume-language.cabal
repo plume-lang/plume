@@ -81,6 +81,14 @@ library
         Plume.Compiler.Desugaring.Modules.ANF
         Plume.Compiler.Desugaring.Modules.Switch
 
+        Plume.Compiler.SSA
+        Plume.Compiler.SSA.DeadCode
+        Plume.Compiler.SSA.Bundler
+
+        Plume.Compiler.Bytecode.Syntax
+        Plume.Compiler.Bytecode.Assembler
+        Plume.Compiler.Bytecode.Serialize
+
         System.IO.Pretty
 
         Control.Monad.IO
@@ -103,7 +111,9 @@ library
         prettyprinter,
         prettyprinter-ansi-terminal,
         filepath,
-        directory
+        directory,
+        text,
+        binary
 
     mixins:
         base hiding (Prelude),
