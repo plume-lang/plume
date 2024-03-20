@@ -1,3 +1,8 @@
-test = (x) => (y) => (z) => x
+native print<A>(x: A): ()
+native equals<A>(x: A, y: A): bool
+native sub(x: int, y: int): int
+native mul(x: int, y: int): int
 
-test(4)(5)(6)
+square(x: int): int => mul(x, x)
+
+print(square(6))
