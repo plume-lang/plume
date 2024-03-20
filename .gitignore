@@ -25,3 +25,5 @@ cabal.project.local~
 __pycache__
 report.html
 .DS_Store
+a.out
+closure.plm.bc
