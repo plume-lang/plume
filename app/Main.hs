@@ -1,7 +1,7 @@
 module Main where
 
 import Control.Monad.Exception
-import Data.Text.IO hiding (writeFile)
+import Data.Text.IO
 import Plume.Compiler.Bytecode.Assembler
 import Plume.Compiler.Bytecode.Serialize
 import Plume.Compiler.ClosureConversion.Conversion
