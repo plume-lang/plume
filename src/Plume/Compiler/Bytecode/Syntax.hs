@@ -3,8 +3,7 @@ module Plume.Compiler.Bytecode.Syntax where
 data Instruction
   = LoadLocal Int
   | StoreLocal Int
-  | CLoad Int
-  | FLoad Int
+  | LoadConstant Int
   | LoadGlobal Int
   | StoreGlobal Int
   | Return
@@ -21,7 +20,7 @@ data Instruction
   | TypeOf
   | ConstructorName
   | Phi Int Int
-  | MakeLambda Int
+  | MakeLambda Int Int
   deriving (Show, Eq)
 
 data Comparator

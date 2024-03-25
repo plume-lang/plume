@@ -8,7 +8,7 @@ import Plume.Compiler.TypeErasure.Syntax qualified as Pre
 import Plume.Syntax.Common.Literal
 
 type Desugar' =
-  Desugar Pre.UntypedStatement [ANFResult Post.DesugaredStatement]
+  Desugar Pre.UntypedStatement [ANFResult (Maybe Post.DesugaredStatement)]
 
 type Desugar'' = Desugar Pre.UntypedExpr (ANFResult Post.DesugaredExpr)
 type DesugarSwitch =

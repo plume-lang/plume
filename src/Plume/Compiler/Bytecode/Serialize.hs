@@ -22,8 +22,7 @@ encodeComparator GreaterThanOrEqualTo = putInt64le 5
 encodeInstruction :: Instruction -> Put
 encodeInstruction (LoadLocal i) = putWord8 0 >> encodeInteger i
 encodeInstruction (StoreLocal i) = putWord8 1 >> encodeInteger i
-encodeInstruction (CLoad i) = putWord8 2 >> encodeInteger i
-encodeInstruction (FLoad i) = putWord8 3 >> encodeInteger i
+encodeInstruction (LoadConstant i) = putWord8 2 >> encodeInteger i
 encodeInstruction (LoadGlobal i) = putWord8 4 >> encodeInteger i
 encodeInstruction (StoreGlobal i) = putWord8 5 >> encodeInteger i
 encodeInstruction Return = putWord8 6
@@ -40,7 +39,7 @@ encodeInstruction (JumpIfRel i) = putWord8 16 >> encodeInteger i
 encodeInstruction TypeOf = putWord8 17
 encodeInstruction ConstructorName = putWord8 18
 encodeInstruction (Phi i j) = putWord8 19 >> encodeInteger i >> encodeInteger j
-encodeInstruction (MakeLambda i) = putWord8 20 >> encodeInteger i
+encodeInstruction (MakeLambda i l) = putWord8 20 >> encodeInteger i >> encodeInteger l
 
 encodeText :: Text -> Put
 encodeText w = do
@@ -61,13 +60,14 @@ encodeMetaData FunctionMetaData {arity, address, localsSpace} = do
   encodeInteger localsSpace
 
 encodeProgram :: Program -> Put
-encodeProgram Program {instructions, constants, metaDatas} = do
+encodeProgram Program {instructions, constants} = do
   encodeInteger $ length instructions
   mapM_ encodeInstruction instructions
   encodeInteger $ length constants
   mapM_ encodeConstant constants
-  encodeInteger $ length metaDatas
-  mapM_ encodeMetaData metaDatas
+
+-- encodeInteger $ length metaDatas
+-- mapM_ encodeMetaData metaDatas
 
 serialize :: Program -> IO BSL.ByteString
 serialize = pure . runPut . encodeProgram

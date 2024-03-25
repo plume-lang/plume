@@ -22,6 +22,11 @@ freshName = do
   writeIORef nameCounter (i + 1)
   pure $ "var" <> show i
 
-createBlock :: [ANFResult DesugaredStatement] -> [DesugaredStatement]
-createBlock ((x, stmts) : xss) = stmts ++ x : createBlock xss
+{-# NOINLINE nativeFunctions #-}
+nativeFunctions :: IORef (Set Text)
+nativeFunctions = unsafePerformIO $ newIORef mempty
+
+createBlock :: [ANFResult (Maybe DesugaredStatement)] -> [DesugaredStatement]
+createBlock ((Just x, stmts) : xss) = stmts ++ x : createBlock xss
+createBlock ((Nothing, stmts) : xss) = stmts ++ createBlock xss
 createBlock [] = []

@@ -3,6 +3,7 @@
 module Plume.Compiler.Desugaring.Desugar where
 
 import Data.IntMap qualified as M
+import Data.Set qualified as Set
 import Plume.Compiler.Desugaring.Monad
 import Plume.Compiler.Desugaring.Syntax qualified as Post
 import Plume.Compiler.TypeErasure.Syntax qualified as Pre
@@ -43,26 +44,29 @@ desugarExpr = \case
   d@(Pre.UEDeclaration {}) -> desugarANF desugarExpr d
   s@(Pre.UESwitch {}) -> desugarSwitch (desugarExpr, desugarStatement) s
   Pre.UEBlock xs -> do
-    (xs', stmts) <- unzip . concat <$> mapM desugarStatement xs
-    return (Post.DEVar "nil", concat stmts <> xs')
+    res <- concat <$> mapM desugarStatement xs
+    return (Post.DEVar "nil", createBlock res)
 
 desugarStatement
-  :: Desugar Pre.UntypedStatement [ANFResult Post.DesugaredStatement]
+  :: Desugar Pre.UntypedStatement [ANFResult (Maybe Post.DesugaredStatement)]
 desugarStatement = \case
   Pre.USExpr x -> do
     (x', stmts) <- desugarExpr x
-    return [(Post.DSExpr x', stmts)]
+    case x' of
+      Post.DEVar "nil" -> return [(Nothing, stmts)]
+      _ -> return [(Just $ Post.DSExpr x', stmts)]
   Pre.USReturn x -> do
     (x', stmts) <- desugarExpr x
-    return [(Post.DSReturn x', stmts)]
+    return [(Just $ Post.DSReturn x', stmts)]
   Pre.USDeclaration n e -> do
     (e', stmts) <- desugarExpr e
-    return [(Post.DSDeclaration n e', stmts)]
+    return [(Just $ Post.DSDeclaration n e', stmts)]
   Pre.USConditionBranch x y z -> do
     (x', stmts1) <- desugarExpr x
     ys <- desugarStatement y
     zs <- desugarStatement z
-    return [(Post.DSConditionBranch x' (createBlock ys) (createBlock zs), stmts1)]
+    return
+      [(Just $ Post.DSConditionBranch x' (createBlock ys) (createBlock zs), stmts1)]
 
 desugarProgram :: Pre.UntypedProgram -> IO [Post.DesugaredProgram]
 desugarProgram = \case
@@ -72,7 +76,9 @@ desugarProgram = \case
   Pre.UPStatement x -> do
     x' <- desugarStatement x
     return $ map Post.DPStatement $ createBlock x'
-  Pre.UPNativeFunction x y -> return [Post.DPNativeFunction x y]
+  Pre.UPNativeFunction x y -> do
+    modifyIORef' nativeFunctions $ Set.insert x
+    return [Post.DPNativeFunction x y]
 
 desugar :: [Pre.UntypedProgram] -> IO [Post.DesugaredProgram]
 desugar = concatMapM desugarProgram

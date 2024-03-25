@@ -58,22 +58,20 @@ assemblerState =
 
 assemble :: Pre.DesugaredExpr -> IO [BC.Instruction]
 assemble (Pre.DEVar n) = do
-  AssemblerState {functions, locals, globals} <- readIORef assemblerState
+  AssemblerState {locals, globals, nativeFunctions} <- readIORef assemblerState
   case Map.lookup n globals of
-    Just i | n `Set.member` functions -> pure [BC.FLoad i]
     Just i -> pure [BC.LoadGlobal i]
     Nothing -> case Map.lookup n locals of
       Just i -> pure [BC.LoadLocal i]
-      Nothing -> error $ "Variable not found: " <> show n
+      Nothing -> case Map.lookup n nativeFunctions of
+        Just (_, addr) -> pure [BC.NLoad addr]
+        _ -> error $ "Variable not found: " <> show n
 assemble (Pre.DEApplication f args) = do
-  AssemblerState {nativeFunctions, functions, locals, globals} <-
+  AssemblerState {nativeFunctions, locals, globals} <-
     readIORef assemblerState
-  args' <- concat <$> mapM assemble (reverse args)
+  args' <- concat <$> mapM assemble args
   pure $
     args' ++ case Map.lookup f globals of
-      Just i
-        | f `Set.member` functions ->
-            [BC.FLoad i, BC.Call (length args)]
       Just i -> [BC.LoadGlobal i, BC.Call (length args)]
       Nothing -> case Map.lookup f locals of
         Just i ->
@@ -85,12 +83,12 @@ assemble (Pre.DEApplication f args) = do
 assemble (Pre.DELiteral l) = do
   AssemblerState {constants} <- readIORef assemblerState
   case Map.lookup l constants of
-    Just i' -> pure [BC.CLoad i']
+    Just i' -> pure [BC.LoadConstant i']
     Nothing -> do
       modifyIORef' assemblerState $ \s ->
         s {constants = Map.insert l (Map.size constants) constants}
       let idx = Map.size constants
-      pure [BC.CLoad idx]
+      pure [BC.LoadConstant idx]
 assemble (Pre.DEList es) = do
   es' <- concat <$> mapM assemble es
   pure $ es' ++ [BC.MakeList $ length es]
@@ -98,8 +96,8 @@ assemble (Pre.DEProperty e i) = do
   e' <- assemble e
   pure $ e' ++ [BC.ListGet i]
 assemble (Pre.DEDictionary es) = do
-  es' <- concatMapM assemble $ IMap.elems es
-  pure $ es' ++ [BC.MakeList $ IMap.size es]
+  es' <- concat <$> mapM assemble es
+  pure $ es' ++ [BC.MakeList $ length es]
 assemble (Pre.DEIf e1 e2 e3) = do
   e1' <- assemble e1
   e2' <- assemble e2
@@ -180,7 +178,8 @@ assembleProgram (Pre.DPFunction n args stmts) = do
           , functions = Set.insert n s.functions
           }
       res <- concatMapM assembleStmt stmts
-      return ([BC.MakeLambda (length res)] ++ res ++ [BC.StoreGlobal i])
+      return
+        ([BC.MakeLambda (length res) (length freed)] ++ res ++ [BC.StoreGlobal i])
     Nothing -> error $ "Function not declared: " <> show n
 assembleProgram (Pre.DPDeclaration n e) = do
   e' <- assemble e
