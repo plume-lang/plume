@@ -272,6 +272,7 @@ synthesize' (Pre.EReturn e) = do
   unify (t :~: ret)
   return (ret, G.Single $ Post.EReturn e', qs)
 synthesize' (Pre.EDeclaration gens (Annotation name ty) value body) = do
+  print name
   (genericTys, genericNames) <-
     (,map getGenericName gens) <$> mapM convert gens
 
@@ -531,13 +532,10 @@ synthesize
 synthesize = shouldBeAlone . local id . synthesize'
 
 mapAndUnzip3M :: (Monad m) => (a -> m (b, c, d)) -> [a] -> m ([b], [c], [d])
-mapAndUnzip3M f =
-  foldrM
-    ( \x (bs, cs, ds) -> do
-        (b, c, d) <- f x
-        return (b : bs, c : cs, d : ds)
-    )
-    ([], [], [])
+mapAndUnzip3M f xs = do
+  res <- mapM f xs
+  let (bs, cs, ds) = unzip3 res
+  return (bs, cs, ds)
 
 runSynthesize
   :: (MonadIO m)

@@ -18,6 +18,9 @@ instance ToText PlumeType where
   toText (TVar i) = "a" <> show i
   toText (TApp t ts) = toText t <> "<" <> intercalate ", " (map toText ts) <> ">"
 
+instance Semigroup PlumeType where
+  t <> _ = t
+
 data PlumeGeneric
   = GVar Int
   | GExtends Int [Text]

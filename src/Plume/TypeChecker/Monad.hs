@@ -33,6 +33,7 @@ import Plume.TypeChecker.Monad.Substitution as Monad
 import Plume.TypeChecker.Monad.Type as Monad
 import Plume.TypeChecker.Monad.Type.Error as Monad
 import Plume.TypeChecker.Monad.Type.Scheme as Monad
+import Text.Megaparsec
 import Prelude hiding (gets, local)
 
 type Result a = Spreadable [a] a
@@ -103,8 +104,12 @@ withGenerics gens =
   with' @"generics" (fromList gens <>)
 
 with
-  :: forall l a m b. (MonadChecker m, HasField l CheckerState a) => a -> m b -> m b
-with v = with' @l (const v)
+  :: forall l a m b
+   . (MonadChecker m, HasField l CheckerState a, Semigroup a)
+  => a
+  -> m b
+  -> m b
+with v = with' @l (v <>)
 
 with'
   :: forall l a m b
@@ -119,3 +124,6 @@ with' f m = do
   new <- readIORef checkerST
   writeIORef checkerST (setField @l new (getField @l old))
   return a
+
+instance Semigroup SourcePos where
+  p <> _ = p
