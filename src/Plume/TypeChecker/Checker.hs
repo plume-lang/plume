@@ -272,7 +272,6 @@ synthesize' (Pre.EReturn e) = do
   unify (t :~: ret)
   return (ret, G.Single $ Post.EReturn e', qs)
 synthesize' (Pre.EDeclaration gens (Annotation name ty) value body) = do
-  print name
   (genericTys, genericNames) <-
     (,map getGenericName gens) <$> mapM convert gens
 
