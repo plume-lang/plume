@@ -33,11 +33,7 @@ desugarExpr = \case
         (M.toList xs)
     let m = mconcat dicts
     return (Post.DEDictionary m, concat stmts)
-  Pre.UEConditionBranch x y z -> do
-    (x', stmts1) <- desugarExpr x
-    (y', stmts2) <- desugarExpr y
-    (z', stmts3) <- desugarExpr z
-    return (Post.DEIf x' y' z', stmts1 <> stmts2 <> stmts3)
+  c@Pre.UEConditionBranch {} -> desugarANF desugarExpr c
   Pre.UETypeOf x -> do
     (x', stmts) <- desugarExpr x
     return (Post.DETypeOf x', stmts)

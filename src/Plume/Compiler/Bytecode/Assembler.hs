@@ -3,18 +3,23 @@
 module Plume.Compiler.Bytecode.Assembler where
 
 import Data.IntMap qualified as IMap
+import Data.List qualified as List
 import Data.Map qualified as Map
-import Data.Set qualified as Set
 import GHC.IO
 import Plume.Compiler.Bytecode.Syntax qualified as BC
-import Plume.Compiler.ClosureConversion.Free
 import Plume.Compiler.Desugaring.Syntax qualified as Pre
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Translation.Generics
 
+class Free a where
+  free :: a -> [Text]
+
+instance (Free a) => Free [a] where
+  free = foldMap free
+
 instance Free Pre.DesugaredExpr where
-  free (Pre.DEVar x) = Set.singleton x
-  free (Pre.DEApplication f args) = Set.singleton f <> foldMap free args
+  free (Pre.DEVar x) = [x]
+  free (Pre.DEApplication f args) = [f] <> foldMap free args
   free (Pre.DEList es) = foldMap free es
   free (Pre.DEProperty e _) = free e
   free (Pre.DEIf e1 e2 e3) = free e1 <> free e2 <> free e3
@@ -28,20 +33,20 @@ instance Free Pre.DesugaredExpr where
 instance Free Pre.DesugaredStatement where
   free (Pre.DSExpr e) = free e
   free (Pre.DSReturn e) = free e
-  free (Pre.DSDeclaration n e) = Set.singleton n <> free e
+  free (Pre.DSDeclaration n e) = [n] <> free e
   free (Pre.DSConditionBranch e1 e2 e3) = free e1 <> foldMap free e2 <> foldMap free e3
 
 instance Free Pre.DesugaredProgram where
-  free (Pre.DPFunction name _ _) = Set.singleton name
+  free (Pre.DPFunction name _ _) = List.singleton name
   free (Pre.DPStatement s) = free s
   free (Pre.DPNativeFunction _ _) = mempty
-  free (Pre.DPDeclaration n _) = Set.singleton n
+  free (Pre.DPDeclaration n _) = List.singleton n
 
 data AssemblerState = AssemblerState
   { constants :: Map Literal Int
   , nativeFunctions :: Map Text (Int, Int)
   , constructors :: Map Text Int
-  , functions :: Set.Set Text
+  , functions :: [Text]
   , metadata :: IntMap BC.FunctionMetaData
   , currentSize :: Int
   , locals :: Map Text Int
@@ -156,11 +161,8 @@ assembleProgram (Pre.DPFunction n args stmts) = do
   case Map.lookup n globals of
     Just i -> do
       let freed =
-            ( free stmts
-                <> Set.fromList args
-                <> Set.singleton n
-            )
-              Set.\\ (Map.keysSet nativeFunctions <> Map.keysSet globals)
+            List.nub (free stmts <> args)
+              List.\\ (Map.keys nativeFunctions <> Map.keys globals)
 
       modifyIORef' assemblerState $ \s ->
         s
@@ -173,11 +175,12 @@ assembleProgram (Pre.DPFunction n args stmts) = do
                     (length freed)
                 )
                 s.metadata
-          , locals = Map.fromList $ zip (Set.toList freed) [0 ..]
+          , locals = Map.fromList $ zip freed [0 ..]
           , globals = Map.insert n i globals
-          , functions = Set.insert n s.functions
+          , functions = List.insert n s.functions
           }
       res <- concatMapM assembleStmt stmts
+
       return
         ([BC.MakeLambda (length res) (length freed)] ++ res ++ [BC.StoreGlobal i])
     Nothing -> error $ "Function not declared: " <> show n
@@ -202,18 +205,18 @@ assembleProgram (Pre.DPNativeFunction n arity) = do
           }
       pure []
 
-getNativeFunctions :: [Pre.DesugaredProgram] -> Set.Set Text
-getNativeFunctions = Set.fromList . mapMaybe getNativeFunction
+getNativeFunctions :: [Pre.DesugaredProgram] -> [Text]
+getNativeFunctions = mapMaybe getNativeFunction
  where
   getNativeFunction (Pre.DPNativeFunction n _) = Just n
   getNativeFunction _ = Nothing
 
 runAssembler :: [Pre.DesugaredProgram] -> IO ([BC.Instruction], AssemblerState)
 runAssembler xs = do
-  let freed = free xs Set.\\ getNativeFunctions xs
+  let freed = List.nub (free xs) List.\\ getNativeFunctions xs
   modifyIORef' assemblerState $ \s ->
     s
-      { globals = Map.fromList $ zip (Set.toList freed) [0 ..]
+      { globals = Map.fromList $ zip freed [0 ..]
       }
   is <- concatMapM assembleProgram xs
   s <- readIORef assemblerState

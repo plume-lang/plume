@@ -47,4 +47,20 @@ desugarANF f (Pre.UEDeclaration name expr body) = do
           <> [Post.DSDeclaration fresh body']
 
   return (Post.DEVar fresh, stmts)
+desugarANF f (Pre.UEConditionBranch e1 e2 e3) = do
+  (e1', stmts1) <- f e1
+  r1@(e2', stmts2) <- f e2
+  r2@(e3', stmts3) <- f e3
+
+  if not (null stmts2) || not (null stmts3)
+    then do
+      let br1 = createBr r1
+      let br2 = createBr r2
+      let br = Post.DSConditionBranch e1' br1 br2
+      return (Post.DEVar "nil", stmts1 <> [br])
+    else do
+      let stmts = stmts1 <> stmts2 <> stmts3
+      return (Post.DEIf e1' e2' e3', stmts)
+ where
+  createBr (e, st) = st <> [Post.DSReturn e]
 desugarANF _ _ = error "test"

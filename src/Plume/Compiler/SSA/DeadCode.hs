@@ -17,6 +17,7 @@ removeDeadCodeStmt _ (DSExpr e) = case e of
   DEEqualsTo _ _ -> Nothing
   DEAnd _ _ -> Nothing
   _ -> Just $ DSExpr e
+removeDeadCodeStmt _ (DSReturn (DEVar "nil")) = Nothing
 removeDeadCodeStmt _ e = Just e
 
 removeDeadCodeProg :: DesugaredProgram -> Maybe DesugaredProgram

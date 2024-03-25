@@ -54,6 +54,7 @@ instance Free ClosedStatement where
   free (CSExpr e) = free e
   free (CSReturn e) = free e
   free (CSDeclaration x e) = free e S.\\ S.singleton x
+  free (CSConditionBranch e1 e2 e3) = free e1 <> free e2 <> free e3
 
 instance Free ClosedProgram where
   free (CPFunction n args e) = free e S.\\ (S.fromList args <> S.singleton n)
@@ -99,6 +100,11 @@ instance Substitutable ClosedStatement ClosedExpr where
   substitute e (CSReturn e') = CSReturn (substitute e e')
   substitute (name, expr) (CSDeclaration x e) =
     CSDeclaration x (substitute (name, expr) e)
+  substitute e (CSConditionBranch e1 e2 e3) =
+    CSConditionBranch
+      (substitute e e1)
+      (substitute e e2)
+      (substitute e e3)
 
 instance Substitutable ClosedProgram ClosedExpr where
   substitute e (CPStatement s) = CPStatement (substitute e s)
