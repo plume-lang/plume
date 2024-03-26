@@ -71,6 +71,10 @@ assemble (Pre.DEVar n) = do
       Nothing -> case Map.lookup n nativeFunctions of
         Just (_, addr) -> pure [BC.NLoad addr]
         _ -> error $ "Variable not found: " <> show n
+assemble (Pre.DEIndex e1 e2) = do
+  e1' <- assemble e1
+  e2' <- assemble e2
+  pure $ e1' ++ e2' ++ [BC.GetIndex]
 assemble (Pre.DEApplication f args) = do
   AssemblerState {nativeFunctions, locals, globals} <-
     readIORef assemblerState
@@ -111,7 +115,6 @@ assemble (Pre.DEIf e1 e2 e3) = do
     e1'
       ++ [BC.JumpIfRel $ length e2' + 1]
       ++ e2'
-      ++ [BC.Jump $ length e3' | not (containsReturn e2')]
       ++ e3'
 assemble (Pre.DETypeOf e) = do
   e' <- assemble e
@@ -142,7 +145,6 @@ assembleStmt (Pre.DSConditionBranch e1 e2 e3) = do
     e1'
       ++ [BC.JumpIfRel $ length e2' + 1]
       ++ e2'
-      ++ [BC.Jump $ length e3' | not (containsReturn e2')]
       ++ e3'
 assembleStmt (Pre.DSDeclaration n e) = do
   e' <- assemble e

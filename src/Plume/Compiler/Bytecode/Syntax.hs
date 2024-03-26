@@ -14,13 +14,12 @@ data Instruction
   | MakeList Int
   | ListGet Int
   | Call Int
-  | Jump Int
-  | JumpIf Int
   | JumpIfRel Int
   | TypeOf
   | ConstructorName
   | Phi Int Int
   | MakeLambda Int Int
+  | GetIndex
   deriving (Show, Eq)
 
 data Comparator
