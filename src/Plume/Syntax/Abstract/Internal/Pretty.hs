@@ -3,6 +3,7 @@ module Plume.Syntax.Abstract.Internal.Pretty where
 import Plume.Syntax.Abstract
 import Plume.Syntax.Common
 import Plume.Syntax.Common.Internal.Pretty
+import Plume.Syntax.Concrete.Internal.Pretty ()
 import Plume.Syntax.Internal.Pretty.ANSI
 import Prettyprinter.Render.Terminal
 import Prelude hiding (intercalate)
@@ -18,6 +19,12 @@ instance {-# OVERLAPS #-} ANSIPretty Program where
   ansiPretty [] = mempty
 
 prettyExpr :: Expression -> Doc AnsiStyle
+prettyExpr (EType (Annotation name gens) ts) =
+  anCol Blue "type" <+> anItalic (pretty name)
+    <> angles (hsep . punctuate comma $ map ansiPretty gens)
+      <+> "="
+    <> line
+    <> indent 2 (vsep . punctuate comma $ map ansiPretty ts)
 prettyExpr (EApplication e es) =
   prettyExpr e
     <> parens (hsep . punctuate comma $ map prettyExpr es)

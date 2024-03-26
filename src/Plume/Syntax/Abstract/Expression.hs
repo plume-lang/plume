@@ -9,7 +9,7 @@ module Plume.Syntax.Abstract.Expression where
 
 import Data.Text hiding (map)
 import Plume.Syntax.Common
-import Plume.Syntax.Concrete.Expression (Position)
+import Plume.Syntax.Concrete.Expression (Position, TypeConstructor)
 import Prelude hiding (intercalate)
 
 data AbstractExpression t
@@ -22,6 +22,7 @@ data AbstractExpression t
       (Annotation (Maybe t))
       (AbstractExpression t)
       (Maybe (AbstractExpression t))
+  | EType (Annotation [PlumeGeneric]) [TypeConstructor t]
   | EConditionBranch
       (AbstractExpression t)
       (AbstractExpression t)

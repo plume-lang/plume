@@ -15,6 +15,7 @@ import Plume.Compiler.Desugaring.Modules.Switch
 
 desugarExpr :: Desugar Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
 desugarExpr = \case
+  Pre.CESpecial -> return' Post.DESpecial
   Pre.CEVar x -> return' $ Post.DEVar x
   x@(Pre.CEApplication _ _) -> desugarANF desugarExpr x
   Pre.CELiteral x -> return' $ Post.DELiteral x

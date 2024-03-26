@@ -2,7 +2,7 @@ module Plume.TypeChecker.TLIR.Syntax where
 
 import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Literal
-import Plume.Syntax.Concrete.Expression (Position)
+import Plume.Syntax.Concrete.Expression (Position, TypeConstructor)
 import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR.Modules.Pattern
 
@@ -15,6 +15,7 @@ data TypedExpression t
   | EEqualsType (TypedExpression t) Text
   | EAnd (TypedExpression t) (TypedExpression t)
   | EIndex (TypedExpression t) (TypedExpression t)
+  | EType (Annotation [PlumeGeneric]) [TypeConstructor t]
   | EDeclaration
       (Annotation t)
       [PlumeGeneric]

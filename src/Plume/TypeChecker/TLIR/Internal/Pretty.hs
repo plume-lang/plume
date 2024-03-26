@@ -2,6 +2,7 @@ module Plume.TypeChecker.TLIR.Internal.Pretty where
 
 import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Internal.Pretty (prettyLit)
+import Plume.Syntax.Concrete.Expression (TypeConstructor (..))
 import Plume.Syntax.Internal.Pretty.ANSI
 import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR
@@ -19,7 +20,17 @@ instance {-# OVERLAPS #-} ANSIPretty Program where
   ansiPretty (d : ds) = ansiPretty d <> line <> line <> ansiPretty ds
   ansiPretty [] = mempty
 
+prettyTyCons :: TypeConstructor PlumeType -> Doc AnsiStyle
+prettyTyCons (TConstructor n ts) = anItalic (pretty n) <> parens (hsep . punctuate comma $ map ansiPretty ts)
+prettyTyCons (TVariable n) = anItalic (pretty n)
+
 prettyExpr :: Expression -> Doc AnsiStyle
+prettyExpr (EType (Annotation name gens) ts) =
+  anCol Blue "type" <+> anItalic (pretty name)
+    <> angles (hsep . punctuate comma $ map ansiPretty gens)
+      <+> "="
+    <> line
+    <> indent 2 (vsep . punctuate comma $ map prettyTyCons ts)
 prettyExpr (EApplication e es) =
   prettyExpr e
     <> parens (hsep . punctuate comma $ map prettyExpr es)

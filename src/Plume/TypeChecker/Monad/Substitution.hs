@@ -3,6 +3,7 @@ module Plume.TypeChecker.Monad.Substitution where
 import Data.Map qualified as M
 import Data.Set qualified as S
 import Plume.Syntax.Common.Annotation
+import Plume.Syntax.Concrete.Expression (TypeConstructor (..))
 import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR
 
@@ -72,6 +73,10 @@ instance (Types a) => Types (TypedExpression a) where
         `S.union` free name
     )
       S.\\ free gens
+  free (EType ann ts) = free ts S.\\ free ann
+  free (EEqualsType e _) = free e
+  free (EAnd e1 e2) = free e1 `S.union` free e2
+  free (EIndex e1 e2) = free e1 `S.union` free e2
 
   apply s (EVariable n t) = EVariable n (apply s t)
   apply s (EList es) = EList (apply s es)
@@ -93,6 +98,17 @@ instance (Types a) => Types (TypedExpression a) where
       (apply s gens)
       (apply s args)
       (apply s body)
+  apply s (EType ann ts) = EType (apply s ann) (apply s ts)
+  apply s (EEqualsType e t) = EEqualsType (apply s e) t
+  apply s (EAnd e1 e2) = EAnd (apply s e1) (apply s e2)
+  apply s (EIndex e1 e2) = EIndex (apply s e1) (apply s e2)
+
+instance (Types a) => Types (TypeConstructor a) where
+  free (TConstructor _ ts) = free ts
+  free (TVariable _) = S.empty
+
+  apply s (TConstructor n ts) = TConstructor n (apply s ts)
+  apply _ (TVariable n) = TVariable n
 
 instance (Types a) => Types (Annotation a) where
   free (Annotation _ t) = free t
@@ -103,11 +119,13 @@ instance (Types a) => Types (TypedPattern a) where
   free (PConstructor _ p2) = free p2
   free PWildcard = S.empty
   free (PLiteral _) = S.empty
+  free (PSpecialVar _ t) = free t
 
   apply s (PVariable n t) = PVariable n (apply s t)
   apply _ (PLiteral l) = PLiteral l
   apply s (PConstructor p1 p2) = PConstructor p1 (apply s p2)
   apply _ PWildcard = PWildcard
+  apply s (PSpecialVar v t) = PSpecialVar v (apply s t)
 
 instance Types Int where
   free = mempty

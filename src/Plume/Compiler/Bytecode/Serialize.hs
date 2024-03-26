@@ -39,6 +39,7 @@ encodeInstruction ConstructorName = putWord8 15
 encodeInstruction (Phi i j) = putWord8 16 >> encodeInteger i >> encodeInteger j
 encodeInstruction (MakeLambda i l) = putWord8 17 >> encodeInteger i >> encodeInteger l
 encodeInstruction GetIndex = putWord8 18
+encodeInstruction Special = putWord8 19
 
 encodeText :: Text -> Put
 encodeText w = do

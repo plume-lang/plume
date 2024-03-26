@@ -62,12 +62,13 @@ assemblerState =
       AssemblerState mempty mempty mempty mempty mempty 0 mempty mempty
 
 assemble :: Pre.DesugaredExpr -> IO [BC.Instruction]
+assemble Pre.DESpecial = pure [BC.Special]
 assemble (Pre.DEVar n) = do
   AssemblerState {locals, globals, nativeFunctions} <- readIORef assemblerState
-  case Map.lookup n globals of
-    Just i -> pure [BC.LoadGlobal i]
-    Nothing -> case Map.lookup n locals of
-      Just i -> pure [BC.LoadLocal i]
+  case Map.lookup n locals of
+    Just i -> pure [BC.LoadLocal i]
+    Nothing -> case Map.lookup n globals of
+      Just i -> pure [BC.LoadGlobal i]
       Nothing -> case Map.lookup n nativeFunctions of
         Just (_, addr) -> pure [BC.NLoad addr]
         _ -> error $ "Variable not found: " <> show n

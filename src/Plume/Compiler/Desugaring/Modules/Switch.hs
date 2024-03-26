@@ -20,20 +20,17 @@ desugarSwitch :: DesugarSwitch
 desugarSwitch (fExpr, _) (Pre.CESwitch x cases) = do
   (x', stmts) <- fExpr x
   let (conds, maps) = unzip $ map (createCondition x' . fst) cases
-  let dict = mconcat maps
-  let lets = stmts <> createLets dict
 
   let bodies = map snd cases
-  let cases' = zip [0 ..] bodies
+  let cases' = zip3 [0 ..] bodies maps
 
   res <-
     mapM
       ( \case
-          (i, expr) -> do
+          (i, expr, m) -> do
             let pat = maybeAt i conds
             (expr', stmts'') <- fExpr expr
-            let expr'' = substituteMany (M.toList dict) expr'
-            let stmts''' = substituteMany (M.toList dict) (stmts'' <> [Post.DSReturn expr''])
+            let stmts''' = substituteMany (M.toList m) (stmts'' <> [Post.DSReturn expr'])
             case pat of
               Just conds_ -> do
                 let cond = createConditionExpr conds_
@@ -44,7 +41,7 @@ desugarSwitch (fExpr, _) (Pre.CESwitch x cases) = do
       cases'
   let ifs' = createIfsStatement $ concat res
 
-  return (Post.DEVar "nil", lets <> ifs')
+  return (Post.DEVar "nil", stmts <> ifs')
 desugarSwitch _ _ = error "test"
 
 createConditionExpr :: [Post.DesugaredExpr] -> Post.DesugaredExpr
@@ -82,8 +79,10 @@ createCondition
 createCondition _ Pre.CPWildcard = ([], mempty)
 createCondition x (Pre.CPVariable y) = ([], M.singleton y x)
 createCondition x (Pre.CPConstructor y xs) =
-  ([Post.DEIsConstructor x y] <> conds, mconcat maps)
- where
-  (conds, maps) = zipWithM (createCondition . Post.DEProperty x) [0 ..] xs
+  let spc = Post.DEEqualsTo (Post.DEProperty x 0) Post.DESpecial
+      cons = Post.DEEqualsTo (Post.DEProperty x 1) (Post.DELiteral (LString y))
+      (conds, maps) = unzip $ zipWith (createCondition . Post.DEProperty x) [2 ..] xs
+   in (spc : cons : concat conds, mconcat maps)
 createCondition x (Pre.CPLiteral l) =
   ([Post.DEEqualsTo x (Post.DELiteral l)], mempty)
+createCondition _ (Pre.CPSpecialVar _) = error "test"

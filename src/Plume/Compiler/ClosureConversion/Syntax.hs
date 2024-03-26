@@ -16,6 +16,7 @@ data ClosedExpr
   | CEBlock [ClosedStatement]
   | CEProperty ClosedExpr Int
   | CEEqualsType ClosedExpr Text
+  | CESpecial
   deriving (Eq, Show, Ord)
 
 data ClosedPattern
@@ -23,6 +24,7 @@ data ClosedPattern
   | CPLiteral Literal
   | CPConstructor Text [ClosedPattern]
   | CPWildcard
+  | CPSpecialVar Text
   deriving (Eq, Show, Ord)
 
 data ClosedStatement

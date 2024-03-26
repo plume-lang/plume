@@ -42,6 +42,7 @@ data ConcreteExpression t
   | EApplication (ConcreteExpression t) [ConcreteExpression t]
   | EBinary BinaryOperator (ConcreteExpression t) (ConcreteExpression t)
   | EPrefix PrefixOperator (ConcreteExpression t)
+  | EType (Annotation [PlumeGeneric]) [TypeConstructor t]
   | EDeclaration
       [PlumeGeneric]
       (Annotation (Maybe t))
@@ -70,6 +71,11 @@ data ConcreteExpression t
   | EGenericProperty [PlumeGeneric] Text [t] t
   | ETypeExtension [PlumeGeneric] (Annotation t) [ExtensionMember t]
   | ENativeFunction Text [Text] t
+
+data TypeConstructor t
+  = TConstructor Text [t]
+  | TVariable Text
+  deriving (Eq, Show)
 
 data ExtensionMember t
   = ExtDeclaration

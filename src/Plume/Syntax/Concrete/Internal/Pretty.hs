@@ -18,6 +18,8 @@ instance ANSIPretty BinaryOperator where ansiPretty = prettyBin
 
 instance ANSIPretty PrefixOperator where ansiPretty = prettyPrefix
 
+instance ANSIPretty (TypeConstructor PlumeType) where ansiPretty = prettyTyCons
+
 prettyBin :: BinaryOperator -> Doc AnsiStyle
 prettyBin Plus = "+"
 prettyBin Minus = "-"
@@ -36,7 +38,17 @@ prettyBin Or = anCol Blue "or"
 prettyPrefix :: PrefixOperator -> Doc AnsiStyle
 prettyPrefix Not = anCol Blue "not"
 
+prettyTyCons :: TypeConstructor PlumeType -> Doc AnsiStyle
+prettyTyCons (TConstructor n ts) = anItalic (pretty n) <> parens (hsep . punctuate comma $ map ansiPretty ts)
+prettyTyCons (TVariable n) = anItalic (pretty n)
+
 prettyExpr :: Int -> Expression -> Doc AnsiStyle
+prettyExpr _ (EType (Annotation name gens) ts) =
+  anCol Blue "type" <+> anItalic (pretty name)
+    <> angles (hsep . punctuate comma $ map ansiPretty gens)
+      <+> "="
+    <> line
+    <> indent 2 (vsep . punctuate comma $ map ansiPretty ts)
 prettyExpr i (EBinary op e1' e2') =
   if i > 0
     then parens res

@@ -20,6 +20,7 @@ data Instruction
   | Phi Int Int
   | MakeLambda Int Int
   | GetIndex
+  | Special
   deriving (Show, Eq)
 
 data Comparator

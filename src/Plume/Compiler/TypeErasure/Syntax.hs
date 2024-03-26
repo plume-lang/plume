@@ -15,6 +15,7 @@ data UntypedExpr
   | UEBlock [UntypedStatement]
   | UEEqualsType UntypedExpr Text
   | UEClosure [Text] UntypedStatement
+  | UESpecial
   deriving (Eq, Show, Ord)
 
 data UntypedPattern
@@ -22,6 +23,7 @@ data UntypedPattern
   | UPLiteral Literal
   | UPConstructor Text [UntypedPattern]
   | UPWildcard
+  | UPSpecialVariable Text
   deriving (Eq, Show, Ord)
 
 data UntypedStatement

@@ -131,6 +131,8 @@ concreteToAbstract (CST.EList es) = do
   es' <-
     fmap flat . sequence <$> mapM concreteToAbstract es
   transRet $ AST.EList <$> es'
+concreteToAbstract (CST.EType ann ts) = do
+  bireturn . Single $ AST.EType ann ts
 
 concreteToAbstractExtensionMember
   :: CST.ExtensionMember Common.PlumeType

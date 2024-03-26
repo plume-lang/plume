@@ -6,6 +6,7 @@ module Plume.TypeChecker.Monad.Type.Conversion where
 import Data.Map qualified as M
 import GHC.Records
 import Plume.Syntax.Common.Type qualified as Pre
+import Plume.Syntax.Concrete.Expression qualified as Pre (TypeConstructor (..))
 import Plume.Syntax.Translation.Generics hiding (Error (..))
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.Monad.Type qualified as Post
@@ -28,6 +29,12 @@ instance a `To` a where convert = return
 
 instance (a `To` b) => Maybe a `To` Maybe b where
   convert = maybeM convert
+
+instance Pre.TypeConstructor Pre.PlumeType `To` (Text, [Post.PlumeType]) where
+  convert (Pre.TVariable n) = return (n, [])
+  convert (Pre.TConstructor n ts) = do
+    ts' <- mapM convert ts
+    return (n, ts')
 
 instance Pre.PlumeType `To` Post.PlumeType where
   convert (Pre.TId n) = do

@@ -199,6 +199,32 @@ eGenericProperty = do
   ret <- symbol ":" *> tType
   return (EGenericProperty gens name (ty : args) ret)
 
+indentOrInlineTC :: Parser [TypeConstructor PlumeType]
+indentOrInlineTC = do
+  block <|> ((: []) <$> typeConstructor)
+ where
+  block = do
+    bl <- indent typeConstructor
+
+    case bl of
+      [] -> fail "Block should contain at least one expression"
+      _ -> return bl
+
+eType :: Parser Expression
+eType = do
+  _ <- reserved "type"
+  name <- identifier
+  gens <- option [] $ angles (gGeneric `sepBy` comma)
+  void $ symbol "="
+  EType (Annotation name gens) <$> indentOrInlineTC
+
+typeConstructor :: Parser (TypeConstructor PlumeType)
+typeConstructor =
+  choice
+    [ try $ TConstructor <$> identifier <*> parens (tType `sepBy` comma)
+    , TVariable <$> identifier
+    ]
+
 eNativeFunction :: Parser Expression
 eNativeFunction = do
   _ <- reserved "native"
@@ -382,6 +408,7 @@ parseToplevel =
             <$> eLocated
               ( choice
                   [ tRequire
+                  , eType
                   , eGenericProperty
                   , eNativeFunction
                   , eExtension

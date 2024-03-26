@@ -90,6 +90,7 @@ closeExpression
 closeExpression (Pre.UEVar x) = pure ([], Post.CEVar x)
 closeExpression (Pre.UELiteral l) = pure ([], Post.CELiteral l)
 closeExpression (Pre.UEList es) = (Post.CEList <$>) . sequence <$> traverse closeExpression es
+closeExpression Pre.UESpecial = pure ([], Post.CESpecial)
 closeExpression (Pre.UEApplication f args) = do
   res <- readIORef reserved
   gv <- readIORef globalVars
@@ -150,6 +151,7 @@ closePattern (Pre.UPConstructor name ps) = do
   ps' <- traverse closePattern ps
   pure $ Post.CPConstructor name ps'
 closePattern Pre.UPWildcard = pure Post.CPWildcard
+closePattern (Pre.UPSpecialVariable x) = pure $ Post.CPSpecialVar x
 
 closeStatement
   :: (MonadClosure m)

@@ -16,6 +16,7 @@ import Plume.Syntax.Common.Literal
 import Plume.Syntax.Common.Pattern qualified as Pre
 import Plume.Syntax.Common.Type qualified as Pre
 import Plume.Syntax.Concrete (Position)
+import Plume.Syntax.Concrete.Expression qualified as Post (TypeConstructor (..))
 import Plume.Syntax.Translation.Generics qualified as G
 import Plume.TypeChecker.Constraints.Definition
 import Plume.TypeChecker.Constraints.Solver qualified as Solver
@@ -122,9 +123,15 @@ getVariable name = do
       instantiated <- checkExtensions t'
       return (Just instantiated)
     Nothing -> do
-      isExtension name >>= \case
-        True -> return Nothing
-        False -> throw (UnboundVariable name)
+      cons <- search @"types" name
+      case cons of
+        Just t' -> do
+          instantiated <- checkExtensions t'
+          return (Just instantiated)
+        Nothing -> do
+          isExtension name >>= \case
+            True -> return Nothing
+            False -> throw (UnboundVariable name)
 
 getExtensions :: [PlumeGeneric] -> Map Int [Text]
 getExtensions gens =
@@ -176,7 +183,13 @@ synthesize' (Pre.EVariable name) = do
     Just t' -> do
       (inst, _, qs) <- instantiate t'
       return (inst, G.Single $ Post.EVariable name inst, qs)
-    Nothing -> throw (UnboundVariable name)
+    Nothing -> do
+      cons <- search @"types" name
+      case cons of
+        Just t' -> do
+          (inst, _, qs) <- instantiate t'
+          return (inst, G.Single $ Post.EVariable name inst, qs)
+        Nothing -> throw (UnboundVariable name)
 synthesize' (Pre.EApplication f xs)
   | Just (Pre.EVariable n) <- spanProperty f = do
       ty <- getVariable n
@@ -408,6 +421,37 @@ synthesize' (Pre.EList es) = do
   t <- freshTVar
   forM_ ts $ unify . (t :~:)
   return (Post.TList t, G.Single $ Post.EList es', concat qs)
+synthesize' (Pre.EType (Annotation name gens) ts) = do
+  gens' <- mapM convert gens
+  let gens'' = map extract gens'
+  let tyGens = map TVar gens''
+  ts' <- mapM convert ts
+
+  let constructors =
+        map
+          ( \(cname, tys) -> case tys of
+              [] -> Post.TVariable cname
+              _ -> Post.TConstructor cname tys
+          )
+          ts'
+
+  let headerTy =
+        if null gens'
+          then Post.TId name
+          else Post.TApp (Post.TId name) tyGens
+  let schs =
+        map
+          ( \(name', ty) ->
+              ( name'
+              , Forall
+                  gens''
+                  ([] :=>: (ty :->: headerTy))
+              )
+          )
+          ts'
+  mapM_ (uncurry $ insert @"types") schs
+  return
+    (Post.TUnit, G.Single (Post.EType (Annotation name gens') constructors), [])
 
 synthesizeExtMember
   :: (MonadChecker m)
@@ -500,7 +544,7 @@ synthesizePat (Pre.PVariable name) = do
   case t of
     Just t' -> do
       (inst, _, _) <- instantiate t'
-      return (inst, Post.PVariable name inst, mempty)
+      return (inst, Post.PSpecialVar name inst, mempty)
     Nothing -> do
       ty <- freshTVar
       return (ty, Post.PVariable name ty, M.singleton name (Forall [] ([] :=>: ty)))

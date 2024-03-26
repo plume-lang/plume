@@ -132,6 +132,7 @@ reservedWords =
   , "with"
   , "extends"
   , "operator"
+  , "type"
   , -- Primitive types
     "int"
   , "str"

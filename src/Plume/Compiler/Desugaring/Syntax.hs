@@ -16,6 +16,7 @@ data DesugaredExpr
   | DEIsConstructor DesugaredExpr Text
   | DEEqualsTo DesugaredExpr DesugaredExpr
   | DEAnd DesugaredExpr DesugaredExpr
+  | DESpecial
   deriving (Eq, Show, Ord)
 
 data DesugaredStatement
@@ -60,3 +61,4 @@ instance Substitutable DesugaredExpr DesugaredExpr where
   substitute s (DEAnd e1 e2) = DEAnd (substitute s e1) (substitute s e2)
   substitute s (DEIndex e1 e2) =
     DEIndex (substitute s e1) (substitute s e2)
+  substitute _ DESpecial = DESpecial
