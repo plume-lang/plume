@@ -1,7 +1,6 @@
 module Plume.Compiler.ClosureConversion.Syntax where
 
 import Plume.Syntax.Common.Literal
-import Plume.TypeChecker.Monad.Type
 
 data ClosedExpr
   = CEVar Text
@@ -33,7 +32,6 @@ data ClosedStatement
 
 data ClosedProgram
   = CPFunction Text [Text] ClosedStatement
-  | CPExtFunction PlumeType Text Text ClosedStatement
   | CPStatement ClosedStatement
   | CPNativeFunction Text Int
   deriving (Eq, Show, Ord)

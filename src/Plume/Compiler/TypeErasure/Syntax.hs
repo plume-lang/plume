@@ -11,9 +11,8 @@ data UntypedExpr
   | UEConditionBranch UntypedExpr UntypedExpr UntypedExpr
   | UESwitch UntypedExpr [(UntypedPattern, UntypedExpr)]
   | UEBlock [UntypedStatement]
-  | UEProperty UntypedExpr Int
-  | UEDictionary (IntMap UntypedExpr)
   | UETypeOf UntypedExpr
+  | UEClosure [Text] UntypedStatement
   deriving (Eq, Show, Ord)
 
 data UntypedPattern

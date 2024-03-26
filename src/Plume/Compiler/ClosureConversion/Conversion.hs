@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedRecordDot #-}
-
 module Plume.Compiler.ClosureConversion.Conversion where
 
 import Control.Monad.Except
@@ -8,9 +6,7 @@ import Data.Set qualified as S
 import GHC.IO
 import Plume.Compiler.ClosureConversion.Free
 import Plume.Compiler.ClosureConversion.Syntax qualified as Post
-import Plume.Syntax.Common.Annotation
-import Plume.TypeChecker.Monad.Type
-import Plume.TypeChecker.TLIR qualified as Pre
+import Plume.Compiler.TypeErasure.Syntax qualified as Pre
 
 type MonadClosure m = (MonadIO m, MonadError Text m)
 
@@ -88,18 +84,17 @@ closeClosure args e = do
 
 closeExpression
   :: (MonadClosure m)
-  => Pre.TypedExpression PlumeType
+  => Pre.UntypedExpr
   -> m ([Post.ClosedProgram], Post.ClosedExpr)
-closeExpression (Pre.EVariable x _) = pure ([], Post.CEVar x)
-closeExpression (Pre.EExtVariable x _) = pure ([], Post.CEVar x)
-closeExpression (Pre.ELiteral l) = pure ([], Post.CELiteral l)
-closeExpression (Pre.EList es) = (Post.CEList <$>) . sequence <$> traverse closeExpression es
-closeExpression (Pre.EApplication f args) = do
+closeExpression (Pre.UEVar x) = pure ([], Post.CEVar x)
+closeExpression (Pre.UELiteral l) = pure ([], Post.CELiteral l)
+closeExpression (Pre.UEList es) = (Post.CEList <$>) . sequence <$> traverse closeExpression es
+closeExpression (Pre.UEApplication f args) = do
   res <- readIORef reserved
   gv <- readIORef globalVars
   (p2s, args') <- sequence <$> traverse closeExpression args
   case f of
-    Pre.EVariable x _ | x `S.member` (res <> gv) -> do
+    Pre.UEVar x | x `S.member` (res <> gv) -> do
       pure (p2s, Post.CEApplication (Post.CEVar x) args')
     _ -> do
       name <- newCallName
@@ -109,27 +104,20 @@ closeExpression (Pre.EApplication f args) = do
       let callDict = Post.CEProperty callVar 0
       let call = Post.CEApplication callVarP (callDict : args')
       pure (p1 <> p2s, Post.CEDeclaration name f' call)
-closeExpression (Pre.EDeclaration (Annotation name _) _ e1 (Just e2)) = do
+closeExpression (Pre.UEDeclaration name e1 e2) = do
   (p1, e1') <- closeExpression e1
   (p2, e2') <- closeExpression e2
   pure (p1 <> p2, Post.CEDeclaration name e1' e2')
-closeExpression (Pre.EDeclaration (Annotation n _) _ _ Nothing) =
-  error n
-closeExpression (Pre.EConditionBranch e1 e2 e3) = do
+closeExpression (Pre.UEConditionBranch e1 e2 e3) = do
   (p1, e1') <- closeExpression e1
   (p2, e2') <- closeExpression e2
-  (p3, e3') <- case e3 of
-    Just e3' -> closeExpression e3'
-    Nothing -> error "TODO: Implement this."
+  (p3, e3') <- closeExpression e3
   pure (p1 <> p2 <> p3, Post.CEConditionBranch e1' e2' e3')
-closeExpression (Pre.EClosure args _ e) = do
-  let args' = map (.annotationName) args
-  (stmts, body) <- case removeLocated e of
-    b@(Pre.EBlock _) -> closeStatement b
-    e' -> (Post.CSReturn <$>) <$> closeExpression e'
-  first (stmts <>) <$> closeClosure args' body
-closeExpression (Pre.EBlock es) = (Post.CEBlock <$>) . sequence <$> traverse closeStatement es
-closeExpression (Pre.ESwitch e cases) = do
+closeExpression (Pre.UEClosure args e) = do
+  (stmts, body) <- closeStatement e
+  first (stmts <>) <$> closeClosure args body
+closeExpression (Pre.UEBlock es) = (Post.CEBlock <$>) . sequence <$> traverse closeStatement es
+closeExpression (Pre.UESwitch e cases) = do
   (s1, e') <- closeExpression e
   (s2, cases') <-
     sequence
@@ -141,37 +129,35 @@ closeExpression (Pre.ESwitch e cases) = do
         )
         cases
   pure (s1 <> s2, Post.CESwitch e' cases')
-closeExpression (Pre.EReturn e) = closeExpression e
-closeExpression (Pre.ELocated e _) = closeExpression e
-closeExpression (Pre.EExtensionDeclaration {}) =
-  error "Should not encounter extension declaration in closure conversion."
-closeExpression (Pre.ENativeFunction {}) = error "Should not encounter native function in closure conversion."
+closeExpression (Pre.UETypeOf e) = do
+  (stmts, e') <- closeExpression e
+  pure (stmts, Post.CETypeOf e')
 
 closePattern
-  :: (MonadClosure m) => Pre.TypedPattern t -> m Post.ClosedPattern
-closePattern (Pre.PVariable x _) = pure $ Post.CPVariable x
-closePattern (Pre.PLiteral l) = pure $ Post.CPLiteral l
-closePattern (Pre.PConstructor name ps) = do
+  :: (MonadClosure m) => Pre.UntypedPattern -> m Post.ClosedPattern
+closePattern (Pre.UPVariable x) = pure $ Post.CPVariable x
+closePattern (Pre.UPLiteral l) = pure $ Post.CPLiteral l
+closePattern (Pre.UPConstructor name ps) = do
   ps' <- traverse closePattern ps
   pure $ Post.CPConstructor name ps'
-closePattern Pre.PWildcard = pure Post.CPWildcard
+closePattern Pre.UPWildcard = pure Post.CPWildcard
 
 closeStatement
   :: (MonadClosure m)
-  => Pre.TypedExpression PlumeType
+  => Pre.UntypedStatement
   -> m ([Post.ClosedProgram], Post.ClosedStatement)
-closeStatement (Pre.EReturn e) = (Post.CSReturn <$>) <$> closeExpression e
-closeStatement (Pre.EDeclaration (Annotation name _) _ e1 Nothing) = do
+closeStatement (Pre.USReturn e) = (Post.CSReturn <$>) <$> closeExpression e
+closeStatement (Pre.USDeclaration name e1) = do
   (stmts, e1') <- closeExpression e1
   pure (stmts, Post.CSDeclaration name e1')
-closeStatement (Pre.ELocated e _) = closeStatement e
-closeStatement (Pre.EConditionBranch e1 e2 e3) = do
+closeStatement (Pre.USConditionBranch e1 e2 e3) = do
   (p1, e1') <- closeExpression e1
   (p2, e2') <- closeStatement e2
-  (p3, e3') <-
-    maybe (return ([], Post.CSExpr (Post.CEBlock []))) closeStatement e3
+  (p3, e3') <- closeStatement e3
   pure (p1 <> p2 <> p3, Post.CSConditionBranch e1' e2' e3')
-closeStatement e = (Post.CSExpr <$>) <$> closeExpression e
+closeStatement (Pre.USExpr e) = do
+  (stmts, e') <- closeExpression e
+  pure (stmts, Post.CSExpr e')
 
 makeReturn :: Post.ClosedExpr -> [Post.ClosedStatement]
 makeReturn (Post.CEBlock es) = es
@@ -186,52 +172,22 @@ makeReturnBody :: Post.ClosedExpr -> Post.ClosedStatement
 makeReturnBody e = Post.CSExpr (Post.CEBlock $ makeReturn e)
 
 closeProgram
-  :: (MonadClosure m) => Pre.TypedExpression PlumeType -> m [Post.ClosedProgram]
-closeProgram (Pre.EDeclaration (Annotation name _) _ (Pre.EClosure args _ e) _) = do
-  let args' = map (.annotationName) args
+  :: (MonadClosure m) => Pre.UntypedProgram -> m [Post.ClosedProgram]
+closeProgram (Pre.UPFunction name args e) = do
   modifyIORef' globalVars (<> S.singleton name)
   (stmts, e') <- closeStatement e
-  pure $ stmts ++ [Post.CPFunction name args' (makeReturnStmt e')]
-closeProgram (Pre.ELocated e _) = closeProgram e
-closeProgram (Pre.EExtensionDeclaration (Annotation name _) ty _ arg e) = do
-  (stmts, e') <- closeStatement e
-  pure $ stmts ++ [Post.CPExtFunction ty name arg.annotationName e']
-closeProgram (Pre.ENativeFunction name _ (args :->: _)) = do
+  pure $ stmts ++ [Post.CPFunction name args (makeReturnStmt e')]
+closeProgram (Pre.UPNativeFunction name arity) = do
   modifyIORef' reserved (S.insert name)
-  pure [Post.CPNativeFunction name (length args)]
-closeProgram e = do
-  (stmts, s) <- closeStatement e
-  pure $ stmts ++ [Post.CPStatement s]
+  pure [Post.CPNativeFunction name arity]
+closeProgram (Pre.UPStatement s) = do
+  (stmts, s') <- closeStatement s
+  pure $ stmts ++ [Post.CPStatement s']
 
 runClosureConversion
   :: (MonadIO m)
-  => [Pre.TypedExpression PlumeType]
+  => [Pre.UntypedProgram]
   -> m (Either Text [Post.ClosedProgram])
 runClosureConversion e = do
   writeIORef closedCounter 0
-  (concat <$>) <$> runExceptT (traverse (closeProgram . removeLocated) e)
-
-removeLocated :: Pre.TypedExpression t -> Pre.TypedExpression t
-removeLocated (Pre.ELocated e _) = removeLocated e
-removeLocated (Pre.EDeclaration name t e1 Nothing) = Pre.EDeclaration name t (removeLocated e1) Nothing
-removeLocated (Pre.EBlock es) = Pre.EBlock $ map removeLocated es
-removeLocated (Pre.EConditionBranch e1 e2 e3) =
-  Pre.EConditionBranch
-    (removeLocated e1)
-    (removeLocated e2)
-    (fmap removeLocated e3)
-removeLocated (Pre.EReturn e) = Pre.EReturn $ removeLocated e
-removeLocated (Pre.EExtensionDeclaration funName varTy gens var e) = Pre.EExtensionDeclaration funName varTy gens var (removeLocated e)
-removeLocated n@(Pre.ENativeFunction {}) = n
-removeLocated n@(Pre.EVariable {}) = n
-removeLocated n@(Pre.EExtVariable {}) = n
-removeLocated n@(Pre.ELiteral {}) = n
-removeLocated (Pre.EList xs) = Pre.EList $ map removeLocated xs
-removeLocated (Pre.EApplication f args) =
-  Pre.EApplication (removeLocated f) (map removeLocated args)
-removeLocated (Pre.EClosure args ty e) =
-  Pre.EClosure args ty (removeLocated e)
-removeLocated (Pre.ESwitch e cases) =
-  Pre.ESwitch (removeLocated e) $ map (fmap removeLocated) cases
-removeLocated (Pre.EDeclaration ann ty e1 (Just e2)) =
-  Pre.EDeclaration ann ty (removeLocated e1) (Just $ removeLocated e2)
+  (concat <$>) <$> runExceptT (traverse closeProgram e)

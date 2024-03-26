@@ -20,12 +20,26 @@ removeDeadCodeStmt _ (DSExpr e) = case e of
 removeDeadCodeStmt _ (DSReturn (DEVar "nil")) = Nothing
 removeDeadCodeStmt _ e = Just e
 
+doesContainReturn :: DesugaredStatement -> Bool
+doesContainReturn (DSReturn _) = True
+doesContainReturn (DSConditionBranch _ e1 e2) =
+  any doesContainReturn e1 || any doesContainReturn e2
+doesContainReturn _ = False
+
 removeDeadCodeProg :: DesugaredProgram -> Maybe DesugaredProgram
 removeDeadCodeProg (DPFunction name args stmts) = case stmts' of
   [] -> Nothing
-  _ -> Just $ DPFunction name args stmts'
+  _ ->
+    if any doesContainReturn stmts'
+      then Just $ DPFunction name args stmts'
+      else case last' of
+        DSExpr e -> Just $ DPFunction name args (init' <> [DSReturn e])
+        DSReturn _ -> Just $ DPFunction name args stmts'
+        _ -> Just $ DPFunction name args (stmts' <> [DSReturn (DEVar "nil")])
  where
   stmts' = mapMaybe (removeDeadCodeStmt mempty) stmts
+  last' = fromMaybe (error "Cannot have empty body") $ viaNonEmpty last stmts'
+  init' = fromMaybe [] $ viaNonEmpty init stmts'
 removeDeadCodeProg (DPStatement s) = removeDeadCodeStmt mempty s >>= Just . DPStatement
 removeDeadCodeProg (DPNativeFunction name arity) = Just $ DPNativeFunction name arity
 removeDeadCodeProg z@DPDeclaration {} = Just z
@@ -75,8 +89,11 @@ analyseDeadCode :: [DesugaredProgram] -> [DesugaredProgram]
 analyseDeadCode (DPFunction name args stmts : xs) =
   case free xs of
     freeProg
-      | S.member name freeProg ->
-          DPFunction name args stmts' : analyseDeadCode xs
+      | S.member name freeProg -> do
+          let fun = removeDeadCodeProg (DPFunction name args stmts')
+          case fun of
+            Just fun' -> fun' : analyseDeadCode xs
+            Nothing -> analyseDeadCode xs
      where
       stmts' = analyseDeadCodeStmt (S.fromList (name : args)) stmts
     _ -> analyseDeadCode xs

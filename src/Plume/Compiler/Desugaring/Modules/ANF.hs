@@ -3,12 +3,12 @@
 module Plume.Compiler.Desugaring.Modules.ANF where
 
 import Data.Set qualified as S
+import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Compiler.Desugaring.Monad
 import Plume.Compiler.Desugaring.Syntax qualified as Post
-import Plume.Compiler.TypeErasure.Syntax qualified as Pre
 
-desugarANF :: DesugarModule Pre.UntypedExpr (ANFResult Post.DesugaredExpr)
-desugarANF f (Pre.UEApplication x xs) = do
+desugarANF :: DesugarModule Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
+desugarANF f (Pre.CEApplication x xs) = do
   (x', stmts1) <- f x
   (xs', stmts2) <- mapAndUnzipM f xs
 
@@ -34,7 +34,7 @@ desugarANF f (Pre.UEApplication x xs) = do
       let stmts' = stmts1 <> [Post.DSDeclaration fresh x'] <> concat stmts2 <> concat stmts3
 
       return (Post.DEApplication fresh xs'', stmts')
-desugarANF f (Pre.UEDeclaration name expr body) = do
+desugarANF f (Pre.CEDeclaration name expr body) = do
   (expr', stmt1) <- f expr
   (body', stmts2) <- desugarANF f body
 
@@ -47,7 +47,7 @@ desugarANF f (Pre.UEDeclaration name expr body) = do
           <> [Post.DSDeclaration fresh body']
 
   return (Post.DEVar fresh, stmts)
-desugarANF f (Pre.UEConditionBranch e1 e2 e3) = do
+desugarANF f (Pre.CEConditionBranch e1 e2 e3) = do
   (e1', stmts1) <- f e1
   r1@(e2', stmts2) <- f e2
   r2@(e3', stmts3) <- f e3

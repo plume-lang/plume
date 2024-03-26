@@ -4,20 +4,20 @@ module Plume.Compiler.Desugaring.Modules.Switch where
 
 import Data.Map qualified as M
 import Plume.Compiler.ClosureConversion.Free
+import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Compiler.Desugaring.Monad
 import Plume.Compiler.Desugaring.Syntax qualified as Post
-import Plume.Compiler.TypeErasure.Syntax qualified as Pre
 import Plume.Syntax.Common.Literal
 
 type Desugar' =
-  Desugar Pre.UntypedStatement [ANFResult (Maybe Post.DesugaredStatement)]
+  Desugar Pre.ClosedStatement [ANFResult (Maybe Post.DesugaredStatement)]
 
-type Desugar'' = Desugar Pre.UntypedExpr (ANFResult Post.DesugaredExpr)
+type Desugar'' = Desugar Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
 type DesugarSwitch =
   (Desugar'', Desugar') -> Desugar''
 
 desugarSwitch :: DesugarSwitch
-desugarSwitch (fExpr, _) (Pre.UESwitch x cases) = do
+desugarSwitch (fExpr, _) (Pre.CESwitch x cases) = do
   (x', stmts) <- fExpr x
   let (conds, maps) = unzip $ map (createCondition x' . fst) cases
   let dict = mconcat maps
@@ -77,13 +77,13 @@ createLets = M.foldrWithKey (\k v acc -> Post.DSDeclaration k v : acc) []
 
 createCondition
   :: Post.DesugaredExpr
-  -> Pre.UntypedPattern
+  -> Pre.ClosedPattern
   -> ([Post.DesugaredExpr], Map Text Post.DesugaredExpr)
-createCondition _ Pre.UPWildcard = ([], mempty)
-createCondition x (Pre.UPVariable y) = ([], M.singleton y x)
-createCondition x (Pre.UPConstructor y xs) =
+createCondition _ Pre.CPWildcard = ([], mempty)
+createCondition x (Pre.CPVariable y) = ([], M.singleton y x)
+createCondition x (Pre.CPConstructor y xs) =
   ([Post.DEIsConstructor x y] <> conds, mconcat maps)
  where
   (conds, maps) = zipWithM (createCondition . Post.DEProperty x) [0 ..] xs
-createCondition x (Pre.UPLiteral l) =
+createCondition x (Pre.CPLiteral l) =
   ([Post.DEEqualsTo x (Post.DELiteral l)], mempty)

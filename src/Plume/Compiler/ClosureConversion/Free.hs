@@ -59,7 +59,6 @@ instance Free ClosedStatement where
 instance Free ClosedProgram where
   free (CPFunction n args e) = free e S.\\ (S.fromList args <> S.singleton n)
   free (CPStatement s) = free s
-  free (CPExtFunction _ n args e) = free e S.\\ (S.singleton args <> S.singleton n)
   free (CPNativeFunction _ _) = S.empty
 
 instance (Free a) => Free (Map k a) where
@@ -110,8 +109,6 @@ instance Substitutable ClosedProgram ClosedExpr where
   substitute e (CPStatement s) = CPStatement (substitute e s)
   substitute e (CPFunction name args body) =
     CPFunction name args (substitute e body)
-  substitute e (CPExtFunction t name args body) =
-    CPExtFunction t name args (substitute e body)
   substitute _ p@(CPNativeFunction _ _) = p
 
 instance Substitutable ClosedPattern ClosedExpr where
