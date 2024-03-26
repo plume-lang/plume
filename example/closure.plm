@@ -25,5 +25,10 @@ a = (x: int) => (y: int) => add(x, y)
 
 print(a(3)(4))
 
+property<A> A.show(): int
+
+extend (c: int) with
+  show(): int => print(c)
+
 res = a(3)(9)
-print(res)
+res.show()
