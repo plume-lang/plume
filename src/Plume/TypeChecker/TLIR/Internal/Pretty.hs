@@ -26,6 +26,7 @@ prettyExpr (EApplication e es) =
 prettyExpr (EVariable v t) = anItalic (pretty v) <> colon <+> prettyTy t
 prettyExpr (EExtVariable v t) = anCol Red (pretty v) <> colon <+> prettyTy t
 prettyExpr (ELiteral l) = prettyLit l
+prettyExpr (ETypeOf e) = anCol Blue "typeof" <+> prettyExpr e
 prettyExpr (EDeclaration a generics e1' e2') =
   gen
     <> arg a

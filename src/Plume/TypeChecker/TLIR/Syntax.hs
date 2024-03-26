@@ -12,6 +12,7 @@ data TypedExpression t
   | ELiteral Literal
   | EList [TypedExpression t]
   | EApplication (TypedExpression t) [TypedExpression t]
+  | ETypeOf (TypedExpression t)
   | EDeclaration
       (Annotation t)
       [PlumeGeneric]
@@ -36,4 +37,4 @@ data TypedExpression t
   | ESwitch (TypedExpression t) [(TypedPattern t, TypedExpression t)]
   | EReturn (TypedExpression t)
   | ENativeFunction Text [PlumeGeneric] t
-  deriving (Eq)
+  deriving (Eq, Show)

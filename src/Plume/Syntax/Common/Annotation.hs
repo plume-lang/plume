@@ -10,7 +10,7 @@ data Annotation t = Annotation
   { annotationName :: Text
   , annotationValue :: t
   }
-  deriving (Eq, Ord, Functor)
+  deriving (Eq, Ord, Functor, Show)
 
 pattern (:@:) :: Text -> t -> Annotation t
 pattern name :@: value = Annotation name value
