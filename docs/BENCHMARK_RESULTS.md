@@ -1,6 +1,6 @@
 | Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 |:---|---:|---:|---:|---:|
-| `python3 benchmark/index.py` | 17.2 ± 0.6 | 15.9 | 19.6 | 21.43 ± 2.74 |
-| `node benchmark/index.js` | 39.2 ± 0.6 | 37.7 | 40.8 | 48.81 ± 6.04 |
-| `./index` | 1.0 ± 0.1 | 0.9 | 2.3 | 1.22 ± 0.22 |
-| `bin/plume-vm example/closure.plm.bc` | 0.8 ± 0.1 | 0.7 | 1.9 | 1.00 |
+| `python3 benchmark/index.py` | 18.2 ± 0.7 | 16.9 | 23.5 | 21.23 ± 3.44 |
+| `node benchmark/index.js` | 36.6 ± 0.6 | 35.7 | 39.6 | 42.73 ± 6.77 |
+| `./index` | 1.1 ± 0.6 | 0.9 | 11.4 | 1.31 ± 0.69 |
+| `bin/plume-vm example/closure.plm.bc` | 0.9 ± 0.1 | 0.7 | 1.8 | 1.00 |
