@@ -17,4 +17,4 @@ def facto(n):
         case _:
             return n * facto(n-1)
     
-print(facto(25))
+print(facto(20))
