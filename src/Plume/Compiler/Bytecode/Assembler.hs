@@ -161,8 +161,8 @@ assembleProgram (Pre.DPFunction n args stmts) = do
   case Map.lookup n globals of
     Just i -> do
       let freed =
-            List.nub (free stmts <> args)
-              List.\\ (Map.keys nativeFunctions <> Map.keys globals)
+            List.nub (free stmts)
+              List.\\ (Map.keys nativeFunctions <> Map.keys globals <> args)
 
       modifyIORef' assemblerState $ \s ->
         s
@@ -172,17 +172,20 @@ assembleProgram (Pre.DPFunction n args stmts) = do
                 ( BC.FunctionMetaData
                     (length args)
                     (s.currentSize + 1)
-                    (length freed)
+                    (length (args <> freed))
                 )
                 s.metadata
-          , locals = Map.fromList $ zip freed [0 ..]
+          , locals = Map.fromList $ zip (args <> freed) [0 ..]
           , globals = Map.insert n i globals
           , functions = List.insert n s.functions
           }
       res <- concatMapM assembleStmt stmts
 
       return
-        ([BC.MakeLambda (length res) (length freed)] ++ res ++ [BC.StoreGlobal i])
+        ( [BC.MakeLambda (length res) (length (args <> freed))]
+            ++ res
+            ++ [BC.StoreGlobal i]
+        )
     Nothing -> error $ "Function not declared: " <> show n
 assembleProgram (Pre.DPDeclaration n e) = do
   e' <- assemble e

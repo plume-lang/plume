@@ -71,6 +71,7 @@ closeClosure args e = do
           Post.CSExpr (Post.CEBlock (envDecl <> [Post.CSReturn ret]))
         Post.CSExpr (Post.CEBlock es) ->
           Post.CSExpr (Post.CEBlock (envDecl <> es))
+        Post.CSExpr ret -> Post.CSExpr (Post.CEBlock (envDecl <> [Post.CSReturn ret]))
         _ -> case envDecl of
           [] -> substBody
           _ -> Post.CSExpr (Post.CEBlock (envDecl <> [substBody]))
