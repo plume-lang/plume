@@ -130,7 +130,9 @@ executable plume-language
         base ^>=4.19.0.0,
         plume-language,
         megaparsec ^>=9.6.1,
-        relude
+        relude,
+        filepath,
+        directory
 
     mixins:
         base hiding (Prelude),
