@@ -1,4 +1,4 @@
-native print<A>(x: A): ()
+native print<A>(x: A): int
 native sub(x: int, y: int): int
 native mul(x: int, y: int): int
 native eq(x: int, y: int): bool
@@ -24,3 +24,6 @@ print(ack(3, 6))
 a = (x: int) => (y: int) => add(x, y)
 
 print(a(3)(4))
+
+res = a(3)(9)
+print(res)

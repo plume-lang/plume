@@ -14,6 +14,8 @@ import Plume.Syntax.Parser
 import Plume.Syntax.Translation.ConcreteToAbstract
 import Plume.TypeChecker.Checker
 import Plume.TypeChecker.TLIR.Internal.Pretty ()
+
+-- import System.IO.Pretty
 import Prelude hiding (readFile)
 
 main :: IO ()
@@ -28,6 +30,7 @@ main = do
         runClosureConversion erased `with` \closed -> do
           desugared <- desugar closed
           let ssa = runSSA desugared
+          -- mapM_ print ssa
           bytecode <- assembleBytecode ssa
           sbc <- serialize bytecode
           -- mapM_
