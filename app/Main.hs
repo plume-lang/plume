@@ -1,9 +1,11 @@
 module Main where
 
 import Control.Monad.Exception
-import Data.Text.IO
+import Data.Text.IO hiding (putStr)
 import Plume.Compiler.Bytecode.Assembler
 import Plume.Compiler.Bytecode.Serialize
+
+-- import Plume.Compiler.Bytecode.Syntax
 import Plume.Compiler.ClosureConversion.Conversion
 import Plume.Compiler.Desugaring.Desugar
 import Plume.Compiler.SSA
@@ -22,10 +24,16 @@ main = do
   parsePlumeFile file content `with` \cst -> do
     runConcreteToAbstract cst `with` \ast -> do
       runSynthesize ast `with` \tlir -> do
-        runClosureConversion tlir `with` \closed -> do
-          let erased = eraseType closed
-          desugared <- desugar erased
+        let erased = eraseType tlir
+        runClosureConversion erased `with` \closed -> do
+          desugared <- desugar closed
           let ssa = runSSA desugared
           bytecode <- assembleBytecode ssa
           sbc <- serialize bytecode
+          -- mapM_
+          --   ( \(i, instr) -> do
+          --       putStr (show i <> ": ")
+          --       print instr
+          --   )
+          --   (zip [0 ..] $ instructions bytecode)
           writeFileLBS "example/closure.plm.bc" sbc
