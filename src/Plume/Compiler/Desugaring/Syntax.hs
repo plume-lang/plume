@@ -8,6 +8,7 @@ data DesugaredExpr
   | DEApplication Text [DesugaredExpr]
   | DELiteral Literal
   | DEList [DesugaredExpr]
+  | DEIndex DesugaredExpr DesugaredExpr
   | DEProperty DesugaredExpr Int
   | DEDictionary (IntMap DesugaredExpr)
   | DEIf DesugaredExpr DesugaredExpr DesugaredExpr
@@ -57,3 +58,5 @@ instance Substitutable DesugaredExpr DesugaredExpr where
   substitute _ (DELiteral l) = DELiteral l
   substitute s (DEDictionary es) = DEDictionary (fmap (substitute s) es)
   substitute s (DEAnd e1 e2) = DEAnd (substitute s e1) (substitute s e2)
+  substitute s (DEIndex e1 e2) =
+    DEIndex (substitute s e1) (substitute s e2)

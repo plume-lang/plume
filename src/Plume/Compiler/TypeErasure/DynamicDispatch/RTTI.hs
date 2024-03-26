@@ -1,17 +1,23 @@
 module Plume.Compiler.TypeErasure.DynamicDispatch.RTTI where
 
+import Plume.Syntax.Common.Literal
 import Plume.TypeChecker.Monad.Type
+import Plume.TypeChecker.TLIR
 
-class RTTI a where
-  rtti :: a -> Text
+data RTTIResult
+  = Item RTTIResult [RTTIResult]
+  | Single Text
+  | Nil
 
-instance RTTI PlumeType where
-  rtti (TApp t xs) = rtti t <> next
-   where
-    xs' = rtti xs
-    next = if xs' == mempty then mempty else "_" <> xs'
-  rtti (TVar _) = mempty
-  rtti (TId t) = t
+rtti :: PlumeType -> RTTIResult
+rtti (TApp t xs) = Item (rtti t) (map rtti xs)
+rtti (TVar _) = Nil
+rtti (TId n) = Single n
 
-instance (RTTI a) => RTTI [a] where
-  rtti xs = mconcat $ intersperse "_" $ map rtti xs
+createCondition
+  :: TypedExpression PlumeType -> RTTIResult -> [TypedExpression PlumeType]
+createCondition e (Item (Single "[]") [x]) =
+  [EEqualsType e "[]"] <> createCondition (EIndex e (ELiteral (LInt 0))) x
+createCondition e (Single n) = [EEqualsType e n]
+createCondition _ Nil = []
+createCondition _ (Item _ _) = error "Type application equality not supported yet"

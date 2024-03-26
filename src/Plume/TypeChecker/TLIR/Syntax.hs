@@ -12,7 +12,9 @@ data TypedExpression t
   | ELiteral Literal
   | EList [TypedExpression t]
   | EApplication (TypedExpression t) [TypedExpression t]
-  | ETypeOf (TypedExpression t)
+  | EEqualsType (TypedExpression t) Text
+  | EAnd (TypedExpression t) (TypedExpression t)
+  | EIndex (TypedExpression t) (TypedExpression t)
   | EDeclaration
       (Annotation t)
       [PlumeGeneric]

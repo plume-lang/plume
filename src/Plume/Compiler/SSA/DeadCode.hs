@@ -59,6 +59,7 @@ instance Free DesugaredExpr where
   free (DEAnd e1 e2) = free e1 <> free e2
   free (DEIf e1 e2 e3) = free e1 <> free e2 <> free e3
   free (DEDictionary es) = free es
+  free (DEIndex e1 e2) = free e1 <> free e2
 
 instance Free DesugaredStatement where
   free (DSExpr e) = free e

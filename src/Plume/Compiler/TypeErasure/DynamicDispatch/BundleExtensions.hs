@@ -1,9 +1,17 @@
 module Plume.Compiler.TypeErasure.DynamicDispatch.BundleExtensions where
 
-import Plume.Compiler.TypeErasure.DynamicDispatch.RTTI
+import Data.Text qualified as T
 import Plume.Syntax.Common.Annotation
 import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR
+
+createName :: PlumeType -> Text
+createName (TId n) = n
+createName (TApp t ts) = createName t <> ts''
+ where
+  ts' = map createName ts
+  ts'' = if null ts' then "" else "_" <> T.intercalate "_" ts'
+createName _ = ""
 
 data Bundled = Bundled
   { bundleName :: Text
@@ -31,8 +39,7 @@ bundleExtension
 bundleExtension name (EExtensionDeclaration (Annotation n _) t _ (Annotation arg _) body)
   | n == name = (Just (Bundled n arg t body, fun), Nothing)
  where
-  rttiName = rtti t
-  extName = n <> "::" <> rttiName
+  extName = n <> "::" <> createName t
   fun =
     EDeclaration
       (Annotation extName t)

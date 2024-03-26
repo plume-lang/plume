@@ -7,13 +7,15 @@ data ClosedExpr
   | CEApplication ClosedExpr [ClosedExpr]
   | CELiteral Literal
   | CEList [ClosedExpr]
+  | CEIndex ClosedExpr ClosedExpr
+  | CEAnd ClosedExpr ClosedExpr
   | CEDeclaration Text ClosedExpr ClosedExpr
   | CEConditionBranch ClosedExpr ClosedExpr ClosedExpr
   | CESwitch ClosedExpr [(ClosedPattern, ClosedExpr)]
   | CEDictionary (IntMap ClosedExpr)
   | CEBlock [ClosedStatement]
   | CEProperty ClosedExpr Int
-  | CETypeOf ClosedExpr
+  | CEEqualsType ClosedExpr Text
   deriving (Eq, Show, Ord)
 
 data ClosedPattern

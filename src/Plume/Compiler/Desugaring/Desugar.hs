@@ -7,6 +7,7 @@ import Data.Set qualified as Set
 import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Compiler.Desugaring.Monad
 import Plume.Compiler.Desugaring.Syntax qualified as Post
+import Plume.Syntax.Common.Literal
 import Plume.Syntax.Translation.Generics
 
 import Plume.Compiler.Desugaring.Modules.ANF
@@ -34,14 +35,22 @@ desugarExpr = \case
     let m = mconcat dicts
     return (Post.DEDictionary m, concat stmts)
   c@Pre.CEConditionBranch {} -> desugarANF desugarExpr c
-  Pre.CETypeOf x -> do
+  Pre.CEEqualsType x t -> do
     (x', stmts) <- desugarExpr x
-    return (Post.DETypeOf x', stmts)
+    return (Post.DEEqualsTo (Post.DETypeOf x') (Post.DELiteral (LString t)), stmts)
   d@(Pre.CEDeclaration {}) -> desugarANF desugarExpr d
   s@(Pre.CESwitch {}) -> desugarSwitch (desugarExpr, desugarStatement) s
   Pre.CEBlock xs -> do
     res <- concat <$> mapM desugarStatement xs
     return (Post.DEVar "nil", createBlock res)
+  Pre.CEAnd x y -> do
+    (x', stmts1) <- desugarExpr x
+    (y', stmts2) <- desugarExpr y
+    return (Post.DEAnd x' y', stmts1 ++ stmts2)
+  Pre.CEIndex x y -> do
+    (x', stmts1) <- desugarExpr x
+    (y', stmts2) <- desugarExpr y
+    return (Post.DEIndex x' y', stmts1 ++ stmts2)
 
 desugarStatement
   :: Desugar Pre.ClosedStatement [ANFResult (Maybe Post.DesugaredStatement)]

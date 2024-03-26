@@ -130,9 +130,17 @@ closeExpression (Pre.UESwitch e cases) = do
         )
         cases
   pure (s1 <> s2, Post.CESwitch e' cases')
-closeExpression (Pre.UETypeOf e) = do
+closeExpression (Pre.UEEqualsType e t) = do
   (stmts, e') <- closeExpression e
-  pure (stmts, Post.CETypeOf e')
+  pure (stmts, Post.CEEqualsType e' t)
+closeExpression (Pre.UEAnd e1 e2) = do
+  (p1, e1') <- closeExpression e1
+  (p2, e2') <- closeExpression e2
+  pure (p1 <> p2, Post.CEAnd e1' e2')
+closeExpression (Pre.UEIndex e1 e2) = do
+  (p1, e1') <- closeExpression e1
+  (p2, e2') <- closeExpression e2
+  pure (p1 <> p2, Post.CEIndex e1' e2')
 
 closePattern
   :: (MonadClosure m) => Pre.UntypedPattern -> m Post.ClosedPattern

@@ -28,8 +28,10 @@ instance Free ClosedExpr where
   free (CESwitch e cases) = free e <> free cases
   free (CEDictionary es) = free es
   free (CEProperty e _) = free e
-  free (CETypeOf e) = free e
+  free (CEEqualsType e _) = free e
   free (CEBlock ss) = freeBody ss
+  free (CEAnd e1 e2) = free e1 <> free e2
+  free (CEIndex e1 e2) = free e1 <> free e2
 
 freeBody :: [ClosedStatement] -> S.Set Text
 freeBody body =
@@ -91,8 +93,10 @@ instance Substitutable ClosedExpr ClosedExpr where
     proceed (p, e') = (p, substitute (name, expr) e')
   substitute (name, expr) (CEDictionary es) = CEDictionary (fmap (substitute (name, expr)) es)
   substitute (name, expr) (CEProperty e i) = CEProperty (substitute (name, expr) e) i
-  substitute e (CETypeOf e') = CETypeOf (substitute e e')
+  substitute e (CEEqualsType e' t) = CEEqualsType (substitute e e') t
   substitute e (CEBlock es) = CEBlock (map (substitute e) es)
+  substitute e (CEAnd e1 e2) = CEAnd (substitute e e1) (substitute e e2)
+  substitute e (CEIndex e1 e2) = CEIndex (substitute e e1) (substitute e e2)
 
 instance Substitutable ClosedStatement ClosedExpr where
   substitute e (CSExpr e') = CSExpr (substitute e e')

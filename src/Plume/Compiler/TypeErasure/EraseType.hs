@@ -52,9 +52,11 @@ eraseExpr (Pre.EBlock es) = Post.UEBlock (map eraseStatement es)
 eraseExpr (Pre.EClosure args _ body) = Post.UEClosure (map (\(Annotation n _) -> n) args) (eraseStatement body)
 eraseExpr (Pre.EExtVariable x _) = Post.UEVar x
 eraseExpr (Pre.ELocated e _) = eraseExpr e
-eraseExpr (Pre.ETypeOf e) = Post.UETypeOf (eraseExpr e)
+eraseExpr (Pre.EEqualsType e t) = Post.UEEqualsType (eraseExpr e) t
 eraseExpr (Pre.ENativeFunction {}) = error "Native functions aren't expressions"
 eraseExpr (Pre.EExtensionDeclaration {}) = error "Extension declarations aren't expressions"
+eraseExpr (Pre.EAnd e1 e2) = Post.UEAnd (eraseExpr e1) (eraseExpr e2)
+eraseExpr (Pre.EIndex e i) = Post.UEIndex (eraseExpr e) (eraseExpr i)
 eraseExpr (Pre.EReturn _) = error "Return isn't an expression"
 
 erasePattern :: Pre.TypedPattern PlumeType -> Post.UntypedPattern

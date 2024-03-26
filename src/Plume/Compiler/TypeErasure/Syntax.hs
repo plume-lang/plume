@@ -7,11 +7,13 @@ data UntypedExpr
   | UEApplication UntypedExpr [UntypedExpr]
   | UELiteral Literal
   | UEList [UntypedExpr]
+  | UEIndex UntypedExpr UntypedExpr
   | UEDeclaration Text UntypedExpr UntypedExpr
   | UEConditionBranch UntypedExpr UntypedExpr UntypedExpr
   | UESwitch UntypedExpr [(UntypedPattern, UntypedExpr)]
+  | UEAnd UntypedExpr UntypedExpr
   | UEBlock [UntypedStatement]
-  | UETypeOf UntypedExpr
+  | UEEqualsType UntypedExpr Text
   | UEClosure [Text] UntypedStatement
   deriving (Eq, Show, Ord)
 
