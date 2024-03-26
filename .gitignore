@@ -26,8 +26,9 @@ __pycache__
 report.html
 .DS_Store
 a.out
-closure.plm.bc
 _old
 bin
 index
 index-*
+bc
+*.bin
