@@ -13,7 +13,7 @@ import Plume.Syntax.Parser.Modules.Literal
 import Plume.Syntax.Parser.Modules.Operator
 import Plume.Syntax.Parser.Modules.Pattern
 import Plume.Syntax.Parser.Modules.Type
-import Text.Megaparsec hiding (many)
+import Text.Megaparsec hiding (many, some)
 import Text.Megaparsec.Char
 
 -- Some useful parsing functions
@@ -398,9 +398,9 @@ tCustomOperator = do
       , reserved "postfix" $> CPostfix
       ]
   prec <- option 0 $ fromInteger <$> integer
-  name <- operator
-  let op = CustomOperator name prec opTy
-  modifyIORef' customOperators (op :)
+  name <- some operator
+  let op = map (\n -> CustomOperator n prec opTy) name
+  modifyIORef' customOperators (op <>)
 
 parseToplevel :: Parser (Maybe Expression)
 parseToplevel =
@@ -410,7 +410,6 @@ parseToplevel =
               ( choice
                   [ tRequire
                   , eType
-                  , eGenericProperty
                   , eNativeFunction
                   , eExtension
                   , eMacroFunction

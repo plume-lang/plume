@@ -359,13 +359,12 @@ synthesize' (Pre.ESwitch e cases) = do
 synthesize' (Pre.ETypeExtension generics (Annotation x t) members) = do
   generics' <- mapM convert generics
   let gensInt = zipWith (curry $ bimap getGenericName extract) generics generics'
-  let qs = generateQualified generics'
   (t', (members', schemes)) <- withGenerics gensInt $ do
     t' <- convert t
     res <-
       unzip
         <$> withVariables
-          [(x, Forall [] (qs :=>: t'))]
+          [(x, Forall [] ([] :=>: t'))]
           ( do
               mapM
                 ( \em -> do
@@ -465,35 +464,33 @@ synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure a
           (map annotationName args)
           args'
 
-  let none x = (x, ([], []))
-  ((t, body', qs'), (tcs, ecs)) <-
-    (if not (null genericTys) then getConstraints else (none <$>)) $
-      withGenerics generics'' $
-        withVariables args'' $
-          withReturnType ret' $
-            synthesize e
+  (t, body', qs') <-
+    withGenerics generics'' $
+      withVariables args'' $
+        withReturnType ret' $
+          synthesize e
 
-  unify (ret' :~: t)
+  unify (t :~: ret')
 
   let funTy = [snd var] :->: (args' :->: ret')
 
   let finalQs = qs ++ qs'
 
-  (sch@(Forall _ (_ :=>: newFunTy)), sub) <-
-    if null genericTys
-      then return (Forall (map extract extGens) ((qs <> qs') :=>: funTy), mempty)
-      else do
-        s1 <- Solver.solve tcs
-        s2 <- Solver.solve (map (second $ apply s1) ecs)
-        let sub = compose s2 s1
+  cons <- gets constraints
+  let (tcs, ecs) = (cons.typesConstr, cons.extensionsConstr)
 
-        let appliedGens = apply sub (extGens ++ genericTys)
-        let appliedTy = apply sub funTy
-        let appliedQs = apply sub finalQs
-        modifyIORef'
-          checkerST
-          (\s -> s {variables = apply sub s.variables})
-        return (Forall (map extract appliedGens) (appliedQs :=>: appliedTy), sub)
+  (sch@(Forall _ (_ :=>: newFunTy)), sub) <- do
+    s1 <- Solver.solve tcs
+    s2 <- Solver.solve (map (second $ apply s1) ecs)
+    let sub = compose s2 s1
+
+    let appliedGens = apply sub (extGens ++ genericTys)
+    let appliedTy = apply sub funTy
+    let appliedQs = apply sub finalQs
+    modifyIORef'
+      checkerST
+      (\s -> s {variables = apply sub s.variables})
+    return (Forall (map extract appliedGens) (appliedQs :=>: appliedTy), sub)
 
   let appliedNewGens = apply sub (extGens ++ genericTys)
   let args''' =

@@ -215,19 +215,7 @@ validOperators =
 
 reservedOperators :: [Text]
 reservedOperators =
-  [ "+"
-  , "-"
-  , "*"
-  , "/"
-  , "%"
-  , "<"
-  , ">"
-  , "=="
-  , "!="
-  , ">="
-  , "<="
-  , "=>"
-  , "->"
+  [ "->"
   , ":"
   , "."
   ]
