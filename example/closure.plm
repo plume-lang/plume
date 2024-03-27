@@ -1,11 +1,6 @@
-require "std:io"
-
-native "ffi.dylib" mul(x: int, y: int): int
-native "ffi.dylib" sub(x: int, y: int): int
-
 facto(n: int): int =>
   switch n
     case 0 => 1
-    case ? => n.mul(facto(n.sub(1)))
+    case ? => n * facto(n - 1)
 
-println(facto(20))
+print(facto(5))
