@@ -3,4 +3,4 @@ facto(n: int): int =>
     case 0 => 1
     case ? => n * facto(n - 1)
 
-print(facto(5))
+println(facto(20))
