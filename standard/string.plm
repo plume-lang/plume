@@ -1,0 +1,10 @@
+native "natives.dylib" add_str(x: str, y: str): str
+native "natives.dylib" mul_str(x: str, y: int): str
+native "natives.dylib" to_string<A>(x: A): str
+
+extend (c: str) with
+  operator + (d: str) => add_str(c, d)
+  operator * (d: int) => mul_str(c, d)
+
+extend (c: int) with
+  show() => to_string(c)
