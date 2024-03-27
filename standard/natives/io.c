@@ -4,6 +4,14 @@
 #include <string.h>
 #include <value.h>
 
+#ifdef WIN32
+#include <io.h>
+#define F_OK 0
+#define access _access
+#else
+#include <unistd.h>
+#endif
+
 void print_helper(Value v) {
   switch (v.type) {
     case VALUE_INT:
@@ -50,6 +58,22 @@ Value println(int arg_n, Module* mod, Value* args) {
   return MAKE_INTEGER(0);
 }
 
+Value does_file_exist(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 1) THROW("DoesFileExists expects 1 argument");
+  ASSERT(args[0].type == VALUE_STRING,
+         "DoesFileExists expects a string argument");
+
+  return MAKE_INTEGER(access(args[0].string_value, F_OK) == 0);
+}
+
 Value get_args(int arg_n, Module* mod, Value* args) {
   return MAKE_LIST(mod->args);
+}
+
+Value execute_command(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 1) THROW("ExecuteCommand expects 1 argument");
+  ASSERT(args[0].type == VALUE_STRING,
+         "ExecuteCommand expects a string argument");
+
+  return MAKE_INTEGER(system(args[0].string_value));
 }

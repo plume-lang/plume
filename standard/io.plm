@@ -1,6 +1,8 @@
 native "std:natives.dylib" print<A>(x: A): int
 native "std:natives.dylib" println<A>(x: A): int
 native "std:natives.dylib" get_args(): [str]
+native "std:natives.dylib" does_file_exist(path: str): bool
+native "std:natives.dylib" execute_command(path: str): str
 
 @print(x) =>
   print(x)
