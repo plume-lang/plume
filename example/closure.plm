@@ -1,32 +1,11 @@
-native "libplume-native-libraries.dylib" print<A>(x: A): int
-native "libplume-native-libraries.dylib" add(x: int, y: int): int
-native "ffi.dylib" test<A>(x: A): int
+require "std:io"
 
-@print(x) =>
-  print(x)
-  print("\n")
+native "ffi.dylib" mul(x: int, y: int): int
+native "ffi.dylib" sub(x: int, y: int): int
 
-@print(test(5))
+facto(n: int): int =>
+  switch n
+    case 0 => 1
+    case ? => n.mul(facto(n.sub(1)))
 
-// println<A>(x: A): int =>
-//   print(x)
-//   print("\n")
-
-// type Option<A> =
-//   Some(A)
-//   None
-
-// extend<A> (c: Option<A>) with
-//   show(showHelper: (A) -> int): int => switch c
-//     case Some(x) => 
-//       print("Some(")
-//       x.showHelper()
-//       println(")")
-//     case None() => println("None")
-
-// extend (c: int) with
-//   show(): int => print(c)
-
-// x: Option<Option<int>> = Some(Some(9))
-
-// x.show((c) => c.show((c) => c.show()))
+println(facto(20))

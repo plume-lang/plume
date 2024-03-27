@@ -1,8 +1,4 @@
-native print<A>(x: A): int
-native sub(x: int, y: int): int
-native mul(x: int, y: int): int
-native eq(x: int, y: int): bool
-native add(x: int, y: int): int
+native "io.dylib" print<A>(x: A): int
 
 type Option<A> =
   Some(A)
@@ -13,6 +9,6 @@ x1: Option<int> = None()
 show(x: Option<int>): int =>
   switch x 
     case Some(x2) => print(x2)
-    case None() => print("None")
+    case None() => print("None\n")
 
 show(x1)
