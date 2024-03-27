@@ -35,3 +35,4 @@ bc
 *.dylib
 build
 .xmake
+.vscode
