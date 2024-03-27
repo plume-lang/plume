@@ -36,3 +36,4 @@ bc
 build
 .xmake
 .vscode
+*.class
