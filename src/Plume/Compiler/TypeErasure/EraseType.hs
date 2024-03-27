@@ -17,8 +17,8 @@ eraseType :: [Pre.TypedExpression PlumeType] -> [Post.UntypedProgram]
 eraseType (Pre.EDeclaration (Annotation name _) _ (Pre.EClosure args _ body) Nothing : xs) = do
   let args' = map (\(Annotation n _) -> n) args
   Post.UPFunction name args' (eraseStatement body) : eraseType xs
-eraseType (Pre.ENativeFunction n _ (args :->: _) : xs) =
-  Post.UPNativeFunction n (length args) : eraseType xs
+eraseType (Pre.ENativeFunction fp n _ (args :->: _) : xs) =
+  Post.UPNativeFunction fp n (length args) : eraseType xs
 eraseType (Pre.ELocated e _ : xs) = eraseType (e : xs)
 eraseType ext@(Pre.EExtensionDeclaration name _ _ arg _ : _) = do
   let arg' = arg.annotationName

@@ -10,6 +10,7 @@ import Plume.Compiler.Bytecode.Syntax qualified as BC
 import Plume.Compiler.Desugaring.Syntax qualified as Pre
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Translation.Generics
+import System.FilePath
 
 class Free a where
   free :: a -> [Text]
@@ -39,18 +40,18 @@ instance Free Pre.DesugaredStatement where
 instance Free Pre.DesugaredProgram where
   free (Pre.DPFunction name _ _) = List.singleton name
   free (Pre.DPStatement s) = free s
-  free (Pre.DPNativeFunction _ _) = mempty
+  free (Pre.DPNativeFunction {}) = mempty
   free (Pre.DPDeclaration n _) = List.singleton n
 
 data AssemblerState = AssemblerState
   { constants :: Map Literal Int
-  , nativeFunctions :: Map Text (Int, Int)
-  , constructors :: Map Text Int
-  , functions :: [Text]
+  , nativeFunctions :: Map Text (Int, Int, Int)
   , metadata :: IntMap BC.FunctionMetaData
   , currentSize :: Int
   , locals :: Map Text Int
   , globals :: Map Text Int
+  , nativeLibraries :: [(FilePath, [Text])]
+  , cwd :: FilePath
   }
   deriving (Show, Eq)
 
@@ -59,7 +60,7 @@ assemblerState :: IORef AssemblerState
 assemblerState =
   unsafePerformIO $
     newIORef $
-      AssemblerState mempty mempty mempty mempty mempty 0 mempty mempty
+      AssemblerState mempty mempty mempty 0 mempty mempty mempty mempty
 
 assemble :: Pre.DesugaredExpr -> IO [BC.Instruction]
 assemble Pre.DESpecial = pure [BC.Special]
@@ -70,7 +71,7 @@ assemble (Pre.DEVar n) = do
     Nothing -> case Map.lookup n globals of
       Just i -> pure [BC.LoadGlobal i]
       Nothing -> case Map.lookup n nativeFunctions of
-        Just (_, addr) -> pure [BC.NLoad addr]
+        Just (funLibIdx, name, libAddr) -> pure [BC.LoadNative name libAddr funLibIdx]
         _ -> error $ "Variable not found: " <> show n
 assemble (Pre.DEIndex e1 e2) = do
   e1' <- assemble e1
@@ -87,8 +88,8 @@ assemble (Pre.DEApplication f args) = do
         Just i ->
           [BC.LoadLocal i, BC.Call (length args)]
         Nothing -> case Map.lookup f nativeFunctions of
-          Just (len, addr) | len == length args -> do
-            [BC.NLoad addr, BC.Call (length args)]
+          Just (funLibIdx, name, libAddr) -> do
+            [BC.LoadNative name libAddr funLibIdx, BC.Call (length args)]
           _ -> error $ "Function not found: " <> show f
 assemble (Pre.DELiteral l) = do
   AssemblerState {constants} <- readIORef assemblerState
@@ -180,7 +181,6 @@ assembleProgram (Pre.DPFunction n args stmts) = do
                 s.metadata
           , locals = Map.fromList $ zip (args <> freed) [0 ..]
           , globals = Map.insert n i globals
-          , functions = List.insert n s.functions
           }
       res <- concatMapM assembleStmt stmts
 
@@ -200,21 +200,43 @@ assembleProgram (Pre.DPDeclaration n e) = do
     Nothing -> error $ "Global variable not found: " <> show n
 assembleProgram (Pre.DPStatement stmt) = do
   assembleStmt stmt
-assembleProgram (Pre.DPNativeFunction n arity) = do
-  AssemblerState {nativeFunctions} <- readIORef assemblerState
+assembleProgram (Pre.DPNativeFunction fp n _) = do
+  AssemblerState {nativeFunctions, constants, nativeLibraries, cwd} <-
+    readIORef assemblerState
   case Map.lookup n nativeFunctions of
     Just _ -> error "Native function already declared"
     Nothing -> do
+      i <- case Map.lookup (LString n) constants of
+        Just i' -> pure i'
+        Nothing -> do
+          modifyIORef' assemblerState $ \s ->
+            s {constants = Map.insert (LString n) (Map.size constants) constants}
+          pure $ Map.size constants
+      let path = cwd </> toString fp
+      let libIdx = case elemIndexAcc nativeLibraries path 0 of
+            Just i' -> i'
+            Nothing -> length nativeLibraries
+
+      let lib = List.lookup path nativeLibraries
+      funLibIdx <- case lib of
+        Just l -> pure $ length l
+        Nothing -> pure 0
+
       modifyIORef' assemblerState $ \s ->
         s
-          { nativeFunctions = Map.insert n (arity, Map.size nativeFunctions) nativeFunctions
+          { nativeFunctions =
+              Map.insert
+                n
+                (funLibIdx, i, libIdx)
+                nativeFunctions
+          , nativeLibraries = insertWith (<> [n]) nativeLibraries path
           }
       pure []
 
 getNativeFunctions :: [Pre.DesugaredProgram] -> [Text]
 getNativeFunctions = mapMaybe getNativeFunction
  where
-  getNativeFunction (Pre.DPNativeFunction n _) = Just n
+  getNativeFunction (Pre.DPNativeFunction _ n _) = Just n
   getNativeFunction _ = Nothing
 
 runAssembler :: [Pre.DesugaredProgram] -> IO ([BC.Instruction], AssemblerState)
@@ -247,9 +269,28 @@ assembleConstants = map fst . sortOn snd . map (first convert) . Map.toList
 convertMetadata :: IntMap BC.FunctionMetaData -> [BC.FunctionMetaData]
 convertMetadata = IMap.elems
 
-assembleBytecode :: [Pre.DesugaredProgram] -> IO BC.Program
-assembleBytecode xs = do
+assembleBytecode :: FilePath -> [Pre.DesugaredProgram] -> IO BC.Program
+assembleBytecode fp xs = do
+  modifyIORef' assemblerState $ \s -> s {cwd = fp}
   (is, s) <- runAssembler xs
   let constants = assembleConstants s.constants
-  let metadatas = convertMetadata s.metadata
-  pure $ BC.Program is constants metadatas
+  let libs = map (second length) s.nativeLibraries
+  pure $ BC.Program is constants libs
+
+elemIndex :: (Eq a) => [(a, b)] -> a -> Maybe b
+elemIndex [] _ = Nothing
+elemIndex ((k, v) : xs) k'
+  | k == k' = Just v
+  | otherwise = elemIndex xs k'
+
+elemIndexAcc :: (Eq a) => [(a, b)] -> a -> Int -> Maybe Int
+elemIndexAcc [] _ i = Just i
+elemIndexAcc ((k, _) : xs) k' i
+  | k == k' = Just i
+  | otherwise = elemIndexAcc xs k' (i + 1)
+
+insertWith :: (Eq a, Monoid b) => (b -> b) -> [(a, b)] -> a -> [(a, b)]
+insertWith f [] k = [(k, f mempty)]
+insertWith f ((k, v) : xs) k'
+  | k' == k = (k, f v) : xs
+  | otherwise = (k, v) : insertWith f xs k'

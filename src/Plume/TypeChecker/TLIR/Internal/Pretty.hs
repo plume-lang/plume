@@ -81,8 +81,9 @@ prettyExpr (ESwitch e ps) =
  where
   prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "=>" <+> prettyExpr e'
 prettyExpr (EReturn e) = anCol Blue "return" <+> prettyExpr e
-prettyExpr (ENativeFunction n gens (args :->: ret)) =
+prettyExpr (ENativeFunction fp n gens (args :->: ret)) =
   anCol Blue "native"
+    <+> pretty fp
     <+> pretty n
     <+> angles (hsep . punctuate comma $ map ansiPretty gens)
     <+> parens (hsep . punctuate comma $ map ansiPretty args)

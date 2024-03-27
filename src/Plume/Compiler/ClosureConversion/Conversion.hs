@@ -188,9 +188,9 @@ closeProgram (Pre.UPFunction name args e) = do
   modifyIORef' globalVars (<> S.singleton name)
   (stmts, e') <- closeStatement e
   pure $ stmts ++ [Post.CPFunction name args (makeReturnStmt e')]
-closeProgram (Pre.UPNativeFunction name arity) = do
+closeProgram (Pre.UPNativeFunction fp name arity) = do
   modifyIORef' reserved (S.insert name)
-  pure [Post.CPNativeFunction name arity]
+  pure [Post.CPNativeFunction fp name arity]
 closeProgram (Pre.UPStatement s) = do
   (stmts, s') <- closeStatement s
   pure $ stmts ++ [Post.CPStatement s']

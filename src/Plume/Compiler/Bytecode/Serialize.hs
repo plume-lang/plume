@@ -29,7 +29,7 @@ encodeInstruction Return = putWord8 5
 encodeInstruction (Compare c) = putWord8 6 >> encodeComparator c
 encodeInstruction And = putWord8 7
 encodeInstruction Or = putWord8 8
-encodeInstruction (NLoad i) = putWord8 9 >> encodeInteger i
+encodeInstruction (LoadNative i cp fp) = putWord8 9 >> encodeInteger i >> encodeInteger cp >> encodeInteger fp
 encodeInstruction (MakeList i) = putWord8 10 >> encodeInteger i
 encodeInstruction (ListGet i) = putWord8 11 >> encodeInteger i
 encodeInstruction (Call i) = putWord8 12 >> encodeInteger i
@@ -60,14 +60,20 @@ encodeMetaData FunctionMetaData {arity, address, localsSpace} = do
   encodeInteger localsSpace
 
 encodeProgram :: Program -> Put
-encodeProgram Program {instructions, constants} = do
+encodeProgram Program {instructions, constants, nativeLibraries} = do
   encodeInteger $ length instructions
   mapM_ encodeInstruction instructions
+
   encodeInteger $ length constants
   mapM_ encodeConstant constants
 
--- encodeInteger $ length metaDatas
--- mapM_ encodeMetaData metaDatas
+  encodeInteger $ length nativeLibraries
+  mapM_ encodeNative nativeLibraries
+
+encodeNative :: (FilePath, Int) -> Put
+encodeNative (path, idx) = do
+  encodeText $ fromString path
+  encodeInteger idx
 
 serialize :: Program -> IO BSL.ByteString
 serialize = pure . runPut . encodeProgram

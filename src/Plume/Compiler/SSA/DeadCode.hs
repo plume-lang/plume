@@ -41,7 +41,7 @@ removeDeadCodeProg (DPFunction name args stmts) = case stmts' of
   last' = fromMaybe (error "Cannot have empty body") $ viaNonEmpty last stmts'
   init' = fromMaybe [] $ viaNonEmpty init stmts'
 removeDeadCodeProg (DPStatement s) = removeDeadCodeStmt mempty s >>= Just . DPStatement
-removeDeadCodeProg (DPNativeFunction name arity) = Just $ DPNativeFunction name arity
+removeDeadCodeProg (DPNativeFunction fp name arity) = Just $ DPNativeFunction fp name arity
 removeDeadCodeProg z@DPDeclaration {} = Just z
 
 removeDeadCode :: [DesugaredProgram] -> [DesugaredProgram]
@@ -71,7 +71,7 @@ instance Free DesugaredStatement where
 instance Free DesugaredProgram where
   free (DPFunction n args stmts) = free stmts S.\\ (S.fromList args <> S.singleton n)
   free (DPStatement s) = free s
-  free (DPNativeFunction _ _) = S.empty
+  free (DPNativeFunction {}) = S.empty
   free (DPDeclaration n e) = free e S.\\ S.singleton n
 
 analyseDeadCodeStmt

@@ -37,5 +37,5 @@ data ClosedStatement
 data ClosedProgram
   = CPFunction Text [Text] ClosedStatement
   | CPStatement ClosedStatement
-  | CPNativeFunction Text Int
+  | CPNativeFunction Text Text Int
   deriving (Eq, Show, Ord)

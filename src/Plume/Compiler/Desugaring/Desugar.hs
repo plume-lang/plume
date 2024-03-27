@@ -82,9 +82,9 @@ desugarProgram = \case
   Pre.CPStatement x -> do
     x' <- desugarStatement x
     return $ map Post.DPStatement $ createBlock x'
-  Pre.CPNativeFunction x y -> do
+  Pre.CPNativeFunction fp x y -> do
     modifyIORef' nativeFunctions $ Set.insert x
-    return [Post.DPNativeFunction x y]
+    return [Post.DPNativeFunction fp x y]
 
 desugar :: [Pre.ClosedProgram] -> IO [Post.DesugaredProgram]
 desugar = concatMapM desugarProgram

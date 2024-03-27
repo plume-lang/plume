@@ -377,12 +377,12 @@ synthesize' (Pre.ETypeExtension generics (Annotation x t) members) = do
   let schemes' = map (\(name, s) -> (Extension name t' [], s)) schemes
   mapM_ (uncurry $ insert @"extensions") schemes'
   return (Post.TUnit, G.Spread members', [])
-synthesize' (Pre.ENativeFunction name gens ty) = do
+synthesize' (Pre.ENativeFunction filepath name gens ty) = do
   gens' <- mapM (const fresh) gens
   let genericList = zip gens gens'
   t <- withGenerics genericList $ convert ty
   insert @"variables" name (Forall gens' ([] :=>: t))
-  return (t, G.Single $ Post.ENativeFunction name (map GVar gens') t, [])
+  return (t, G.Single $ Post.ENativeFunction filepath name (map GVar gens') t, [])
 synthesize' (Pre.EGenericProperty {-gens name tys ty-} {}) = do
   throw (CompilerError "Generic properties are no longer supported")
 -- gens' <- mapM convert gens

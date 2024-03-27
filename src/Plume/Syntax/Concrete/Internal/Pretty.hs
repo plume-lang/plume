@@ -123,8 +123,9 @@ prettyExpr _ (ETypeExtension gens a es) =
       <+> parens (ansiPretty a)
       <+> line
     <> indent 2 (vsep (map prettyExt es))
-prettyExpr _ (ENativeFunction n gens (args :->: ret)) =
+prettyExpr _ (ENativeFunction fp n gens (args :->: ret)) =
   anCol Blue "native"
+    <+> anCol Green (pretty fp)
     <+> anBold (pretty n)
     <> angles (hsep . punctuate comma $ map pretty gens)
     <> parens (hsep . punctuate comma $ map ansiPretty args)

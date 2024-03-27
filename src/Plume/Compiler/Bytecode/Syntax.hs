@@ -10,7 +10,7 @@ data Instruction
   | Compare Comparator
   | And
   | Or
-  | NLoad Int
+  | LoadNative Int Int Int
   | MakeList Int
   | ListGet Int
   | Call Int
@@ -41,7 +41,7 @@ data Constant
 data Program = Program
   { instructions :: [Instruction]
   , constants :: [Constant]
-  , metaDatas :: [FunctionMetaData]
+  , nativeLibraries :: [(FilePath, Int)]
   }
 
 data FunctionMetaData = FunctionMetaData

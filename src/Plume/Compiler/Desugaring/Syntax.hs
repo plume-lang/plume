@@ -30,7 +30,7 @@ data DesugaredProgram
   = DPFunction Text [Text] [DesugaredStatement]
   | DPStatement DesugaredStatement
   | DPDeclaration Text DesugaredExpr
-  | DPNativeFunction Text Int
+  | DPNativeFunction Text Text Int
   deriving (Eq, Show, Ord)
 
 instance Substitutable DesugaredStatement DesugaredExpr where

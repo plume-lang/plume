@@ -8,8 +8,8 @@ bundleProg (DPFunction name args stmts) =
 bundleProg (DPStatement (DSDeclaration n e)) =
   Just $ DPDeclaration n e
 bundleProg (DPStatement s) = Just $ DPStatement s
-bundleProg (DPNativeFunction name arity) =
-  Just $ DPNativeFunction name arity
+bundleProg (DPNativeFunction fp name arity) =
+  Just $ DPNativeFunction fp name arity
 bundleProg (DPDeclaration n e) =
   Just $ DPDeclaration n e
 

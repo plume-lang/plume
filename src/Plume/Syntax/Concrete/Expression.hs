@@ -70,7 +70,7 @@ data ConcreteExpression t
   | EReturn (ConcreteExpression t)
   | EGenericProperty [PlumeGeneric] Text [t] t
   | ETypeExtension [PlumeGeneric] (Annotation t) [ExtensionMember t]
-  | ENativeFunction Text [Text] t
+  | ENativeFunction Text Text [Text] t
 
 data TypeConstructor t
   = TConstructor Text [t]

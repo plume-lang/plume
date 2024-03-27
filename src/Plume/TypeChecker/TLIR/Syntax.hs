@@ -39,5 +39,5 @@ data TypedExpression t
   | ELocated (TypedExpression t) Position
   | ESwitch (TypedExpression t) [(TypedPattern t, TypedExpression t)]
   | EReturn (TypedExpression t)
-  | ENativeFunction Text [PlumeGeneric] t
+  | ENativeFunction Text Text [PlumeGeneric] t
   deriving (Eq, Show)

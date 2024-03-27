@@ -68,7 +68,7 @@ instance (Types a) => Types (TypedExpression a) where
   free (EConditionBranch e1 e2 e3) = free e1 `S.union` free e2 `S.union` free e3
   free (EBlock es) = free es
   free (ELiteral _) = S.empty
-  free (ENativeFunction _ gens t) = free t S.\\ free gens
+  free (ENativeFunction _ _ gens t) = free t S.\\ free gens
   free (EExtVariable _ t) = free t
   free (EExtensionDeclaration _ extTy gens args body) =
     ( free extTy
@@ -92,7 +92,7 @@ instance (Types a) => Types (TypedExpression a) where
   apply s (EConditionBranch e1 e2 e3) = EConditionBranch (apply s e1) (apply s e2) (apply s e3)
   apply s (EBlock es) = EBlock (apply s es)
   apply _ (ELiteral l) = ELiteral l
-  apply s (ENativeFunction n gens t) = ENativeFunction n (apply s gens) (apply s t)
+  apply s (ENativeFunction f n gens t) = ENativeFunction f n (apply s gens) (apply s t)
   apply s (EExtVariable v t) = EExtVariable v (apply s t)
   apply s (EExtensionDeclaration name extTy gens args body) =
     EExtensionDeclaration

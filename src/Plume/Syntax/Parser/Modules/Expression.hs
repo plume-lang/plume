@@ -228,12 +228,13 @@ typeConstructor =
 eNativeFunction :: Parser Expression
 eNativeFunction = do
   _ <- reserved "native"
+  path <- stringLiteral
   name <- identifier
   gens <- option [] (angles (identifier `sepBy` comma))
   args <- parens ((optional (identifier >> colon) *> tType) `sepBy` comma)
   ret <- symbol ":" *> tType
   let funTy = args :->: ret
-  return (ENativeFunction name gens funTy)
+  return (ENativeFunction path name gens funTy)
 
 -- name(a: t1, b: t2, ..., z: tn): ret -> e where name is the function name,
 -- parenthesized elements are function arguments, ret is function return type

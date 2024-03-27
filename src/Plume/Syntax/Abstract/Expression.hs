@@ -36,7 +36,7 @@ data AbstractExpression t
   | ESwitch (AbstractExpression t) [(Pattern, AbstractExpression t)]
   | EReturn (AbstractExpression t)
   | ETypeExtension [PlumeGeneric] (Annotation t) [ExtensionMember t]
-  | ENativeFunction Text [Text] t
+  | ENativeFunction Text Text [Text] t
   | EGenericProperty [PlumeGeneric] Text [t] t
   deriving (Eq)
 
