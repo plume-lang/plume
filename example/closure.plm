@@ -1,51 +1,24 @@
 native print<A>(x: A): int
-native sub(x: int, y: int): int
-native mul(x: int, y: int): int
-native eq(x: int, y: int): bool
-native add(x: int, y: int): int
 
-facto(x: int) =>
-  switch x 
-    case 0 => 1
-    case ? => mul(x, facto(sub(x, 1)))
+println<A>(x: A): int =>
+  print(x)
+  print("\n")
 
-print(facto(5))
+type Option<A> =
+  Some(A)
+  None
 
-ack(m: int, n: int) =>
-  if eq(m, 0) then 
-    return add(n, 1)
-  else if eq(n, 0) then 
-    return ack(sub(m, 1), 1)
-  else 
-    return ack(sub(m, 1), ack(m, sub(n, 1)))
-
-print(ack(3, 6))
-
-a = (x: int) => (y: int) => add(x, y)
-
-print(a(3)(4))
-
-property<A> A.show(): int
-
-infixl 6 ++
+extend<A> (c: Option<A>) with
+  show(showHelper: (A) -> int): int => switch c
+    case Some(x) => 
+      print("Some(")
+      x.showHelper()
+      println(")")
+    case None() => println("None")
 
 extend (c: int) with
   show(): int => print(c)
 
-  operator ++(x: int): int => add(c, x)
+x: Option<Option<int>> = Some(Some(9))
 
-extend (c: [int]) with
-  show(): int => print(c)
-
-extend (c: [str]) with
-  show(): int => print(c)
-
-res = a(3)(9)
-res.show()
-
-[1, 2, 3].show()
-["a", "b", "c"].show()
-
-3.ack(6).show()
-
-print(4 ++ 6)
+x.show((c) => c.show((c) => c.show()))
