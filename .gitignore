@@ -33,3 +33,5 @@ index-*
 bc
 *.bin
 *.dylib
+build
+.xmake
