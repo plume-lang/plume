@@ -2,17 +2,18 @@
 
 module Plume.Syntax.Translation.ConcreteToAbstract where
 
+import Control.Monad.Exception
+import Data.Text qualified as T
 import Plume.Syntax.Abstract qualified as AST
 import Plume.Syntax.Common qualified as Common
 import Plume.Syntax.Concrete qualified as CST
-
-import Control.Monad.Exception
 import Plume.Syntax.Translation.ConcreteToAbstract.MacroResolver
 import Plume.Syntax.Translation.ConcreteToAbstract.Operations
 import Plume.Syntax.Translation.ConcreteToAbstract.Require
 import Plume.Syntax.Translation.ConcreteToAbstract.UFCS
 import Plume.Syntax.Translation.Generics
 import System.Directory
+import System.FilePath
 
 interpretSpreadable
   :: Spreadable [AST.Expression] AST.Expression -> AST.Expression
@@ -121,8 +122,26 @@ concreteToAbstract (CST.ETypeExtension g ann ems) = do
   ems' <-
     fmap flat . sequence <$> mapM concreteToAbstractExtensionMember ems
   transRet $ AST.ETypeExtension g ann <$> ems'
-concreteToAbstract (CST.ENativeFunction fp n gens t) =
-  transRet . Right $ AST.ENativeFunction fp n gens t
+concreteToAbstract (CST.ENativeFunction fp n gens t) = do
+  let strModName = toString fp
+  let isStd = "std:" `T.isPrefixOf` fp
+  cwd <- ask
+  let modPath =
+        if isStd
+          then do
+            p <- liftIO $ readIORef stdPath
+            case p of
+              Just p' -> return $ Right (p' </> drop 4 strModName)
+              Nothing -> throwError' $ CompilerError "Standard library path not set"
+          else return $ Right (cwd </> strModName)
+  modPath `with` \path -> do
+    liftIO (doesFileExist path) >>= \case
+      False -> do
+        pos <- readIORef positionRef
+        throwError $ case pos of
+          Just p -> ModuleNotFound fp p
+          Nothing -> NoPositionSaved
+      _ -> transRet . Right $ AST.ENativeFunction (fromString path) n gens t
 concreteToAbstract (CST.EGenericProperty g n ts t) =
   transRet . Right $ AST.EGenericProperty g n ts t
 concreteToAbstract (CST.EList es) = do
@@ -141,10 +160,15 @@ concreteToAbstractExtensionMember (CST.ExtDeclaration g ann e) = do
   e' <- shouldBeAlone <$> concreteToAbstract e
   return $ Single . AST.ExtDeclaration g ann <$> e'
 
-runConcreteToAbstract :: [CST.Expression] -> IO (Either Error [AST.Expression])
-runConcreteToAbstract x = do
+runConcreteToAbstract
+  :: Maybe FilePath
+  -> FilePath
+  -> [CST.Expression]
+  -> IO (Either Error [AST.Expression])
+runConcreteToAbstract std dir x = do
+  writeIORef stdPath std
   -- Getting the current working directory as a starting point
   -- for the reader monad
-  cwd <- getCurrentDirectory
+  cwd <- (</> dir) <$> getCurrentDirectory
 
   runReaderT (fmap flat . sequence <$> mapM concreteToAbstract x) cwd

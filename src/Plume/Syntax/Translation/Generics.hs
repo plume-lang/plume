@@ -8,6 +8,10 @@ import Control.Monad.Parser
 import GHC.IO
 import Plume.Syntax.Concrete.Expression (Position)
 
+{-# NOINLINE stdPath #-}
+stdPath :: IORef (Maybe FilePath)
+stdPath = unsafePerformIO $ newIORef Nothing
+
 {-# NOINLINE positionRef #-}
 positionRef :: IORef (Maybe Position)
 positionRef = unsafePerformIO $ newIORef Nothing
@@ -81,6 +85,9 @@ maybeM f = maybe (return Nothing) (fmap Just . f)
 
 throwError :: err -> TranslatorReader err b
 throwError err = return $ Left err
+
+throwError' :: err -> IOReader FilePath (Either err b)
+throwError' = return . Left
 
 -- ShouldBeAlone checks if a value is a single value or a spread of values.
 -- If it is a spread of values that hold only one value, it returns the
