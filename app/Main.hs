@@ -22,6 +22,8 @@ import Prelude hiding (putStrLn, readFile)
 main :: IO ()
 main = do
   file_input <- maybeAt 0 <$> getArgs
+  env <- lookupEnv "PLUME_PATH"
+
   case file_input of
     Just file -> do
       doesFileExist file >>= \case
@@ -38,7 +40,7 @@ main = do
       content <- readFile file
 
       parsePlumeFile file content `with` \cst -> do
-        runConcreteToAbstract cst `with` \ast -> do
+        runConcreteToAbstract env dir cst `with` \ast -> do
           runSynthesize ast `with` \tlir -> do
             let erased = eraseType tlir
             runClosureConversion erased `with` \closed -> do
