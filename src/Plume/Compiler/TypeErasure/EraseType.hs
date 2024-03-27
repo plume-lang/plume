@@ -20,12 +20,12 @@ eraseType (Pre.EDeclaration (Annotation name _) _ (Pre.EClosure args _ body) Not
 eraseType (Pre.ENativeFunction n _ (args :->: _) : xs) =
   Post.UPNativeFunction n (length args) : eraseType xs
 eraseType (Pre.ELocated e _ : xs) = eraseType (e : xs)
-eraseType ext@(Pre.EExtensionDeclaration (Annotation name _) _ _ arg _ : _) = do
+eraseType ext@(Pre.EExtensionDeclaration name _ _ arg _ : _) = do
   let arg' = arg.annotationName
   let (exts, rest, extFuns) = bundleExtensions name ext
   let prog = dispatch (name, arg') exts
   eraseType (extFuns ++ prog : rest)
-eraseType (Pre.EType (Annotation _ _) ts : xs) = do
+eraseType (Pre.EType (Annotation tyName _) ts : xs) = do
   map createFunction ts ++ eraseType xs
  where
   createVariant n = "a" <> show n
@@ -33,12 +33,24 @@ eraseType (Pre.EType (Annotation _ _) ts : xs) = do
     map
       ( \case
           Pre.TVariable n ->
-            (n, const $ Post.UEList [Post.UESpecial, Post.UELiteral (LString n)])
+            ( n
+            , const $
+                Post.UEList
+                  [ Post.UESpecial
+                  , Post.UELiteral (LString tyName)
+                  , Post.UELiteral (LString n)
+                  ]
+            )
           Pre.TConstructor n _ ->
             ( n
             , \vars ->
                 Post.UEList
-                  ([Post.UESpecial, Post.UELiteral (LString n)] <> map Post.UEVar vars)
+                  ( [ Post.UESpecial
+                    , Post.UELiteral (LString tyName)
+                    , Post.UELiteral (LString n)
+                    ]
+                      <> map Post.UEVar vars
+                  )
             )
       )
       ts

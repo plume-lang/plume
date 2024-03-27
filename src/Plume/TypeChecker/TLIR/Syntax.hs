@@ -22,7 +22,7 @@ data TypedExpression t
       (TypedExpression t)
       (Maybe (TypedExpression t))
   | EExtensionDeclaration
-      (Annotation t)
+      Text
       t
       [PlumeGeneric]
       (Annotation t)

@@ -36,7 +36,7 @@ bundleExtension
   :: Text
   -> TypedExpression PlumeType
   -> (Maybe (Bundled, TypedExpression PlumeType), Maybe (TypedExpression PlumeType))
-bundleExtension name (EExtensionDeclaration (Annotation n _) t _ (Annotation arg _) body)
+bundleExtension name (EExtensionDeclaration n t _ (Annotation arg _) body)
   | n == name = (Just (Bundled n arg t body, fun), Nothing)
  where
   extName = n <> "::" <> createName t

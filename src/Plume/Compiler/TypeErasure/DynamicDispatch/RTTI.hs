@@ -20,4 +20,12 @@ createCondition e (Item (Single "[]") [x]) =
   [EEqualsType e "[]"] <> createCondition (EIndex e (ELiteral (LInt 0))) x
 createCondition e (Single n) = [EEqualsType e n]
 createCondition _ Nil = []
+createCondition e (Item (Single x) xs) =
+  [EEqualsType e x]
+    <> concat
+      ( zipWith
+          (\x' i -> createCondition (EIndex e (ELiteral (LInt i))) x')
+          xs
+          [0 :: Integer ..]
+      )
 createCondition _ (Item _ _) = error "Type application equality not supported yet"

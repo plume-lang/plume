@@ -25,13 +25,15 @@ instance Free ClosedExpr where
   free (CEList es) = free es
   free (CEDeclaration x e1 e2) = (free e1 <> free e2) S.\\ S.singleton x
   free (CEConditionBranch e1 e2 e3) = free e1 <> free e2 <> free e3
-  free (CESwitch e cases) = free e <> free cases
+  free (CESwitch e cases) =
+    free e <> foldMap (\(p, b) -> free b S.\\ free p) cases
   free (CEDictionary es) = free es
   free (CEProperty e _) = free e
   free (CEEqualsType e _) = free e
   free (CEBlock ss) = freeBody ss
   free (CEAnd e1 e2) = free e1 <> free e2
   free (CEIndex e1 e2) = free e1 <> free e2
+  free CESpecial = S.empty
 
 freeBody :: [ClosedStatement] -> S.Set Text
 freeBody body =
@@ -51,6 +53,7 @@ instance Free ClosedPattern where
   free (CPLiteral _) = S.empty
   free (CPConstructor _ ps) = free ps
   free CPWildcard = S.empty
+  free (CPSpecialVar x) = S.singleton x
 
 instance Free ClosedStatement where
   free (CSExpr e) = free e
@@ -97,6 +100,7 @@ instance Substitutable ClosedExpr ClosedExpr where
   substitute e (CEBlock es) = CEBlock (map (substitute e) es)
   substitute e (CEAnd e1 e2) = CEAnd (substitute e e1) (substitute e e2)
   substitute e (CEIndex e1 e2) = CEIndex (substitute e e1) (substitute e e2)
+  substitute _ CESpecial = CESpecial
 
 instance Substitutable ClosedStatement ClosedExpr where
   substitute e (CSExpr e') = CSExpr (substitute e e')

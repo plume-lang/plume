@@ -75,7 +75,6 @@ local f m = do
         s'
           { tvarCounter = s.tvarCounter
           , constraints = s.constraints
-          , extendedGenerics = s.extendedGenerics
           }
     )
   return a

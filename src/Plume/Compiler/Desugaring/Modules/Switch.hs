@@ -80,8 +80,8 @@ createCondition _ Pre.CPWildcard = ([], mempty)
 createCondition x (Pre.CPVariable y) = ([], M.singleton y x)
 createCondition x (Pre.CPConstructor y xs) =
   let spc = Post.DEEqualsTo (Post.DEProperty x 0) Post.DESpecial
-      cons = Post.DEEqualsTo (Post.DEProperty x 1) (Post.DELiteral (LString y))
-      (conds, maps) = unzip $ zipWith (createCondition . Post.DEProperty x) [2 ..] xs
+      cons = Post.DEEqualsTo (Post.DEProperty x 2) (Post.DELiteral (LString y))
+      (conds, maps) = unzip $ zipWith (createCondition . Post.DEProperty x) [3 ..] xs
    in (spc : cons : concat conds, mconcat maps)
 createCondition x (Pre.CPLiteral l) =
   ([Post.DEEqualsTo x (Post.DELiteral l)], mempty)

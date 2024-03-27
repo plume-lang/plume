@@ -9,7 +9,6 @@ data ConstraintConstructor
   = PlumeType :~: PlumeType
   | Extends PlumeType Text PlumeType
   | Hole PlumeType
-  | ExtensionExists Text PlumeType
   deriving (Show, Eq)
 
 infix 4 :~:
@@ -20,9 +19,7 @@ instance Types ConstraintConstructor where
   free (t1 :~: t2) = free t1 `S.union` free t2
   free (Extends c _ ty) = free c <> free ty
   free (Hole t) = free t
-  free (ExtensionExists _ t) = free t
 
   apply s (t1 :~: t2) = apply s t1 :~: apply s t2
   apply s (Hole t) = Hole $ apply s t
   apply s (Extends c t ty) = Extends (apply s c) t (apply s ty)
-  apply s (ExtensionExists t ty) = ExtensionExists t (apply s ty)

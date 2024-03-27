@@ -90,7 +90,7 @@ prettyExpr (ENativeFunction n gens (args :->: ret)) =
     <+> prettyTy ret
 prettyExpr (ENativeFunction {}) = error "ENativeFunction: invalid type"
 prettyExpr (EList es) = brackets (hsep $ punctuate comma $ map prettyExpr es)
-prettyExpr (EExtensionDeclaration (Annotation name _) extTy gens args body) =
+prettyExpr (EExtensionDeclaration name extTy gens args body) =
   anCol Blue "extension"
     <+> pretty name
     <+> prettyTy extTy
@@ -105,3 +105,4 @@ prettyPat (PLiteral l) = prettyLit l
 prettyPat (PConstructor p1 p2) =
   pretty p1 <+> parens (hsep $ punctuate comma $ map prettyPat p2)
 prettyPat PWildcard = anCol Blue "_"
+prettyPat (PSpecialVar v t) = anCol Red (pretty v) <> colon <+> prettyTy t

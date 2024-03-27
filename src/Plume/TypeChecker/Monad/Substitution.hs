@@ -52,6 +52,10 @@ instance (Types a) => Types (M.Map Text a) where
   free = free . M.elems
   apply s = M.map (apply s)
 
+instance Types (M.Map Int a) where
+  free = free . M.keys
+  apply s = M.mapKeys (apply s)
+
 instance (Types a) => Types (TypedExpression a) where
   free (EVariable _ t) = free t
   free (EList es) = free es
@@ -66,11 +70,10 @@ instance (Types a) => Types (TypedExpression a) where
   free (ELiteral _) = S.empty
   free (ENativeFunction _ gens t) = free t S.\\ free gens
   free (EExtVariable _ t) = free t
-  free (EExtensionDeclaration name extTy gens args body) =
+  free (EExtensionDeclaration _ extTy gens args body) =
     ( free extTy
         `S.union` free args
         `S.union` free body
-        `S.union` free name
     )
       S.\\ free gens
   free (EType ann ts) = free ts S.\\ free ann
@@ -128,8 +131,10 @@ instance (Types a) => Types (TypedPattern a) where
   apply s (PSpecialVar v t) = PSpecialVar v (apply s t)
 
 instance Types Int where
-  free = mempty
-  apply = const id
+  free = S.singleton
+  apply s i = case M.lookup i s of
+    Just (TVar i') -> i'
+    _ -> i
 
 instance (Types a, Types b) => Types (a, b) where
   free (a, b) = free a `S.union` free b

@@ -54,7 +54,6 @@ instance Pre.PlumeGeneric `To` (Post.PlumeGeneric, Map Text Scheme) where
     ty <- fresh
     insert @"generics" n ty
     tys' <- mapM getScheme tys
-    insert @"extendedGenerics" ty tys
     return (Post.GExtends ty tys, M.fromList $ zip tys tys')
 
 instance Pre.PlumeGeneric `To` Post.PlumeGeneric where
@@ -65,7 +64,6 @@ instance Pre.PlumeGeneric `To` Post.PlumeGeneric where
   convert (Pre.GExtends n tys) = do
     ty <- fresh
     insert @"generics" n ty
-    insert @"extendedGenerics" ty tys
     return (Post.GExtends ty tys)
 
 getScheme :: (MonadChecker m) => Text -> m Scheme
@@ -73,7 +71,7 @@ getScheme n = do
   s <- gets extensions
   let found =
         findWithKey
-          (\(Extension name _ gen _) -> name == n && gen)
+          (\(Extension name _ _) -> name == n)
           s
   case found of
     Just (_, scheme) -> return scheme

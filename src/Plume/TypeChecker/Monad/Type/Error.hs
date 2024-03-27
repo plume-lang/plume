@@ -17,7 +17,7 @@ data TypeError
   | CompilerError Text
   | EmptyMatch
   | NoExtensionFound Text PlumeType
-  | MultipleExtensionsFound Text [PlumeType]
+  | MultipleExtensionsFound Text [PlumeType] PlumeType
   | NoGenericExtensionFound PlumeType
   | TypeMissing Text
   | UnboundTypeVariable Int
@@ -66,8 +66,13 @@ instance Throwable TypeError where
   showError EmptyMatch = "Empty match"
   showError (NoExtensionFound n t) =
     "No extension found for " <> show n <> " on type " <> showError t
-  showError (MultipleExtensionsFound n ts) =
-    "Multiple extensions found for " <> show n <> " on types " <> showError ts
+  showError (MultipleExtensionsFound n ts t) =
+    "Multiple extensions found for "
+      <> show n
+      <> " with type(s) "
+      <> showError ts
+      <> " on type "
+      <> showError t
   showError (NoGenericExtensionFound t) =
     "No generic extension found for type " <> showError t
   showError (TypeMissing t) = "Type missing " <> show t <> " in type extension"

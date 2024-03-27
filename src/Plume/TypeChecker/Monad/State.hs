@@ -20,30 +20,31 @@ data CheckerState = CheckerState
   , variables :: Environment
   , types :: Environment
   , returnType :: PlumeType
-  , constraints :: [TypeConstraint]
+  , constraints :: Constraints
   , position :: Maybe Position
   , generics :: Map Text Int
-  , extendedGenerics :: Map Int [Text]
   , extensions :: Map Extension Scheme
-  , extensionConstraints :: [TypeConstraint]
+  }
+
+data Constraints = Constraints
+  { typesConstr :: [TypeConstraint]
+  , extensionsConstr :: [TypeConstraint]
   }
 
 data Extension = Extension
   { name :: Text
   , value :: PlumeType
-  , isGeneric :: Bool
   , superExtensions :: [Extension]
   }
   deriving (Show)
 
 instance Ord Extension where
-  compare (Extension n1 t1 _ se1) (Extension n2 t2 _ se2) = compare n1 n2 <> compare t1 t2 <> compare se1 se2
+  compare (Extension n1 t1 se1) (Extension n2 t2 se2) = compare n1 n2 <> compare t1 t2 <> compare se1 se2
 
 instance Eq Extension where
-  (Extension n1 t b se1) == (Extension n2 t' b' se2) =
+  (Extension n1 t se1) == (Extension n2 t' se2) =
     n1 == n2
       && t == t'
-      && b == b'
       && se1 == se2
 
 checkerST :: IORef CheckerState
@@ -57,12 +58,10 @@ emptyState =
     , variables = Map.empty
     , types = Map.empty
     , returnType = TUnit
-    , constraints = []
+    , constraints = Constraints [] []
     , position = Nothing
     , generics = Map.empty
-    , extendedGenerics = Map.empty
     , extensions = Map.empty
-    , extensionConstraints = []
     }
 
 search
@@ -93,7 +92,7 @@ instance HasField "position" CheckerState (Maybe Position) where
 instance HasField "generics" CheckerState (Map Text Int) where
   hasField c = (\x -> c {generics = x}, generics c)
 
-instance HasField "constraints" CheckerState [TypeConstraint] where
+instance HasField "constraints" CheckerState Constraints where
   hasField c = (\x -> c {constraints = x}, constraints c)
 
 instance HasField "tvarCounter" CheckerState Int where
@@ -102,17 +101,14 @@ instance HasField "tvarCounter" CheckerState Int where
 instance HasField "extensions" CheckerState (Map Extension Scheme) where
   hasField c = (\x -> c {extensions = x}, extensions c)
 
-instance HasField "extendedGenerics" CheckerState (Map Int [Text]) where
-  hasField c = (\x -> c {extendedGenerics = x}, extendedGenerics c)
-
-instance HasField "extensionConstraints" CheckerState [TypeConstraint] where
-  hasField c = (\x -> c {extensionConstraints = x}, extensionConstraints c)
-
 instance HasField "name" Extension Text where
   hasField c = (\x -> c {name = x}, name c)
 
 instance HasField "value" Extension PlumeType where
   hasField c = (\x -> c {value = x}, value c)
 
-instance HasField "isGeneric" Extension Bool where
-  hasField c = (\x -> c {isGeneric = x}, isGeneric c)
+instance HasField "typesConstr" Constraints [TypeConstraint] where
+  hasField c = (\x -> c {typesConstr = x}, typesConstr c)
+
+instance HasField "extensionsConstr" Constraints [TypeConstraint] where
+  hasField c = (\x -> c {extensionsConstr = x}, extensionsConstr c)
