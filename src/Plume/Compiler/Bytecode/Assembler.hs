@@ -152,14 +152,16 @@ assembleStmt (Pre.DSConditionBranch e1 e2 e3) = do
       ++ e3'
 assembleStmt (Pre.DSDeclaration n e) = do
   e' <- assemble e
-  AssemblerState {locals} <- readIORef assemblerState
+  AssemblerState {locals, globals} <- readIORef assemblerState
 
   case Map.lookup n locals of
     Just i -> do
       modifyIORef' assemblerState $ \s ->
         s {locals = Map.insert n i locals}
       pure $ e' ++ [BC.StoreLocal i]
-    Nothing -> error $ "Variable not found: " <> show n
+    Nothing -> case Map.lookup n globals of
+      Just i -> pure $ e' ++ [BC.StoreGlobal i]
+      Nothing -> error $ "Variable not found: " <> show n
 
 assembleProgram :: Pre.DesugaredProgram -> IO [BC.Instruction]
 assembleProgram (Pre.DPFunction n args stmts) = do
@@ -200,8 +202,7 @@ assembleProgram (Pre.DPDeclaration n e) = do
       let res = e' ++ [BC.StoreGlobal i]
       return res
     Nothing -> error $ "Global variable not found: " <> show n
-assembleProgram (Pre.DPStatement stmt) = do
-  assembleStmt stmt
+assembleProgram (Pre.DPStatement stmt) = assembleStmt stmt
 assembleProgram (Pre.DPNativeFunction fp n _) = do
   AssemblerState {nativeFunctions, constants, nativeLibraries, cwd} <-
     readIORef assemblerState
