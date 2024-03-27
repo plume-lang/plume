@@ -1,24 +1,32 @@
-native print<A>(x: A): int
+native "libplume-native-libraries.dylib" print<A>(x: A): int
+native "libplume-native-libraries.dylib" add(x: int, y: int): int
+native "ffi.dylib" test<A>(x: A): int
 
-println<A>(x: A): int =>
+@print(x) =>
   print(x)
   print("\n")
 
-type Option<A> =
-  Some(A)
-  None
+@print(test(5))
 
-extend<A> (c: Option<A>) with
-  show(showHelper: (A) -> int): int => switch c
-    case Some(x) => 
-      print("Some(")
-      x.showHelper()
-      println(")")
-    case None() => println("None")
+// println<A>(x: A): int =>
+//   print(x)
+//   print("\n")
 
-extend (c: int) with
-  show(): int => print(c)
+// type Option<A> =
+//   Some(A)
+//   None
 
-x: Option<Option<int>> = Some(Some(9))
+// extend<A> (c: Option<A>) with
+//   show(showHelper: (A) -> int): int => switch c
+//     case Some(x) => 
+//       print("Some(")
+//       x.showHelper()
+//       println(")")
+//     case None() => println("None")
 
-x.show((c) => c.show((c) => c.show()))
+// extend (c: int) with
+//   show(): int => print(c)
+
+// x: Option<Option<int>> = Some(Some(9))
+
+// x.show((c) => c.show((c) => c.show()))
