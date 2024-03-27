@@ -364,10 +364,13 @@ sameLine p = try $ do
 -- no indentation.
 -- This indent sensitive parsing function is quite special as it does not
 -- consume any newlines. Often used to parse top-level constructs.
-nonIndented :: Parser a -> Parser a
+nonIndented :: Parser (Maybe a) -> Parser (Maybe a)
 nonIndented p = do
   ilevel <- consumeIndents
   if ilevel == 0
     then local (const 0) p
-    else
-      fail $ "Indentation level mismatch, expected 0 but received " ++ show ilevel
+    else do
+      p' <- optional (notFollowedBy eol)
+      case p' of
+        Just _ -> return Nothing
+        Nothing -> fail $ "Indentation level mismatch, expected 0 but received " ++ show ilevel

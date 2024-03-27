@@ -3,6 +3,7 @@
 module Plume.Syntax.Translation.ConcreteToAbstract where
 
 import Control.Monad.Exception
+import Data.List qualified as L
 import Data.Text qualified as T
 import Plume.Syntax.Abstract qualified as AST
 import Plume.Syntax.Common qualified as Common
@@ -171,4 +172,16 @@ runConcreteToAbstract std dir x = do
   -- for the reader monad
   cwd <- (</> dir) <$> getCurrentDirectory
 
-  runReaderT (fmap flat . sequence <$> mapM concreteToAbstract x) cwd
+  runReaderT
+    ( do
+        let x' = loadPrelude std x
+        fmap (L.nub . flat) . sequence <$> mapM concreteToAbstract x'
+    )
+    cwd
+
+loadPrelude :: Maybe FilePath -> [CST.Expression] -> [CST.Expression]
+loadPrelude (Just path) = do
+  let preludePath = path </> "prelude"
+  let require = CST.ERequire (fromString preludePath)
+  (require :)
+loadPrelude Nothing = id

@@ -89,6 +89,10 @@ throwError err = return $ Left err
 throwError' :: err -> IOReader FilePath (Either err b)
 throwError' = return . Left
 
+{-# NOINLINE imports #-}
+imports :: IORef [FilePath]
+imports = unsafePerformIO $ newIORef []
+
 -- ShouldBeAlone checks if a value is a single value or a spread of values.
 -- If it is a spread of values that hold only one value, it returns the
 -- value. If it is a single value, it returns the value. Otherwise, it

@@ -13,6 +13,7 @@ import Prelude hiding (intercalate, unwords)
 data PlumeType
   = TId Text
   | TApp PlumeType [PlumeType]
+  deriving (Eq)
 
 data PlumeGeneric
   = GVar Text
