@@ -42,7 +42,7 @@ main = do
       parsePlumeFile file content `with` \cst -> do
         runConcreteToAbstract env dir cst `with` \ast -> do
           runSynthesize ast `with` \tlir -> do
-            let erased = eraseType tlir
+            erased <- erase tlir
             runClosureConversion erased `with` \closed -> do
               desugared <- desugar closed
               let ssa = runSSA desugared
@@ -50,6 +50,7 @@ main = do
               sbc <- serialize bytecode
               let new_path = file -<.> "bin"
               writeFileLBS new_path sbc
+              putStrLn $ "Bytecode written to " <> fromString new_path
     Nothing -> putStrLn "No file provided"
 
 printBytecode :: Program -> IO ()
