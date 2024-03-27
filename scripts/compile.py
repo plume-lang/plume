@@ -4,6 +4,7 @@ import os.path
 from glob import glob
 import platform
 import sys
+import pathlib
 
 ext = '.exe' if platform.system() == 'Windows' else ''
 
@@ -19,5 +20,8 @@ if (not os.path.isdir('bin') or
 
 file = sys.argv[1]
 
+dir = pathlib.Path(__file__).parent.parent.resolve() / "standard"
+os.environ['PLUME_PATH'] = str(dir)
+
 system(f'bin/plume-language{ext} {file}')
-system(f'bin/plume-vm{ext} {file}.bc')
+system(f'bin/plume-vm{ext} {file.removesuffix('.plm')}.bin')
