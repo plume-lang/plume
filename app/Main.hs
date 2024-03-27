@@ -4,7 +4,7 @@ module Main where
 
 import Control.Monad.Exception
 import Data.Text.IO hiding (putStr)
-import Plume.Compiler.Bytecode.Assembler
+import Plume.Compiler.Bytecode.Assembler hiding (nativeLibraries)
 import Plume.Compiler.Bytecode.Serialize
 
 import Plume.Compiler.Bytecode.Syntax
@@ -32,6 +32,9 @@ main = do
           exitFailure
         True -> pure ()
 
+      cwd <- getCurrentDirectory >>= canonicalizePath
+      let dir = cwd </> takeDirectory file
+
       content <- readFile file
 
       parsePlumeFile file content `with` \cst -> do
@@ -41,7 +44,7 @@ main = do
             runClosureConversion erased `with` \closed -> do
               desugared <- desugar closed
               let ssa = runSSA desugared
-              bytecode <- assembleBytecode ssa
+              bytecode <- assembleBytecode dir ssa
               sbc <- serialize bytecode
               let new_path = file -<.> "bin"
               writeFileLBS new_path sbc
