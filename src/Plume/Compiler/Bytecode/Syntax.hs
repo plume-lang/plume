@@ -15,6 +15,7 @@ data Instruction
   | ListGet Int
   | Call Int
   | JumpIfRel Int
+  | JumpRel Int
   | TypeOf
   | ConstructorName
   | Phi Int Int

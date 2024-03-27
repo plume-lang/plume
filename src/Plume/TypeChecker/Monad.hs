@@ -95,7 +95,7 @@ withVariables :: (MonadChecker m) => [(Text, Scheme)] -> m a -> m a
 withVariables vars =
   with' @"variables" (fromList vars <>)
 
-withReturnType :: (MonadChecker m) => PlumeType -> m a -> m a
+withReturnType :: (MonadChecker m) => Maybe PlumeType -> m a -> m a
 withReturnType = with @"returnType"
 
 withGenerics :: (MonadChecker m) => [(Text, Int)] -> m a -> m a

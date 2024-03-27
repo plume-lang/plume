@@ -115,8 +115,9 @@ assemble (Pre.DEIf e1 e2 e3) = do
   e3' <- assemble e3
   pure $
     e1'
-      ++ [BC.JumpIfRel $ length e2' + 1]
+      ++ [BC.JumpIfRel $ if containsReturn e2' then length e2' + 1 else length e2' + 2]
       ++ e2'
+      ++ [BC.JumpRel $ length e3' + 1 | not (containsReturn e2')]
       ++ e3'
 assemble (Pre.DETypeOf e) = do
   e' <- assemble e
@@ -145,8 +146,9 @@ assembleStmt (Pre.DSConditionBranch e1 e2 e3) = do
   e3' <- concatMapM assembleStmt e3
   pure $
     e1'
-      ++ [BC.JumpIfRel $ length e2' + 1]
+      ++ [BC.JumpIfRel $ if containsReturn e2' then length e2' + 1 else length e2' + 2]
       ++ e2'
+      ++ [BC.JumpRel $ length e3' + 1 | not (containsReturn e2')]
       ++ e3'
 assembleStmt (Pre.DSDeclaration n e) = do
   e' <- assemble e

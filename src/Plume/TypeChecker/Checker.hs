@@ -231,7 +231,7 @@ synthesize' (Pre.EClosure args ret body) = do
 
   (t, body', qs) <-
     withVariables args'' $
-      withReturnType ret' $
+      withReturnType (Just ret') $
         synthesize body
   unify (t :~: ret')
   return
@@ -263,9 +263,11 @@ synthesize' (Pre.EConditionBranch cond then' else') = case else' of
     return (t', G.Single $ Post.EConditionBranch cond' then'' Nothing, qs1 ++ qs2)
 synthesize' (Pre.EBlock es) = do
   (ret, (_, es', qss)) <- local id $ do
-    es' <- mapAndUnzip3M (shouldBeAlone . synthesize') es
+    es'@(ts, _, _) <- mapAndUnzip3M (shouldBeAlone . synthesize') es
     ret <- gets returnType
-    return (ret, es')
+    case ret of
+      Just ret' -> return (ret', es')
+      Nothing -> return (fromMaybe Post.TUnit (viaNonEmpty last ts), es')
   return (ret, G.Single $ Post.EBlock es', concat qss)
 synthesize' (Pre.ELocated e p) = do
   (t, e', qs) <- with @"position" (Just p) $ synthesize' e
@@ -273,8 +275,11 @@ synthesize' (Pre.ELocated e p) = do
 synthesize' (Pre.EReturn e) = do
   (t, e', qs) <- synthesize e
   ret <- gets returnType
-  unify (t :~: ret)
-  return (ret, G.Single $ Post.EReturn e', qs)
+  case ret of
+    Just ret' -> do
+      unify (t :~: ret')
+      return (ret', G.Single $ Post.EReturn e', qs)
+    Nothing -> throw (CompilerError "Return outside of function")
 synthesize' (Pre.EDeclaration gens (Annotation name ty) value body) = do
   (genericTys, genericNames) <-
     (,map getGenericName gens) <$> mapM convert gens
@@ -467,7 +472,7 @@ synthesizeExtMember (Pre.ExtDeclaration gens (Annotation name _) (Pre.EClosure a
   (t, body', qs') <-
     withGenerics generics'' $
       withVariables args'' $
-        withReturnType ret' $
+        withReturnType (Just ret') $
           synthesize e
 
   unify (t :~: ret')

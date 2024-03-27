@@ -19,7 +19,7 @@ data CheckerState = CheckerState
   { tvarCounter :: Int
   , variables :: Environment
   , types :: Environment
-  , returnType :: PlumeType
+  , returnType :: Maybe PlumeType
   , constraints :: Constraints
   , position :: Maybe Position
   , generics :: Map Text Int
@@ -57,7 +57,7 @@ emptyState =
     { tvarCounter = 0
     , variables = Map.empty
     , types = Map.empty
-    , returnType = TUnit
+    , returnType = Nothing
     , constraints = Constraints [] []
     , position = Nothing
     , generics = Map.empty
@@ -83,7 +83,7 @@ instance HasField "variables" CheckerState (Map Text Scheme) where
 instance HasField "types" CheckerState (Map Text Scheme) where
   hasField c = (\x -> c {types = x}, types c)
 
-instance HasField "returnType" CheckerState PlumeType where
+instance HasField "returnType" CheckerState (Maybe PlumeType) where
   hasField c = (\x -> c {returnType = x}, returnType c)
 
 instance HasField "position" CheckerState (Maybe Position) where
