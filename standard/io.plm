@@ -1,0 +1,6 @@
+native "std:natives.dylib" print<A>(x: A): int
+native "std:natives.dylib" println<A>(x: A): int
+
+@print(x) =>
+  print(x)
+  print("\n")
