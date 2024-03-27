@@ -1,5 +1,6 @@
 module Plume.Compiler.TypeErasure.DynamicDispatch.BundleExtensions where
 
+import Data.List qualified as List
 import Data.Text qualified as T
 import Plume.Syntax.Common.Annotation
 import Plume.TypeChecker.Monad.Type
@@ -24,20 +25,56 @@ data Bundled = Bundled
 bundleExtensions
   :: Text
   -> [TypedExpression PlumeType]
-  -> ([Bundled], [TypedExpression PlumeType], [TypedExpression PlumeType])
+  -> ( [Bundled]
+     , [TypedExpression PlumeType]
+     , [TypedExpression PlumeType]
+     , [TypedExpression PlumeType]
+     )
 bundleExtensions name progs = do
-  let progs' = map (bundleExtension name) progs
-  let (exts, xs) = unzip progs'
-  let (exts', extFuns) = unzip $ catMaybes exts
-  let xs' = catMaybes xs
-  (exts', xs', extFuns)
+  let progs' = bundle name progs
+  let (before, x, after) = progs'
+  let x' = case x of
+        Just v | isExtension v name -> Just $ bundleExtension v
+        _ -> Nothing
+
+  case x' of
+    Just (b, fun) -> do
+      let (bundled, bef, aft, funs) = bundleExtensions name after
+      (b : bundled, before <> bef, aft, fun : funs)
+    Nothing -> ([], before, after, [])
+
+isExtension :: TypedExpression PlumeType -> Text -> Bool
+isExtension (EExtensionDeclaration n _ _ _ _) name = n == name
+isExtension (ELocated e _) name = isExtension e name
+isExtension _ _ = False
+
+findExtensionIndex :: Text -> [TypedExpression PlumeType] -> Maybe Int
+findExtensionIndex name progs = do
+  List.findIndex (`isExtension` name) progs
+
+bundle
+  :: Text
+  -> [TypedExpression PlumeType]
+  -> ( [TypedExpression PlumeType]
+     , Maybe (TypedExpression PlumeType)
+     , [TypedExpression PlumeType]
+     )
+bundle name progs = do
+  let idx = findExtensionIndex name progs
+  case idx of
+    Just i -> do
+      let (xs, ys1) = splitAt i progs
+      let (y, zs) = case ys1 of
+            [] -> (Nothing, [])
+            (y' : zs') -> (Just y', zs')
+      (xs, y, zs)
+    Nothing -> (progs, Nothing, [])
 
 bundleExtension
-  :: Text
-  -> TypedExpression PlumeType
-  -> (Maybe (Bundled, TypedExpression PlumeType), Maybe (TypedExpression PlumeType))
-bundleExtension name (EExtensionDeclaration n t _ (Annotation arg _) body)
-  | n == name = (Just (Bundled n arg t body, fun), Nothing)
+  :: TypedExpression PlumeType
+  -> (Bundled, TypedExpression PlumeType)
+bundleExtension (EExtensionDeclaration n t _ (Annotation arg _) body) =
+  (Bundled n arg t body, fun)
  where
   extName = n <> "::" <> createName t
   fun =
@@ -46,5 +83,5 @@ bundleExtension name (EExtensionDeclaration n t _ (Annotation arg _) body)
       []
       (EClosure [Annotation arg t] t body)
       Nothing
-bundleExtension n (ELocated e _) = bundleExtension n e
-bundleExtension _ p = (Nothing, Just p)
+bundleExtension (ELocated e _) = bundleExtension e
+bundleExtension _ = error "Invalid extension"

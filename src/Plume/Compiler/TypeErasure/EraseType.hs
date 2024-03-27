@@ -4,6 +4,7 @@
 module Plume.Compiler.TypeErasure.EraseType where
 
 import Data.List qualified as List
+import GHC.IO
 import Plume.Compiler.TypeErasure.DynamicDispatch.BundleExtensions
 import Plume.Compiler.TypeErasure.DynamicDispatch.Dispatch
 import Plume.Compiler.TypeErasure.Syntax qualified as Post
@@ -13,20 +14,53 @@ import Plume.Syntax.Concrete.Expression qualified as Pre (TypeConstructor (..))
 import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR qualified as Pre
 
-eraseType :: [Pre.TypedExpression PlumeType] -> [Post.UntypedProgram]
+{-# NOINLINE program #-}
+program
+  :: IORef ([Post.UntypedProgram], [Post.UntypedProgram], [Post.UntypedProgram])
+program = unsafePerformIO $ newIORef ([], [], [])
+
+eraseType :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]
 eraseType (Pre.EDeclaration (Annotation name _) _ (Pre.EClosure args _ body) Nothing : xs) = do
   let args' = map (\(Annotation n _) -> n) args
-  Post.UPFunction name args' (eraseStatement body) : eraseType xs
-eraseType (Pre.ENativeFunction fp n _ (args :->: _) : xs) =
-  Post.UPNativeFunction fp n (length args) : eraseType xs
+  let fun = Post.UPFunction name args' (eraseStatement body)
+  modifyIORef'
+    program
+    ( \(natives, exts, stmts) ->
+        ( natives
+        , exts <> [fun]
+        , stmts
+        )
+    )
+  eraseType xs
+eraseType (Pre.ENativeFunction fp n _ (args :->: _) : xs) = do
+  modifyIORef'
+    program
+    ( \(natives, exts, stmts) ->
+        ( natives <> [Post.UPNativeFunction fp n (length args)]
+        , exts
+        , stmts
+        )
+    )
+  eraseType xs
 eraseType (Pre.ELocated e _ : xs) = eraseType (e : xs)
 eraseType ext@(Pre.EExtensionDeclaration name _ _ arg _ : _) = do
   let arg' = arg.annotationName
-  let (exts, rest, extFuns) = bundleExtensions name ext
-  let prog = dispatch (name, arg') exts
-  eraseType (extFuns ++ prog : rest)
+  let (bundled, before, after, funs) = bundleExtensions name ext
+  let prog = dispatch (name, arg') bundled
+  progs <- eraseType (funs <> [prog])
+  stmts' <- eraseType (before <> after)
+  modifyIORef'
+    program
+    (\(natives, exts, stmts) -> (natives, exts <> progs, stmts <> stmts'))
+  return []
 eraseType (Pre.EType (Annotation tyName _) ts : xs) = do
-  map createFunction ts ++ eraseType xs
+  let tys = map createFunction ts
+  modifyIORef'
+    program
+    ( \(natives, exts, stmts) ->
+        (natives, exts <> tys, stmts)
+    )
+  eraseType xs
  where
   createVariant n = "a" <> show n
   ts' =
@@ -63,8 +97,11 @@ eraseType (Pre.EType (Annotation tyName _) ts : xs) = do
      where
       args = map createVariant [0 .. length vars - 1]
     Nothing -> error "Type constructor not found"
-eraseType (x : xs) = Post.UPStatement (eraseStatement x) : eraseType xs
-eraseType [] = []
+eraseType (x : xs) = do
+  ys <- eraseType xs
+  let x' = eraseStatement x
+  return (Post.UPStatement x' : ys)
+eraseType [] = return []
 
 eraseStatement :: Pre.TypedExpression PlumeType -> Post.UntypedStatement
 eraseStatement (Pre.EReturn e) = Post.USReturn (eraseExpr e)
@@ -108,3 +145,10 @@ erasePattern (Pre.PLiteral l) = Post.UPLiteral l
 erasePattern (Pre.PConstructor n ps) = Post.UPConstructor n (map erasePattern ps)
 erasePattern Pre.PWildcard = Post.UPWildcard
 erasePattern (Pre.PSpecialVar x _) = Post.UPSpecialVariable x
+
+erase :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]
+erase xs = do
+  writeIORef program ([], [], [])
+  xs' <- eraseType xs
+  readIORef program >>= \case
+    (natives, exts, stmts) -> return (natives <> exts <> stmts <> xs')
