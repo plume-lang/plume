@@ -5,8 +5,18 @@ import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer
 import Plume.Syntax.Parser.Modules.Expression
 
-parseTestPlume :: FileContent -> IO (Either ParsingError Program)
-parseTestPlume = parsePlumeFile mempty
+parseTestPlume
+  :: FileContent
+  -> IO (Either ParsingError (Program, [CustomOperator]))
+parseTestPlume fc = parsePlumeFile mempty fc mempty
 
-parsePlumeFile :: FilePath -> FileContent -> IO (Either ParsingError Program)
-parsePlumeFile = parse (scn *> parseProgram)
+parsePlumeFile
+  :: FilePath
+  -> FileContent
+  -> [CustomOperator]
+  -> IO (Either ParsingError (Program, [CustomOperator]))
+parsePlumeFile fp fc ops' = do
+  modifyIORef' customOperators (ops' ++)
+  res <- parse (scn *> parseProgram) fp fc
+  ops <- readIORef customOperators
+  pure $ (,ops) <$> res

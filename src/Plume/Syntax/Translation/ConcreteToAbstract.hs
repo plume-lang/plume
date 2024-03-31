@@ -164,9 +164,10 @@ concreteToAbstractExtensionMember (CST.ExtDeclaration g ann e) = do
 runConcreteToAbstract
   :: Maybe FilePath
   -> FilePath
-  -> [CST.Expression]
+  -> [(Text, Maybe CST.Position)]
+  -> FilePath
   -> IO (Either Error [AST.Expression])
-runConcreteToAbstract std dir x = do
+runConcreteToAbstract std dir paths fp = do
   writeIORef stdPath std
   -- Getting the current working directory as a starting point
   -- for the reader monad
@@ -174,8 +175,29 @@ runConcreteToAbstract std dir x = do
 
   runReaderT
     ( do
-        let x' = loadPrelude std x
-        fmap (L.nub . flat) . sequence <$> mapM concreteToAbstract x'
+        imports' <-
+          sequenceMapM
+            ( \(i, p) ->
+                withMaybePos p $
+                  convertRequire concreteToAbstract $
+                    CST.ERequire i
+            )
+            paths
+        case L.nub . flat <$> imports' of
+          Left err -> throwError' err
+          Right exprs -> do
+            newCWD <- liftIO getCurrentDirectory
+            mainModule <-
+              local (const newCWD) $
+                convertRequire
+                  concreteToAbstract
+                  (CST.ERequire (fromString fp))
+
+            case mainModule of
+              Left err -> throwError' err
+              Right mainModule' -> do
+                let mainModuleExprs = fromSpreadable mainModule'
+                bireturn (exprs <> mainModuleExprs)
     )
     cwd
 

@@ -7,6 +7,7 @@ import Control.Monad.IO
 import Control.Monad.Parser
 import GHC.IO
 import Plume.Syntax.Concrete.Expression (Position)
+import Plume.Syntax.Parser.Lexer
 
 {-# NOINLINE stdPath #-}
 stdPath :: IORef (Maybe FilePath)
@@ -15,6 +16,10 @@ stdPath = unsafePerformIO $ newIORef Nothing
 {-# NOINLINE positionRef #-}
 positionRef :: IORef (Maybe Position)
 positionRef = unsafePerformIO $ newIORef Nothing
+
+{-# NOINLINE operators #-}
+operators :: IORef [CustomOperator]
+operators = unsafePerformIO $ newIORef []
 
 -- A spreadable type is a type that can handle either a single value or a
 -- spread of values. It is used to specify the translator that we need to
@@ -138,3 +143,26 @@ instance (Throwable err) => Throwable (Spreadable [err] err) where
   showError (Spread errs) = unlines $ map showError errs
   showError (Single err) = showError err
   showError Empty = "Empty"
+
+withMaybePos
+  :: (Throwable err)
+  => Maybe Position
+  -> TranslatorReader err a
+  -> TranslatorReader err a
+withMaybePos (Just pos) f = withPosition pos f
+withMaybePos Nothing f = f
+
+withPosition
+  :: (Throwable err) => Position -> TranslatorReader err a -> TranslatorReader err a
+withPosition pos f = do
+  old <- readIORef positionRef
+  writeIORef positionRef (Just pos)
+
+  res <-
+    f `with` \case
+      Single e' -> bireturn (Single e')
+      Spread es -> bireturn (Spread es)
+      Empty -> bireturn Empty
+
+  writeIORef positionRef old
+  return res
