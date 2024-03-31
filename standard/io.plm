@@ -5,5 +5,15 @@ native "std:natives.dylib" does_file_exist(path: str): bool
 native "std:natives.dylib" execute_command(path: str): str
 
 @print(x) =>
-  print(x)
+  print(x.show())
+
+@println(x) =>
+  @print(x)
+  print("\n")
+
+@print_with(fmt, x) =>
+  print(x.show(fmt))
+
+@println_with(fmt, x) =>
+  @print_with(fmt, x)
   print("\n")
