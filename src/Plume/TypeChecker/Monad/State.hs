@@ -1,5 +1,7 @@
 module Plume.TypeChecker.Monad.State where
 
+import Data.Map qualified as Map
+import Data.Set qualified as Set
 import GHC.IO hiding (liftIO)
 import GHC.Records
 import Plume.Syntax.Concrete
@@ -62,4 +64,12 @@ checkState = unsafePerformIO $ newIORef emptyState
 instance Free Extension where
   free (MkExtension _ t s) = free t <> free s
 
-  apply s (MkExtension n t s') = MkExtension n (apply s t) (apply s s')
+  apply s (MkExtension n t (Forall gens ty)) =
+    MkExtension n (apply s t) (Forall (apply s gens) (apply s ty))
+
+instance Free TyVar where
+  free = Set.singleton
+
+  apply s i = case Map.lookup i s of
+    Just (TypeVar i') -> i'
+    _ -> i

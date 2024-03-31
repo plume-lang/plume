@@ -50,11 +50,7 @@ instance Throwable TypeError where
   showError EmptyMatch = "Empty match"
   showError (UnboundTypeVariable i) = "Unbound type variable " <> show i
   showError (UnboundVariable v) = "Unbound variable " <> show v
-  showError (CompilerError e) =
-    "Compiler error: "
-      <> show e
-      <> "\n"
-      <> fromString (prettyCallStack callStack)
+  showError (CompilerError e) = "Compiler error: " <> e
 
 type PlumeError = (Position, TypeError)
 

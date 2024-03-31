@@ -83,7 +83,7 @@ synthesizeMany xs = do
   xs' <- concatMapM (fmap snd . localPosition . synthesize) xs
   cs <- gets constraints
   s1 <- solve cs.tyConstraints
-  s2 <- solve (map (second (apply s1)) cs.extConstraints)
+  (s2, _) <- resolveCyclic cs.extConstraints
   let s3 = s2 <> s1
   pure (apply s3 xs')
 

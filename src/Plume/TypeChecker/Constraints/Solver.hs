@@ -2,9 +2,14 @@ module Plume.TypeChecker.Constraints.Solver where
 
 import Data.Map qualified as Map
 import Data.Set qualified as Set
+import GHC.IO
 import Plume.TypeChecker.Constraints.Definition
 import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.Monad
+
+{-# NOINLINE errorStack #-}
+errorStack :: IORef [PlumeError]
+errorStack = unsafePerformIO $ newIORef []
 
 solve :: [PlumeConstraint] -> Checker Substitution
 solve [] = pure Map.empty
@@ -19,23 +24,13 @@ solveConstraint :: TypeConstraint -> Checker Substitution
 solveConstraint (t1 :~: t2) = case mgu t1 t2 of
   Right s -> pure s
   Left e -> throw e
-solveConstraint (DoesExtend t name funTy@((ty : _) :->: _)) = do
-  ext <- findExtensionWithType name funTy t
-  s1 <- getSubst
-  let MkExtension _ _ sch = ext
-  extFun <- instantiate (apply s1 sch)
-  case extFun of
-    ((ty' : _) :->: _) -> do
-      let s2 = mgu ty ty'
-      let s3 = mgu funTy extFun
-      either throw pure (s3 <> s2)
-    _ -> throw $ CompilerError "Only functions are supported in extensions"
 solveConstraint (DoesExtend {}) =
   throw $ CompilerError "Only functions are supported in extensions"
 solveConstraint (Hole _) =
   throw $ CompilerError "Holes are not supported yet"
 
-findExtensionWithType :: Text -> PlumeType -> PlumeType -> Checker Extension
+findExtensionWithType
+  :: Text -> PlumeType -> PlumeType -> Checker (Either PlumeError Extension)
 findExtensionWithType n t fallback = do
   sub <- getSubst
   exts <- apply sub . Set.toList <$> gets extensions
@@ -51,12 +46,77 @@ findExtensionWithType n t fallback = do
           )
           exts
   case found of
-    [ext] -> pure ext
-    [] -> throw $ NoExtensionFound n t
+    [ext] -> pure $ Right ext
+    [] -> Left <$> throw' (NoExtensionFound n t)
     _ -> do
       let found' = map (\(MkExtension _ ty _) -> ty) found
-      throw $ MultipleExtensionsFound n found' t
+      Left <$> throw' (MultipleExtensionsFound n found' t)
 
 isNotTVar :: PlumeType -> Bool
 isNotTVar (TypeVar _) = False
 isNotTVar _ = True
+
+popConstraint :: Checker ()
+popConstraint = do
+  extCons <- gets (extConstraints . constraints)
+  case viaNonEmpty tail extCons of
+    Nothing -> pure ()
+    Just xs ->
+      modify $ \s ->
+        s {constraints = (constraints s) {extConstraints = xs}}
+
+throw' :: TypeError -> Checker PlumeError
+throw' err = do
+  pos <- fetchPosition
+  pure (pos, err)
+
+{-# NOINLINE cyclicCounter #-}
+cyclicCounter :: IORef Int
+cyclicCounter = unsafePerformIO $ newIORef 0
+
+maxCyclicCounter :: Int
+maxCyclicCounter = 5
+
+resolveCyclic :: [PlumeConstraint] -> Checker (Substitution, [PlumeConstraint])
+resolveCyclic cs = do
+  counter <- readIORef cyclicCounter
+  when (counter > maxCyclicCounter) $ do
+    errors <- readIORef errorStack
+    case viaNonEmpty last errors of
+      Just e -> throwRaw e
+      Nothing ->
+        throw $
+          CompilerError $
+            "Cyclic constraint resolution failed after "
+              <> show maxCyclicCounter
+              <> " attempts"
+  modifyIORef' cyclicCounter (+ 1)
+  s <- gets (substitution . constraints)
+  solveExtend (map (second (apply s)) cs)
+
+solveExtend
+  :: [PlumeConstraint] -> Checker (Substitution, [PlumeConstraint])
+solveExtend (x@(p, DoesExtend t name funTy) : xs) = withPosition p $ do
+  ext <- findExtensionWithType name funTy t
+  case ext of
+    Right (MkExtension _ _ sch) -> do
+      s1 <- getSubst
+      extFun <- instantiate (apply s1 sch)
+      let s2 = mgu funTy extFun
+      case s2 of
+        Right s -> do
+          updateSubst s
+          solveExtend (map (second $ apply s) xs)
+        Left e -> throw e
+    Left e@(_, err) -> do
+      (sub, cs) <- solveExtend xs
+      unless (null cs) $ throw err
+      modifyIORef' errorStack (e :)
+      (s1', cs1) <- resolveCyclic [fmap (apply sub) x]
+      case cs1 of
+        [] -> pure (s1', cs1)
+        _ -> throw err
+solveExtend (_ : xs) = solveExtend xs
+solveExtend [] = do
+  s <- getSubst
+  pure (s, [])

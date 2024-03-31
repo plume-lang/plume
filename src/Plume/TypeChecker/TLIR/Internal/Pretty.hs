@@ -44,7 +44,7 @@ prettyExpr (EApplication e es) =
   prettyExpr e
     <> parens (hsep . punctuate comma $ map prettyExpr es)
 prettyExpr (EVariable v t) = anItalic (pretty v) <> colon <+> prettyTy t
-prettyExpr (EExtVariable n _ t) = parens (anCol Red (pretty n) <> ":" <+> prettyTy t)
+prettyExpr (EExtVariable n t _) = parens (anCol Red (pretty n) <> ":" <+> prettyTy t)
 prettyExpr (ELiteral l) = prettyLit l
 prettyExpr (EEqualsType e t) = anCol Blue "typeof" <+> prettyExpr e <+> "==" <+> pretty t
 prettyExpr (EAnd e1 e2) = prettyExpr e1 <+> anCol Blue "and" <+> prettyExpr e2

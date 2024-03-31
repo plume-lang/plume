@@ -5,6 +5,7 @@ module Plume.TypeChecker.Monad (
   runChecker,
   Checker,
   throw,
+  throwRaw,
   insertWith,
   searchEnv,
   insertEnv,
@@ -25,7 +26,9 @@ module Plume.TypeChecker.Monad (
 ) where
 
 import Control.Monad.Except
+import Control.Monad.Exception
 import Data.Map qualified as Map
+import Data.Text.IO qualified as T
 import GHC.Records
 import Plume.Syntax.Concrete (Position)
 import Plume.TypeChecker.Monad.Error as Monad
@@ -55,8 +58,13 @@ throw :: TypeError -> Checker a
 throw e = MkChecker $ do
   pos <- readIORef checkState <&> positions
   case viaNonEmpty last pos of
-    Nothing -> error "No position found in checker state"
+    Nothing -> liftIO $ do
+      T.putStrLn (showError e)
+      exitFailure
     Just p -> throwError (p, e)
+
+throwRaw :: PlumeError -> Checker a
+throwRaw e = MkChecker $ throwError e
 
 instance MonadState CheckState Checker where
   get = MkChecker $ readIORef checkState
