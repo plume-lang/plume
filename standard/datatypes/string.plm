@@ -1,0 +1,14 @@
+native "std:native.dylib" add_str(x: str, y: str): str
+native "std:native.dylib" mul_str(x: str, y: int): str
+native "std:native.dylib" to_string<A>(x: A): str
+native "std:native.dylib" string_length(x: str): int
+native "std:native.dylib" eq_string(x: str, y: str): bool
+
+extend (c: str) with
+  operator + (d: str) => add_str(c, d)
+  operator * (d: int) => mul_str(c, d)
+  operator == (d: str) => eq_string(c, d)
+  concat(d: str) => c + d
+  show() => "\"{c}\""
+  len() => string_length(c)
+  

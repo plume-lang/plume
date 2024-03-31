@@ -1,0 +1,79 @@
+native "std:native.dylib" add_int(x: int, y: int): int
+native "std:native.dylib" sub_int(x: int, y: int): int
+native "std:native.dylib" mul_int(x: int, y: int): int
+native "std:native.dylib" div_int(x: int, y: int): int
+native "std:native.dylib" mod_int(x: int, y: int): int
+native "std:native.dylib" float_to_int(x: float): int
+native "std:native.dylib" int_to_float(x: int): float
+native "std:native.dylib" eq_int(x: int, y: int): bool
+native "std:native.dylib" lt_int(x: int, y: int): bool
+native "std:native.dylib" eq_float(x: float, y: float): bool
+native "std:native.dylib" lt_float(x: float, y: float): bool
+
+require "string"
+require "bool"
+
+infix 3 ^
+
+// Defining math operators
+
+extend (c: int) with
+  operator * (d: int) => mul_int(c, d)
+  operator / (d: int) => div_int(c, d)
+  operator % (d: int) => mod_int(c, d)
+  operator - (d: int) => sub_int(c, d)
+  operator + (d: int) => add_int(c, d)
+  operator ^ (d: int) =>
+    switch d
+      case 0 => 1
+      case ? => c * (c ^ (d - 1))
+  operator == (d: int) => eq_int(c, d)
+  operator < (d: int) => lt_int(c, d)
+  operator > (d: int) => lt_int(d, c)
+  operator <= (d: int) => not (lt_int(d, c))
+  operator >= (d: int) => not (lt_int(c, d))
+  
+  to_float(): float => int_to_float(c)
+  
+extend (c: int) with
+  show() => to_string(c)
+
+// Defining math functions
+
+postfix 3 !
+
+extend (c: int) with
+  operator !(): int =>
+    switch c
+      case 0 => 1
+      case ? => c * (c - 1)!
+
+  negate(): int => 0 - c
+
+native "std:native.dylib" add_float(x: float, y: float): float
+native "std:native.dylib" sub_float(x: float, y: float): float
+native "std:native.dylib" mul_float(x: float, y: float): float
+native "std:native.dylib" div_float(x: float, y: float): float
+native "std:native.dylib" mod_float(x: float, y: float): float
+native "std:native.dylib" pow_float(x: float, y: float): float
+
+extend (c: float) with
+  operator * (d: float) => mul_float(c, d)
+  operator / (d: float) => div_float(c, d)
+  operator % (d: float) => mod_float(c, d)
+  operator - (d: float) => sub_float(c, d)
+  operator + (d: float) => add_float(c, d)
+  operator ^ (d: float) => pow_float(c, d)
+  operator == (d: float) => eq_float(c, d)
+  operator < (d: float) => lt_float(c, d)
+  operator > (d: float) => lt_float(d, c)
+  operator <= (d: float) => not (lt_float(d, c))
+  operator >= (d: float) => not (lt_float(c, d))
+
+  to_int(): int => float_to_int(c)
+
+  show() => to_string(c)
+
+@e = 2.718282
+expf(x: float): float => @e ^ x
+exp(x: int): float => expf(x.to_float())

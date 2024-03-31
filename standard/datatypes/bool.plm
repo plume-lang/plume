@@ -1,0 +1,13 @@
+extend (c: bool) with
+  show() => 
+    return if c then "true" else "false"
+
+  not() =>
+    return if c then false else true
+
+  and(d: bool) =>
+    return if c then d else false
+
+  or(d: bool) =>
+    return if c then true else d
+    

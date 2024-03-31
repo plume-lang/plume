@@ -1,0 +1,5 @@
+require "datatypes/number"
+require "datatypes/string"
+require "datatypes/result"
+require "datatypes/option"
+require "datatypes/bool"
