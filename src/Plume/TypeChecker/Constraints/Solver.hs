@@ -101,7 +101,7 @@ solveExtend (x@(p, DoesExtend t name funTy) : xs) = withPosition p $ do
   case ext of
     Right (MkExtension _ _ sch) -> do
       s1 <- getSubst
-      extFun <- instantiate (apply s1 sch)
+      extFun <- apply s1 <$> instantiate sch
       let s2 = mgu funTy extFun
       case s2 of
         Right s -> do

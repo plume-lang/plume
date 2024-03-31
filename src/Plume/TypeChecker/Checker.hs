@@ -3,7 +3,7 @@
 module Plume.TypeChecker.Checker where
 
 import Plume.Syntax.Abstract qualified as Pre
-import Plume.Syntax.Translation.Generics hiding (Error (..))
+import Plume.Syntax.Translation.Generics hiding (Error (..), withPosition)
 import Plume.TypeChecker.Constraints.Solver
 import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.Monad
