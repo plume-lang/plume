@@ -5,4 +5,4 @@ facto(n: int): int =>
     case 0 => 1
     case ? => n * facto(n - 1)
 
-println(facto(20))
+@println(facto(20))

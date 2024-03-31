@@ -47,7 +47,9 @@ Value print(int arg_n, Module* mod, Value* args) {
   if (arg_n < 1) THROW("Print expects at least 1 argument");
   Value v = args[0];
 
-  print_helper(v);
+  ASSERT(v.type == VALUE_STRING, "Print expects a string argument");
+
+  printf("%s", v.string_value);
 
   return MAKE_INTEGER(0);
 }
