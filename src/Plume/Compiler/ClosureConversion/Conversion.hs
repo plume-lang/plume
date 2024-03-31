@@ -169,6 +169,10 @@ closePattern (Pre.UPConstructor name ps) = do
   pure $ Post.CPConstructor name ps'
 closePattern Pre.UPWildcard = pure Post.CPWildcard
 closePattern (Pre.UPSpecialVariable x) = pure $ Post.CPSpecialVar x
+closePattern (Pre.UPList ps p) = do
+  ps' <- traverse closePattern ps
+  p' <- traverse closePattern p
+  pure $ Post.CPList ps' p'
 
 closeStatement
   :: (MonadClosure m)

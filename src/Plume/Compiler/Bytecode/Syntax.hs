@@ -22,6 +22,8 @@ data Instruction
   | MakeLambda Int Int
   | GetIndex
   | Special
+  | Slice Int
+  | ListLength
   deriving (Show, Eq)
 
 data Comparator

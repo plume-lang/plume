@@ -79,6 +79,25 @@ synthPattern (Pre.PConstructor name pats) = do
       inst `unifiesTo` (patsTy :->: ret)
       return (ret, Post.PConstructor name pats', mconcat env)
     Nothing -> throw $ UnboundVariable name
+synthPattern (Pre.PList pats slice) = do
+  tv <- fresh
+  (patsTy, pats', env) <- mapAndUnzip3M synthPattern pats
+  forM_ patsTy (`unifiesTo` tv)
+
+  slRes <- maybeM slice synthPattern
+
+  case slRes of
+    Just (slTy, sl', slEnv) -> do
+      slTy `unifiesTo` TList tv
+      return (TList tv, Post.PList pats' (Just sl'), mconcat env <> slEnv)
+    Nothing -> return (TList tv, Post.PList pats' Nothing, mconcat env)
+synthPattern (Pre.PSlice n) = do
+  tv <- fresh
+  return
+    ( TList tv
+    , Post.PVariable n (TList tv)
+    , Map.singleton n (Forall [] (TList tv))
+    )
 
 typeOfLiteral :: Literal -> (PlumeType, Literal)
 typeOfLiteral (LInt i) = (TInt, LInt i)

@@ -17,6 +17,9 @@ data DesugaredExpr
   | DEEqualsTo DesugaredExpr DesugaredExpr
   | DEAnd DesugaredExpr DesugaredExpr
   | DESpecial
+  | DESlice DesugaredExpr Int
+  | DEGreaterThan DesugaredExpr DesugaredExpr
+  | DEListLength DesugaredExpr
   deriving (Eq, Show, Ord)
 
 data DesugaredStatement
@@ -62,3 +65,7 @@ instance Substitutable DesugaredExpr DesugaredExpr where
   substitute s (DEIndex e1 e2) =
     DEIndex (substitute s e1) (substitute s e2)
   substitute _ DESpecial = DESpecial
+  substitute s (DESlice e i) = DESlice (substitute s e) i
+  substitute s (DEGreaterThan e1 e2) =
+    DEGreaterThan (substitute s e1) (substitute s e2)
+  substitute s (DEListLength e) = DEListLength (substitute s e)

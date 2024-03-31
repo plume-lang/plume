@@ -7,4 +7,6 @@ data Pattern
   | PWildcard
   | PConstructor Text [Pattern]
   | PLiteral Literal
+  | PList [Pattern] (Maybe Pattern)
+  | PSlice Text
   deriving (Eq, Show)

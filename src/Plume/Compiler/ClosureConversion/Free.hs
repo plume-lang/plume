@@ -54,6 +54,7 @@ instance Free ClosedPattern where
   free (CPConstructor _ ps) = free ps
   free CPWildcard = S.empty
   free (CPSpecialVar x) = S.singleton x
+  free (CPList ps p) = free ps <> foldMap free p
 
 instance Free ClosedStatement where
   free (CSExpr e) = free e

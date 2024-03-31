@@ -180,6 +180,8 @@ erasePattern (Pre.PLiteral l) = pure $ Post.UPLiteral l
 erasePattern (Pre.PConstructor n ps) = Post.UPConstructor n <$> mapM erasePattern ps
 erasePattern Pre.PWildcard = pure Post.UPWildcard
 erasePattern (Pre.PSpecialVar x _) = pure $ Post.UPSpecialVariable x
+erasePattern (Pre.PList ps t) =
+  Post.UPList <$> mapM erasePattern ps <*> maybeM t erasePattern
 
 erase :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]
 erase xs = do

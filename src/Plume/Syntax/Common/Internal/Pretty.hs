@@ -31,6 +31,10 @@ prettyPat (PVariable v) = anItalic $ pretty v
 prettyPat (PLiteral l) = prettyLit l
 prettyPat (PConstructor n ps) = anCol Magenta (pretty n) <+> hsep (map prettyPat ps)
 prettyPat PWildcard = "?"
+prettyPat (PList ps slice) =
+  brackets
+    (hsep (punctuate comma (map prettyPat ps ++ [".." <> ansiPretty slice])))
+prettyPat (PSlice p) = ".." <> pretty p
 
 prettyLit :: Literal -> Doc AnsiStyle
 prettyLit (LInt i) = anCol Yellow $ pretty i

@@ -73,3 +73,4 @@ instance (Free t) => Free (TypedPattern t) where
   apply _ (PLiteral l) = PLiteral l
   apply s (PSpecialVar n t) = PSpecialVar n (apply s t)
   apply _ PWildcard = PWildcard
+  apply s (PList xs sl) = PList (apply s xs) (apply s sl)

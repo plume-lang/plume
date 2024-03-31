@@ -25,6 +25,7 @@ data ClosedPattern
   | CPConstructor Text [ClosedPattern]
   | CPWildcard
   | CPSpecialVar Text
+  | CPList [ClosedPattern] (Maybe ClosedPattern)
   deriving (Eq, Show, Ord)
 
 data ClosedStatement

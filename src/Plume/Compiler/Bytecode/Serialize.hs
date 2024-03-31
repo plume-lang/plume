@@ -41,6 +41,8 @@ encodeInstruction (MakeLambda i l) = putWord8 17 >> encodeInteger i >> encodeInt
 encodeInstruction GetIndex = putWord8 18
 encodeInstruction Special = putWord8 19
 encodeInstruction (JumpRel i) = putWord8 20 >> encodeInteger i
+encodeInstruction (Slice i) = putWord8 21 >> encodeInteger i
+encodeInstruction ListLength = putWord8 22
 
 encodeText :: Text -> Put
 encodeText w = do

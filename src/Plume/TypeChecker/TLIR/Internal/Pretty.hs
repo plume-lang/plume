@@ -105,6 +105,8 @@ prettyExpr (EExtensionDeclaration name extTy args body) =
     <+> "="
     <+> prettyExpr body
 
+instance ANSIPretty Pattern where ansiPretty = prettyPat
+
 prettyPat :: Pattern -> Doc AnsiStyle
 prettyPat (PVariable v t) = pretty v <> colon <+> prettyTy t
 prettyPat (PLiteral l) = prettyLit l
@@ -112,3 +114,9 @@ prettyPat (PConstructor p1 p2) =
   pretty p1 <+> parens (hsep $ punctuate comma $ map prettyPat p2)
 prettyPat PWildcard = anCol Blue "_"
 prettyPat (PSpecialVar v t) = anCol Red (pretty v) <> colon <+> prettyTy t
+prettyPat (PList ps sl) =
+  brackets
+    ( hsep $
+        punctuate comma $
+          map prettyPat ps <> [".." <> ansiPretty sl]
+    )

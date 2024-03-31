@@ -8,4 +8,5 @@ data TypedPattern t
   | PConstructor Text [TypedPattern t]
   | PSpecialVar Text t
   | PWildcard
+  | PList [TypedPattern t] (Maybe (TypedPattern t))
   deriving (Eq, Show)

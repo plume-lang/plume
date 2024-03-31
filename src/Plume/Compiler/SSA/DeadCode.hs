@@ -61,6 +61,9 @@ instance Free DesugaredExpr where
   free (DEDictionary es) = free es
   free (DEIndex e1 e2) = free e1 <> free e2
   free DESpecial = S.empty
+  free (DESlice e _) = free e
+  free (DEGreaterThan e1 e2) = free e1 <> free e2
+  free (DEListLength e) = free e
 
 instance Free DesugaredStatement where
   free (DSExpr e) = free e

@@ -89,3 +89,22 @@ createCondition x (Pre.CPSpecialVar n) = do
   let spc = Post.DEEqualsTo (Post.DEProperty x 0) Post.DESpecial
   let cons = Post.DEEqualsTo (Post.DEProperty x 2) (Post.DELiteral (LString n))
   ([spc, cons], mempty)
+createCondition x (Pre.CPList pats slice) =
+  let (conds, maps) =
+        unzip $
+          zipWith
+            createCondition
+            [Post.DEProperty x i | i <- [0 .. length pats - 1]]
+            pats
+      (conds', maps') = maybe mempty (createCondition (Post.DESlice x (length pats))) slice
+      patLen = fromIntegral $ length pats
+      lenCond = case slice of
+        Just _ ->
+          Post.DEGreaterThan
+            (Post.DEListLength x)
+            (Post.DELiteral (LInt (patLen - 1)))
+        Nothing ->
+          Post.DEEqualsTo
+            (Post.DEListLength x)
+            (Post.DELiteral (LInt patLen))
+   in (lenCond : concat conds <> conds', mconcat maps <> maps')

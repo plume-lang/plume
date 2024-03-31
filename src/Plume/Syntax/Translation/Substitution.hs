@@ -16,6 +16,8 @@ instance Free AST.Pattern where
   ftv AST.PWildcard = S.empty
   ftv (AST.PLiteral _) = S.empty
   ftv (AST.PConstructor _ ps) = foldMap ftv ps
+  ftv (AST.PList ps t) = foldMap ftv ps <> foldMap ftv t
+  ftv (AST.PSlice p) = S.singleton p
 
 instance (Free a) => Free [a] where
   ftv = foldr (S.union . ftv) S.empty

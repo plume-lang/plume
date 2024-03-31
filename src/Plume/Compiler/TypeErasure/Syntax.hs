@@ -24,6 +24,7 @@ data UntypedPattern
   | UPConstructor Text [UntypedPattern]
   | UPWildcard
   | UPSpecialVariable Text
+  | UPList [UntypedPattern] (Maybe UntypedPattern)
   deriving (Eq, Show, Ord)
 
 data UntypedStatement
