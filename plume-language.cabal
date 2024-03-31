@@ -52,18 +52,26 @@ library
         Plume.TypeChecker.TLIR.Internal.Pretty
 
         Plume.TypeChecker.Monad
-        Plume.TypeChecker.Monad.Type
         Plume.TypeChecker.Monad.State
-        Plume.TypeChecker.Monad.Substitution
-        Plume.TypeChecker.Monad.Type.Scheme
-        Plume.TypeChecker.Monad.Type.Error
-        Plume.TypeChecker.Monad.Type.Conversion
+        Plume.TypeChecker.Monad.Type
+        Plume.TypeChecker.Monad.Error
+        Plume.TypeChecker.Monad.Free
+        Plume.TypeChecker.Monad.Conversion
 
+        Plume.TypeChecker.Checker
+        Plume.TypeChecker.Checker.Monad
+        Plume.TypeChecker.Checker.Application
+        Plume.TypeChecker.Checker.Declaration
+        Plume.TypeChecker.Checker.Closure
+        Plume.TypeChecker.Checker.Condition
+        Plume.TypeChecker.Checker.Extension
+        Plume.TypeChecker.Checker.Datatype
+        Plume.TypeChecker.Checker.Switch
+        Plume.TypeChecker.Checker.Native
+        
         Plume.TypeChecker.Constraints.Definition
         Plume.TypeChecker.Constraints.Unification
         Plume.TypeChecker.Constraints.Solver
-
-        Plume.TypeChecker.Checker
 
         Plume.Compiler.ClosureConversion.Syntax
         Plume.Compiler.ClosureConversion.Free
@@ -99,7 +107,11 @@ library
 
     hs-source-dirs:     src
     default-language:   GHC2021
-    default-extensions: OverloadedStrings
+    default-extensions: 
+      OverloadedStrings
+      OverloadedRecordDot
+      TemplateHaskell
+      DataKinds
     ghc-options:        -Wall -Wno-orphans
     build-depends:
         base ^>=4.19.0.0,
@@ -113,7 +125,8 @@ library
         filepath,
         directory,
         text,
-        binary
+        binary,
+        template-haskell
 
     mixins:
         base hiding (Prelude),
