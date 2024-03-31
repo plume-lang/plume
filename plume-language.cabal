@@ -32,6 +32,7 @@ library
         Plume.Syntax.Parser.Modules.Expression
         Plume.Syntax.Parser.Modules.Type
         Plume.Syntax.Parser.Modules.Pattern
+        Plume.Syntax.Parser.Modules.ParseImports
 
         Plume.Syntax.Abstract
         Plume.Syntax.Abstract.Expression
