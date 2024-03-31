@@ -26,7 +26,6 @@ __pycache__
 report.html
 .DS_Store
 a.out
-_old
 bin
 index
 index-*
@@ -37,3 +36,5 @@ build
 .xmake
 .vscode
 *.class
+
+_*
