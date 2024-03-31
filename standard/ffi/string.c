@@ -67,3 +67,19 @@ Value to_string(int arg_n, Module* mod, Value* args) {
 
   return MAKE_STRING(new_str);
 }
+
+Value string_length(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 1) THROW("String_length expects 1 argument");
+  ASSERT(args[0].type == VALUE_STRING,
+         "String_length expects a string argument");
+
+  return MAKE_INTEGER(strlen(args[0].string_value));
+}
+
+Value eq_string(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 2) THROW("Eq expects 2 arguments");
+  ASSERT(args[0].type == VALUE_STRING && args[1].type == VALUE_STRING,
+         "Eq expects string arguments");
+
+  return MAKE_INTEGER(strcmp(args[0].string_value, args[1].string_value) == 0);
+}
