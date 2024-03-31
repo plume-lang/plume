@@ -3,6 +3,8 @@
 module Main where
 
 import Control.Monad.Exception
+import Control.Monad.Parser
+import Data.Either
 import Data.Text.IO hiding (putStr)
 import Plume.Compiler.Bytecode.Assembler hiding (nativeLibraries)
 import Plume.Compiler.Bytecode.Serialize
@@ -11,12 +13,19 @@ import Plume.Compiler.ClosureConversion.Conversion
 import Plume.Compiler.Desugaring.Desugar
 import Plume.Compiler.SSA
 import Plume.Compiler.TypeErasure.EraseType
+import Plume.Syntax.Abstract.Internal.Pretty ()
 import Plume.Syntax.Parser
+import Plume.Syntax.Parser.Modules.ParseImports
 import Plume.Syntax.Translation.ConcreteToAbstract
 import Plume.TypeChecker.Checker
 import System.Directory
 import System.FilePath
+import System.IO.Pretty
 import Prelude hiding (putStrLn, readFile)
+
+fromEither :: a -> Either b a -> a
+fromEither _ (Right a) = a
+fromEither a _ = a
 
 main :: IO ()
 main = do
@@ -38,18 +47,22 @@ main = do
 
       content <- readFile file
 
-      parsePlumeFile file content `with` \cst -> do
-        runConcreteToAbstract env dir cst `with` \ast -> do
-          runSynthesize ast `with` \tlir -> do
-            erased <- erase tlir
-            runClosureConversion erased `with` \closed -> do
-              desugared <- desugar closed
-              let ssa = runSSA desugared
-              bytecode <- assembleBytecode dir ssa
-              sbc <- serialize bytecode
-              let new_path = file -<.> "bin"
-              writeFileLBS new_path sbc
-              putStrLn $ "Bytecode written to " <> fromString new_path
+      paths <- fromEither [] <$> parse getPaths file content
+      let paths' = case env of
+            Just _ -> ("std:prelude", Nothing) : paths
+            Nothing -> paths
+
+      runConcreteToAbstract env dir paths' file `with` \ast -> do
+        runSynthesize ast `with` \tlir -> do
+          erased <- erase tlir
+          runClosureConversion erased `with` \closed -> do
+            desugared <- desugar closed
+            let ssa = runSSA desugared
+            bytecode <- assembleBytecode dir ssa
+            sbc <- serialize bytecode
+            let new_path = file -<.> "bin"
+            writeFileLBS new_path sbc
+            putStrLn $ "Bytecode written to " <> fromString new_path
     Nothing -> putStrLn "No file provided"
 
 printBytecode :: Program -> IO ()
