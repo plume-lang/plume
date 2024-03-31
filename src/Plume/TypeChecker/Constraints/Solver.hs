@@ -109,12 +109,10 @@ solveExtend (x@(p, DoesExtend t name funTy) : xs) = withPosition p $ do
           solveExtend (map (second $ apply s) xs)
         Left e -> throw e
     Left e@(_, err) -> do
-      (sub, cs) <- solveExtend xs
-      unless (null cs) $ throw err
       modifyIORef' errorStack (e :)
-      (s1', cs1) <- resolveCyclic [fmap (apply sub) x]
+      (s1', cs1) <- resolveCyclic (xs <> [x])
       case cs1 of
-        [] -> pure (s1', cs1)
+        [] -> updateSubst s1' $> (s1', cs1)
         _ -> throw err
 solveExtend (_ : xs) = solveExtend xs
 solveExtend [] = do
