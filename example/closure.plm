@@ -1,13 +1,8 @@
+require "std:string"
+
 facto(n: int): int =>
   switch n
     case 0 => 1
     case ? => n * facto(n - 1)
 
 println(facto(20))
-
-if does_file_exist("example/types.plm") then
-  println("File exists")
-  res = execute_command("cat example/types.plm")
-  println(res)
-else
-  println("File does not exist")

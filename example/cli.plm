@@ -1,0 +1,24 @@
+require "std:string"
+
+type Argument =
+  WithArgument(str, str)
+  NoArgument(str)
+
+extend (c: Argument) with
+  show(): str =>
+    switch c
+      case WithArgument(name, value) => "-{name} {value}"
+      case NoArgument(name) => name
+
+type List<A> =
+  Nil
+  Cons(A, List<A>)
+
+extend<A> (c: List<A>) with
+  show(showHelper: (A) -> str): str =>
+    switch c
+      case Nil => "Nil"
+      case Cons(x, xs) => x.showHelper() + " :: " + xs.show(showHelper)
+
+ls = Cons(5, Cons(6, Nil))
+println(ls.show(show))
