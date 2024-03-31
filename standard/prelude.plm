@@ -1,2 +1,2 @@
 require "std:io"
-require "std:math"
+require "std:datatypes"

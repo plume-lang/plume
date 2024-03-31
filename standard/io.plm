@@ -1,8 +1,8 @@
-native "std:natives.dylib" print(x: str): int
-native "std:natives.dylib" println(x: str): int
-native "std:natives.dylib" get_args(): [str]
-native "std:natives.dylib" does_file_exist(path: str): bool
-native "std:natives.dylib" execute_command(path: str): str
+native "std:native.dylib" print(x: str): int
+native "std:native.dylib" println(x: str): int
+native "std:native.dylib" get_args(): [str]
+native "std:native.dylib" does_file_exist(path: str): bool
+native "std:native.dylib" execute_command(path: str): str
 
 @print(x) =>
   print(x.show())
