@@ -13,12 +13,12 @@ import Prelude hiding (intercalate, unwords)
 data PlumeType
   = TId Text
   | TApp PlumeType [PlumeType]
-  deriving (Eq)
+  deriving (Eq, Show)
 
 data PlumeGeneric
   = GVar Text
   | GExtends Text [Text]
-  deriving (Eq)
+  deriving (Eq, Show)
 
 pattern TFunction, (:->:) :: [PlumeType] -> PlumeType -> PlumeType
 pattern TFunction args ret = TApp (TApp (TId "->") [ret]) args

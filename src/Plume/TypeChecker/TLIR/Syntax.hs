@@ -3,28 +3,25 @@ module Plume.TypeChecker.TLIR.Syntax where
 import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Concrete.Expression (Position, TypeConstructor)
-import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR.Modules.Pattern
 
 data TypedExpression t
   = EVariable Text t
-  | EExtVariable Text t
+  | EExtVariable Text t t
   | ELiteral Literal
   | EList [TypedExpression t]
   | EApplication (TypedExpression t) [TypedExpression t]
   | EEqualsType (TypedExpression t) Text
   | EAnd (TypedExpression t) (TypedExpression t)
   | EIndex (TypedExpression t) (TypedExpression t)
-  | EType (Annotation [PlumeGeneric]) [TypeConstructor t]
+  | EType Text [TypeConstructor t]
   | EDeclaration
       (Annotation t)
-      [PlumeGeneric]
       (TypedExpression t)
       (Maybe (TypedExpression t))
   | EExtensionDeclaration
       Text
       t
-      [PlumeGeneric]
       (Annotation t)
       (TypedExpression t)
   | EConditionBranch
@@ -39,5 +36,5 @@ data TypedExpression t
   | ELocated (TypedExpression t) Position
   | ESwitch (TypedExpression t) [(TypedPattern t, TypedExpression t)]
   | EReturn (TypedExpression t)
-  | ENativeFunction Text Text [PlumeGeneric] t
-  deriving (Eq, Show)
+  | ENativeFunction Text Text t
+  deriving (Show, Eq)

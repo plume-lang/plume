@@ -70,7 +70,6 @@ eBlock p = eLocated $ do
 
   case bl of
     [] -> fail "Block should contain at least one expression"
-    [x] -> return x
     _ -> return (EBlock bl)
 
 -- (e) where e is an expression

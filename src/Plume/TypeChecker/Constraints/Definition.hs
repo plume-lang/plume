@@ -1,25 +1,23 @@
 module Plume.TypeChecker.Constraints.Definition where
 
-import Data.Set qualified as S
 import Plume.Syntax.Concrete (Position)
-import Plume.TypeChecker.Monad.Substitution
+import Plume.TypeChecker.Monad.Free
 import Plume.TypeChecker.Monad.Type
 
-data ConstraintConstructor
+data TypeConstraint
   = PlumeType :~: PlumeType
-  | Extends PlumeType Text PlumeType
+  | DoesExtend PlumeType Text PlumeType
   | Hole PlumeType
-  deriving (Show, Eq)
+  deriving (Eq, Show)
 
-infix 4 :~:
+type PlumeConstraint = (Position, TypeConstraint)
 
-type TypeConstraint = (Position, ConstraintConstructor)
-
-instance Types ConstraintConstructor where
-  free (t1 :~: t2) = free t1 `S.union` free t2
-  free (Extends c _ ty) = free c <> free ty
+instance Free TypeConstraint where
+  free (t1 :~: t2) = free t1 <> free t2
+  free (DoesExtend extTy _ appTy) = free extTy <> free appTy
   free (Hole t) = free t
 
   apply s (t1 :~: t2) = apply s t1 :~: apply s t2
+  apply s (DoesExtend extTy name appTy) =
+    DoesExtend (apply s extTy) name (apply s appTy)
   apply s (Hole t) = Hole $ apply s t
-  apply s (Extends c t ty) = Extends (apply s c) t (apply s ty)

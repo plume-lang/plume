@@ -42,7 +42,7 @@ desugarSwitch (fExpr, _) (Pre.CESwitch x cases) = do
   let ifs' = createIfsStatement $ concat res
 
   return (Post.DEVar "nil", stmts <> ifs')
-desugarSwitch _ _ = error "test"
+desugarSwitch _ _ = error "Received incorrect expression, not a switch."
 
 createConditionExpr :: [Post.DesugaredExpr] -> Post.DesugaredExpr
 createConditionExpr [] = Post.DELiteral (LBool True)
@@ -56,7 +56,7 @@ createIfsStatement [] = []
 createIfsStatement (Post.DSConditionBranch c t [] : xs)
   | c == Post.DELiteral (LBool True) = t
   | otherwise = [Post.DSConditionBranch c t (createIfsStatement xs)]
-createIfsStatement _ = error "test"
+createIfsStatement _ = []
 
 createIfs
   :: [([Post.DesugaredExpr], Post.DesugaredExpr)] -> Post.DesugaredExpr
@@ -67,7 +67,7 @@ createIfs ((cond, body) : xs) =
     else Post.DEIf cond' body (createIfs xs)
  where
   cond' = createConditionExpr cond
-createIfs [] = error "test"
+createIfs [] = error "Switch should have at least one case."
 
 createLets :: Map Text Post.DesugaredExpr -> [Post.DesugaredStatement]
 createLets = M.foldrWithKey (\k v acc -> Post.DSDeclaration k v : acc) []
@@ -85,4 +85,7 @@ createCondition x (Pre.CPConstructor y xs) =
    in (spc : cons : concat conds, mconcat maps)
 createCondition x (Pre.CPLiteral l) =
   ([Post.DEEqualsTo x (Post.DELiteral l)], mempty)
-createCondition _ (Pre.CPSpecialVar _) = error "test"
+createCondition x (Pre.CPSpecialVar n) = do
+  let spc = Post.DEEqualsTo (Post.DEProperty x 0) Post.DESpecial
+  let cons = Post.DEEqualsTo (Post.DEProperty x 2) (Post.DELiteral (LString n))
+  ([spc, cons], mempty)

@@ -7,4 +7,4 @@ data Pattern
   | PWildcard
   | PConstructor Text [Pattern]
   | PLiteral Literal
-  deriving (Eq)
+  deriving (Eq, Show)

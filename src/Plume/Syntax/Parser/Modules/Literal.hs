@@ -45,7 +45,7 @@ stringLiteralInterpolated f = lexeme $ do
   str <- char '"' *> manyTill interpolation (char '"')
   return $ buildString str
  where
-  parseInterpolation = braces (f <* sc)
+  parseInterpolation = char '{' *> f <* sc <* char '}'
   parseCharChunk = do
     str <-
       T.pack

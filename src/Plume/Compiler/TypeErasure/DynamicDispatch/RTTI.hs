@@ -10,9 +10,9 @@ data RTTIResult
   | Nil
 
 rtti :: PlumeType -> RTTIResult
-rtti (TApp t xs) = Item (rtti t) (map rtti xs)
-rtti (TVar _) = Nil
-rtti (TId n) = Single n
+rtti (TypeApp t xs) = Item (rtti t) (map rtti xs)
+rtti (TypeVar _) = Nil
+rtti (TypeId n) = Single n
 
 createCondition
   :: TypedExpression PlumeType -> RTTIResult -> [TypedExpression PlumeType]

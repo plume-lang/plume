@@ -18,7 +18,6 @@ dispatch (extName, extVar) impl = do
   let ifSequence = createIfSequence if'
   EDeclaration
     (Annotation extName TUnit)
-    []
     (EClosure [Annotation extVar TUnit] TUnit ifSequence)
     Nothing
 

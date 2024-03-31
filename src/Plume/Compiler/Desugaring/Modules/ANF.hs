@@ -63,4 +63,5 @@ desugarANF f (Pre.CEConditionBranch e1 e2 e3) = do
       return (Post.DEIf e1' e2' e3', stmts)
  where
   createBr (e, st) = st <> [Post.DSReturn e]
-desugarANF _ _ = error "test"
+desugarANF _ _ =
+  error "Received incorrect expression, not an ANF convertible one"

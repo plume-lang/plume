@@ -38,6 +38,7 @@ data AbstractExpression t
   | ETypeExtension [PlumeGeneric] (Annotation t) [ExtensionMember t]
   | ENativeFunction Text Text [Text] t
   | EGenericProperty [PlumeGeneric] Text [t] t
+  deriving (Show)
 
 instance (Eq t) => Eq (AbstractExpression t) where
   EVariable n1 == EVariable n2 = n1 == n2
@@ -67,7 +68,7 @@ data ExtensionMember t
       [PlumeGeneric]
       (Annotation (Maybe t))
       (AbstractExpression t)
-  deriving (Eq)
+  deriving (Eq, Show)
 
 pattern (:>:) :: AbstractExpression t -> Position -> AbstractExpression t
 pattern e :>: p = ELocated e p

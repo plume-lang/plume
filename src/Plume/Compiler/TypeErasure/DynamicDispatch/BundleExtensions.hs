@@ -7,10 +7,10 @@ import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR
 
 createName :: PlumeType -> Text
-createName (TId n) = n
-createName (TApp t ts) = createName t <> ts''
+createName (TypeId n) = n
+createName (TypeApp t ts) = createName t <> ts''
  where
-  ts' = map createName ts
+  ts' = filter (/= "") $ map createName ts
   ts'' = if null ts' then "" else "_" <> T.intercalate "_" ts'
 createName _ = ""
 
@@ -44,7 +44,7 @@ bundleExtensions name progs = do
     Nothing -> ([], before, after, [])
 
 isExtension :: TypedExpression PlumeType -> Text -> Bool
-isExtension (EExtensionDeclaration n _ _ _ _) name = n == name
+isExtension (EExtensionDeclaration n _ _ _) name = n == name
 isExtension (ELocated e _) name = isExtension e name
 isExtension _ _ = False
 
@@ -73,14 +73,13 @@ bundle name progs = do
 bundleExtension
   :: TypedExpression PlumeType
   -> (Bundled, TypedExpression PlumeType)
-bundleExtension (EExtensionDeclaration n t _ (Annotation arg _) body) =
+bundleExtension (EExtensionDeclaration n t (Annotation arg _) body) =
   (Bundled n arg t body, fun)
  where
   extName = n <> "::" <> createName t
   fun =
     EDeclaration
       (Annotation extName t)
-      []
       (EClosure [Annotation arg t] t body)
       Nothing
 bundleExtension (ELocated e _) = bundleExtension e

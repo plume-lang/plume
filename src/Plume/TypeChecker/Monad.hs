@@ -1,128 +1,235 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedRecordDot #-}
 
 module Plume.TypeChecker.Monad (
   module Monad,
-  MonadChecker,
-  Inference,
-  Result,
-  fresh,
-  freshTVar,
-  instantiate,
-  generalize,
-  local,
-  gets,
-  extract,
+  runChecker,
+  Checker,
   throw,
-  withVariables,
-  withReturnType,
-  withGenerics,
-  with,
-  with',
+  insertWith,
+  searchEnv,
+  insertEnv,
+  insertEnvWith,
+  deleteEnv,
+  replaceEnv,
+  fresh,
+  instantiate,
+  fetchPosition,
+  trackPosition,
+  withPosition,
+  localPosition,
+  maybeM,
+  extractFromArray,
+  pushConstraint,
+  getSubst,
+  updateSubst,
 ) where
 
 import Control.Monad.Except
 import Data.Map qualified as Map
-import Data.Set qualified as Set
 import GHC.Records
 import Plume.Syntax.Concrete (Position)
-import Plume.Syntax.Translation.Generics (Spreadable)
+import Plume.TypeChecker.Monad.Error as Monad
+import Plume.TypeChecker.Monad.Free as Monad
 import Plume.TypeChecker.Monad.State as Monad
-import Plume.TypeChecker.Monad.Substitution as Monad
 import Plume.TypeChecker.Monad.Type as Monad
-import Plume.TypeChecker.Monad.Type.Error as Monad
-import Plume.TypeChecker.Monad.Type.Scheme as Monad
-import Text.Megaparsec
-import Prelude hiding (gets, local)
 
-type Result a = Spreadable [a] a
+newtype CheckerT m a
+  = MkChecker {runCheckerT :: ExceptT PlumeError m a}
 
-type MonadChecker m = (MonadIO m, MonadError (TypeError, Maybe Position) m)
-type Inference m from to =
-  (MonadChecker m) => from -> m (PlumeType, Result to, [Qualified])
+instance (Functor m) => Functor (CheckerT m) where
+  fmap f (MkChecker m) = MkChecker (fmap f m)
 
-fresh :: (MonadIO m) => m Int
-fresh = liftIO $ do
-  i <- (.tvarCounter) <$> readIORef checkerST
-  modifyIORef' checkerST $ \s -> s {tvarCounter = i + 1}
-  return i
+instance (Monad m) => Applicative (CheckerT m) where
+  pure x = MkChecker (pure x)
+  MkChecker f <*> MkChecker x = MkChecker (f <*> x)
 
-freshTVar :: (MonadIO m) => m PlumeType
-freshTVar = TVar <$> fresh
+instance (Monad m) => Monad (CheckerT m) where
+  MkChecker m >>= f = MkChecker (m >>= runCheckerT . f)
 
-extract :: PlumeGeneric -> Int
-extract (GVar n) = n
-extract (GExtends n _) = n
+type Checker = CheckerT IO
 
-instantiate :: (MonadIO m) => Scheme -> m (PlumeType, Substitution, [Qualified])
-instantiate (Forall vars t) = do
-  vars' <- mapM (const freshTVar) vars
-  let s = Map.fromList $ zip vars vars'
-   in case apply s t of
-        qs :=>: t' -> return (t', s, qs)
+runChecker :: Checker a -> IO (Either PlumeError a)
+runChecker = runExceptT . runCheckerT
 
-local :: (MonadChecker m) => (CheckerState -> CheckerState) -> m a -> m a
-local f m = do
-  old <- readIORef checkerST
-  modifyIORef checkerST f
-  a <- m
-  s <- readIORef checkerST
-  writeIORef checkerST old
-  modifyIORef'
-    checkerST
-    ( \s' ->
-        s'
-          { tvarCounter = s.tvarCounter
-          , constraints = s.constraints
-          }
-    )
-  return a
+throw :: TypeError -> Checker a
+throw e = MkChecker $ do
+  pos <- readIORef checkState <&> positions
+  case viaNonEmpty last pos of
+    Nothing -> error "No position found in checker state"
+    Just p -> throwError (p, e)
 
-generalize :: Environment -> [Qualified] -> PlumeType -> Scheme
-generalize env qs t = Forall vars (qs :=>: t)
- where
-  vars = Set.toList ((free t <> free qs) Set.\\ free env)
+instance MonadState CheckState Checker where
+  get = MkChecker $ readIORef checkState
+  put s = MkChecker $ writeIORef checkState s
 
-gets :: (MonadIO m) => (CheckerState -> a) -> m a
-gets f = f <$> readIORef checkerST
+instance MonadIO Checker where
+  liftIO = MkChecker . liftIO
 
-throw :: (MonadChecker m) => TypeError -> m a
-throw err =
-  throwError . (err,) . position =<< readIORef checkerST
+search
+  :: forall l k r a
+   . (HasField l r (Map k a), Ord k)
+  => k
+  -> r
+  -> Maybe a
+search key record = do
+  let env = getField @l record
+  Map.lookup key env
 
-withVariables :: (MonadChecker m) => [(Text, Scheme)] -> m a -> m a
-withVariables vars =
-  with' @"variables" (fromList vars <>)
+insert
+  :: forall l k r a
+   . (HasField l r (Map k a), Ord k)
+  => k
+  -> a
+  -> r
+  -> r
+insert key value record = do
+  let env = getField @l record
+  setField @l record (Map.insert key value env)
 
-withReturnType :: (MonadChecker m) => Maybe PlumeType -> m a -> m a
-withReturnType = with @"returnType"
+insertWith
+  :: forall l a
+   . (HasField l CheckState a)
+  => (a -> a -> a)
+  -> a
+  -> Checker ()
+insertWith f value = do
+  modify $ \s -> setField @l s (f value (getField @l s))
 
-withGenerics :: (MonadChecker m) => [(Text, Int)] -> m a -> m a
-withGenerics gens =
-  with' @"generics" (fromList gens <>)
-
-with
-  :: forall l a m b
-   . (MonadChecker m, HasField l CheckerState a, Semigroup a)
+pushConstraint
+  :: forall l a
+   . (HasField l Constraints [a])
   => a
-  -> m b
-  -> m b
-with v = with' @l (v <>)
+  -> Checker ()
+pushConstraint c = do
+  modify $ \s ->
+    s
+      { constraints =
+          setField @l
+            s.constraints
+            (getField @l s.constraints ++ [c])
+      }
 
-with'
-  :: forall l a m b
-   . (MonadChecker m, HasField l CheckerState a)
-  => (a -> a)
-  -> m b
-  -> m b
-with' f m = do
-  old <- readIORef checkerST
-  writeIORef checkerST (setField @l old (f (getField @l old)))
-  a <- m
-  new <- readIORef checkerST
-  writeIORef checkerST (setField @l new (getField @l old))
-  return a
+searchEnv
+  :: forall l a
+   . (HasField l Environment (Map Text a))
+  => Text
+  -> Checker (Maybe a)
+searchEnv name = do
+  env <- get <&> environment
+  pure $ search @l name env
 
-instance Semigroup SourcePos where
-  p <> _ = p
+insertEnv
+  :: forall l a
+   . (HasField l Environment (Map Text a))
+  => Text
+  -> a
+  -> Checker ()
+insertEnv name value = do
+  env <- get <&> environment
+  let rec' = insert @l name value env
+  modify $ \s -> setField @"environment" s rec'
+
+deleteEnv
+  :: forall l a
+   . (HasField l Environment (Map Text a))
+  => Text
+  -> Checker ()
+deleteEnv name = do
+  env <- get <&> environment
+  let rec' = setField @l env (Map.delete name (getField @l env))
+  modify $ \s -> setField @"environment" s rec'
+
+replaceEnv
+  :: forall l a
+   . (HasField l Environment (Map Text a))
+  => Map Text a
+  -> Checker ()
+replaceEnv value = do
+  env <- get <&> environment
+  modify $ \s -> setField @"environment" s (setField @l env value)
+
+insertEnvWith
+  :: forall l a
+   . (HasField l Environment (Map Text a))
+  => (Map Text a -> Map Text a -> Map Text a)
+  -> Map Text a
+  -> Checker ()
+insertEnvWith f value = do
+  env <- get <&> environment
+  let env' = getField @l env
+  modify $ \s ->
+    setField @"environment" s (setField @l env (f value env'))
+
+fresh :: Checker PlumeType
+fresh = do
+  n <- get <&> nextTyVar
+  modify $ \s -> s {nextTyVar = n + 1}
+  pure $ TypeVar (MkTyVar n)
+
+instantiate :: PlumeScheme -> Checker PlumeType
+instantiate (Forall vars ty) = do
+  subst <- Map.fromList <$> traverse (\v -> (v,) <$> fresh) vars
+  pure $ apply subst ty
+
+fetchPosition :: Checker Position
+fetchPosition = do
+  pos <- get <&> positions
+  case viaNonEmpty last pos of
+    Nothing -> error "No position found in checker state"
+    Just p -> pure p
+
+trackPosition :: Position -> Checker a -> Checker a
+trackPosition pos action = do
+  modify $ \s -> s {positions = positions s ++ [pos]}
+  action
+
+withPosition :: Position -> Checker a -> Checker a
+withPosition pos action = do
+  oldPos <- get <&> positions
+  modify $ \s -> s {positions = positions s ++ [pos]}
+  a <- action
+  modify $ \s -> s {positions = oldPos}
+  pure a
+
+localPosition :: Checker a -> Checker a
+localPosition action = do
+  oldPos <- get <&> positions
+  a <- action
+  modify $ \s -> s {positions = oldPos}
+  pure a
+
+maybeM :: (Applicative f) => Maybe t -> (t -> f a) -> f (Maybe a)
+maybeM (Just x) f = Just <$> f x
+maybeM Nothing _ = pure Nothing
+
+extractFromArray :: Checker (b, [a]) -> Checker (b, a)
+extractFromArray ls = do
+  (t, xs) <- ls
+  case xs of
+    [x] -> pure (t, x)
+    r ->
+      throw $
+        CompilerError $
+          "Expected a single element, received: " <> show (length r)
+
+updateSubst :: Substitution -> Checker ()
+updateSubst s2 = do
+  s1 <- getSubst
+  modify $ \st ->
+    st {constraints = st.constraints {substitution = s2 <> s1}}
+
+getSubst :: Checker Substitution
+getSubst = gets (substitution . constraints)
+
+instance MonadReader CheckState Checker where
+  ask = get
+  local f action = do
+    s <- get
+    put (f s)
+    a <- action
+    modify $ \st ->
+      st
+        { environment = s.environment
+        , returnType = s.returnType
+        }
+    pure a

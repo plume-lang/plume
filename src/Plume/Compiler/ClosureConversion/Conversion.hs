@@ -14,6 +14,10 @@ type MonadClosure m = (MonadIO m, MonadError Text m)
 globalVars :: IORef (S.Set Text)
 globalVars = unsafePerformIO $ newIORef S.empty
 
+{-# NOINLINE functions #-}
+functions :: IORef (M.Map Text Int)
+functions = unsafePerformIO $ newIORef M.empty
+
 {-# NOINLINE closedCounter #-}
 closedCounter :: IORef Int
 closedCounter = unsafePerformIO $ newIORef 0
@@ -49,7 +53,7 @@ closeClosure args e = do
   let env = free e S.\\ (S.fromList args <> globalV <> res)
 
   name <- newLambdaName
-  modifyIORef' globalVars (<> S.singleton name)
+  modifyIORef' reserved (<> S.singleton name)
 
   let envVars = fromList $ zip (S.toList env) [0 ..]
   let envDict =
@@ -87,16 +91,29 @@ closeExpression
   :: (MonadClosure m)
   => Pre.UntypedExpr
   -> m ([Post.ClosedProgram], Post.ClosedExpr)
-closeExpression (Pre.UEVar x) = pure ([], Post.CEVar x)
+closeExpression (Pre.UEVar x) = do
+  res <- readIORef reserved
+  if x `S.member` res
+    then do
+      funs <- readIORef functions
+      case M.lookup x funs of
+        Just arity -> do
+          let args = [x <> "_arg" <> show i | i <- [0 .. arity - 1]]
+          let lambda =
+                Pre.UEClosure
+                  args
+                  (Pre.USReturn (Pre.UEApplication (Pre.UEVar x) (map Pre.UEVar args)))
+          closeExpression lambda
+        Nothing -> pure ([], Post.CEVar x)
+    else pure ([], Post.CEVar x)
 closeExpression (Pre.UELiteral l) = pure ([], Post.CELiteral l)
 closeExpression (Pre.UEList es) = (Post.CEList <$>) . sequence <$> traverse closeExpression es
 closeExpression Pre.UESpecial = pure ([], Post.CESpecial)
 closeExpression (Pre.UEApplication f args) = do
   res <- readIORef reserved
-  gv <- readIORef globalVars
   (p2s, args') <- sequence <$> traverse closeExpression args
   case f of
-    Pre.UEVar x | x `S.member` (res <> gv) -> do
+    Pre.UEVar x | x `S.member` res -> do
       pure (p2s, Post.CEApplication (Post.CEVar x) args')
     _ -> do
       name <- newCallName
@@ -185,11 +202,13 @@ makeReturnBody e = Post.CSExpr (Post.CEBlock $ makeReturn e)
 closeProgram
   :: (MonadClosure m) => Pre.UntypedProgram -> m [Post.ClosedProgram]
 closeProgram (Pre.UPFunction name args e) = do
-  modifyIORef' globalVars (<> S.singleton name)
+  modifyIORef' reserved (<> S.singleton name)
+  modifyIORef' functions (M.insert name (length args))
   (stmts, e') <- closeStatement e
   pure $ stmts ++ [Post.CPFunction name args (makeReturnStmt e')]
 closeProgram (Pre.UPNativeFunction fp name arity) = do
   modifyIORef' reserved (S.insert name)
+  modifyIORef' functions (M.insert name arity)
   pure [Post.CPNativeFunction fp name arity]
 closeProgram (Pre.UPStatement s) = do
   (stmts, s') <- closeStatement s

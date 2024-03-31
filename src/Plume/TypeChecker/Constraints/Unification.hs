@@ -1,26 +1,39 @@
 module Plume.TypeChecker.Constraints.Unification where
 
-import Data.Map qualified as M
-import Data.Set qualified as S
+import Data.Map qualified as Map
+import Data.Set qualified as Set
+import Plume.TypeChecker.Constraints.Definition
 import Plume.TypeChecker.Monad
 
-variable :: Int -> PlumeType -> Either TypeError Substitution
+infix 4 `unifiesTo`
+
+unifiesTo :: PlumeType -> PlumeType -> Checker ()
+t1 `unifiesTo` t2 = do
+  p <- fetchPosition
+  pushConstraint @"tyConstraints" (p, t1 :~: t2)
+
+doesExtend :: PlumeType -> Text -> PlumeType -> Checker ()
+doesExtend t n a = do
+  p <- fetchPosition
+  pushConstraint @"extConstraints" (p, DoesExtend t n a)
+
+variable :: TyVar -> PlumeType -> Either TypeError Substitution
 variable n t
-  | t == TVar n = Right M.empty
-  | n `S.member` free t =
+  | t == TypeVar n = Right Map.empty
+  | n `Set.member` free t =
       Left (InfiniteType n t)
-  | otherwise = Right $ M.singleton n t
+  | otherwise = Right $ Map.singleton n t
 
 mgu
   :: PlumeType
   -> PlumeType
   -> Either TypeError Substitution
-mgu (TVar i) t = variable i t
-mgu t (TVar i) = variable i t
-mgu (TApp t1 t2) (TApp t3 t4) = mguMany (t2 ++ [t1]) (t4 ++ [t3])
-mgu t1@(TId n) t2@(TId n') =
+mgu (TypeVar i) t = variable i t
+mgu t (TypeVar i) = variable i t
+mgu (TypeApp t1 t2) (TypeApp t3 t4) = mguMany (t2 ++ [t1]) (t4 ++ [t3])
+mgu t1@(TypeId n) t2@(TypeId n') =
   if n == n'
-    then Right M.empty
+    then Right Map.empty
     else Left (UnificationFail t1 t2)
 mgu t1 t2 = Left (UnificationFail t1 t2)
 
@@ -28,9 +41,9 @@ mguMany
   :: [PlumeType]
   -> [PlumeType]
   -> Either TypeError Substitution
-mguMany [] [] = Right M.empty
+mguMany [] [] = Right Map.empty
 mguMany (t1 : t1s) (t2 : t2s) = do
   s1 <- mgu t1 t2
   s2 <- mguMany (apply s1 t1s) (apply s1 t2s)
-  return $ compose s2 s1
+  return $ s2 <> s1
 mguMany t1s t2s = Left (UnificationMismatch t1s t2s)
