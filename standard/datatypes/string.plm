@@ -12,3 +12,9 @@ extend (c: str) with
   show() => "\"{c}\""
   len() => string_length(c)
   
+extend (c: [str]) with
+  join(sep: str) =>
+    switch c
+      case [] => ""
+      case [x] => x
+      case [x, ..xs] => x + sep + xs.join(sep)
