@@ -5,6 +5,8 @@ native "natives.dylib" to_string<A>(x: A): str
 extend (c: str) with
   operator + (d: str) => add_str(c, d)
   operator * (d: int) => mul_str(c, d)
+  show() => "\"{c}\""
 
 extend (c: int) with
   show() => to_string(c)
+  
