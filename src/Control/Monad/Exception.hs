@@ -9,7 +9,7 @@ import System.IO.Pretty
 import Text.Megaparsec
 
 class Throwable a where
-  showError :: a -> Text
+  showError :: (HasCallStack) => a -> Text
   default showError :: (ANSIPretty a) => a -> Text
   showError e =
     renderStrict $
