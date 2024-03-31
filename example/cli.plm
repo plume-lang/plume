@@ -1,24 +1,20 @@
 require "std:string"
 
-type Argument =
-  WithArgument(str, str)
-  NoArgument(str)
+type Error<T> =
+  Ok(T)
+  Err(str)
 
-extend (c: Argument) with
-  show(): str =>
-    switch c
-      case WithArgument(name, value) => "-{name} {value}"
-      case NoArgument(name) => name
+extend<T> (this: Error<T>) with
+  show(showHelper: (T) -> str): str =>
+    switch this
+      case Ok(t) => "Ok({t.showHelper()})"
+      case Err(e) => "Err({e.show()})"
 
-type List<A> =
-  Nil
-  Cons(A, List<A>)
+  map<B>(f: (T) -> B): Error<B> =>
+    switch this
+      case Ok(t) => Ok(f(t))
+      case Err(e) => Err(e)
 
-extend<A> (c: List<A>) with
-  show(showHelper: (A) -> str): str =>
-    switch c
-      case Nil => "Nil"
-      case Cons(x, xs) => x.showHelper() + " :: " + xs.show(showHelper)
-
-ls = Cons(5, Cons(6, Nil))
-println(ls.show(show))
+err: Error<str> = Ok("Hello, ")
+x: Error<str> = err.map((s) => s + "world!")
+println(x.show(show))
