@@ -6,7 +6,6 @@ import Control.Monad.Exception
 import Data.Text.IO hiding (putStr)
 import Plume.Compiler.Bytecode.Assembler hiding (nativeLibraries)
 import Plume.Compiler.Bytecode.Serialize
-
 import Plume.Compiler.Bytecode.Syntax
 import Plume.Compiler.ClosureConversion.Conversion
 import Plume.Compiler.Desugaring.Desugar
