@@ -24,4 +24,5 @@ dir = pathlib.Path(__file__).parent.parent.resolve() / "standard"
 os.environ['PLUME_PATH'] = str(dir)
 
 system(f'bin/plume-language{ext} {file}')
-system(f'bin/plume-vm{ext} {file.removesuffix('.plm')}.bin')
+without_ext = file.removesuffix('.plm')
+system(f'bin/plume-vm{ext} {without_ext}.bin')
