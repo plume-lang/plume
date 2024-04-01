@@ -88,3 +88,8 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           path: ${{ github.workspace }}/plume-${{ matrix.os }}.zip
+
+      - name: Upload artifact to latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: plume-${{ matrix.os }}.zip
