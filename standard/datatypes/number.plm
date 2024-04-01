@@ -1,21 +1,21 @@
-native "std:native.dylib" add_int(x: int, y: int): int
-native "std:native.dylib" sub_int(x: int, y: int): int
-native "std:native.dylib" mul_int(x: int, y: int): int
-native "std:native.dylib" div_int(x: int, y: int): int
-native "std:native.dylib" mod_int(x: int, y: int): int
-native "std:native.dylib" float_to_int(x: float): int
-native "std:native.dylib" int_to_float(x: int): float
-native "std:native.dylib" eq_int(x: int, y: int): bool
-native "std:native.dylib" lt_int(x: int, y: int): bool
+native "std:native" add_int(x: int, y: int): int
+native "std:native" sub_int(x: int, y: int): int
+native "std:native" mul_int(x: int, y: int): int
+native "std:native" div_int(x: int, y: int): int
+native "std:native" mod_int(x: int, y: int): int
+native "std:native" float_to_int(x: float): int
+native "std:native" int_to_float(x: int): float
+native "std:native" eq_int(x: int, y: int): bool
+native "std:native" lt_int(x: int, y: int): bool
 
-native "std:native.dylib" add_float(x: float, y: float): float
-native "std:native.dylib" sub_float(x: float, y: float): float
-native "std:native.dylib" mul_float(x: float, y: float): float
-native "std:native.dylib" div_float(x: float, y: float): float
-native "std:native.dylib" mod_float(x: float, y: float): float
-native "std:native.dylib" pow_float(x: float, y: float): float
-native "std:native.dylib" eq_float(x: float, y: float): bool
-native "std:native.dylib" lt_float(x: float, y: float): bool
+native "std:native" add_float(x: float, y: float): float
+native "std:native" sub_float(x: float, y: float): float
+native "std:native" mul_float(x: float, y: float): float
+native "std:native" div_float(x: float, y: float): float
+native "std:native" mod_float(x: float, y: float): float
+native "std:native" pow_float(x: float, y: float): float
+native "std:native" eq_float(x: float, y: float): bool
+native "std:native" lt_float(x: float, y: float): bool
 
 require "string"
 require "bool"

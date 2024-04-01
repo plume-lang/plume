@@ -1,8 +1,8 @@
 require "string"
 
-native "std:native.dylib" list_append<A>(x: [A], y: A): [A]
-native "std:native.dylib" list_prepend<A>(x: [A], y: A): [A]
-native "std:native.dylib" list_concat<A>(x: [A], y: [A]): [A]
+native "std:native" list_append<A>(x: [A], y: A): [A]
+native "std:native" list_prepend<A>(x: [A], y: A): [A]
+native "std:native" list_concat<A>(x: [A], y: [A]): [A]
 
 extend<A> (c: [A]) with
   append(d: A) => list_append(c, d)

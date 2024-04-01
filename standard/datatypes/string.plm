@@ -1,8 +1,8 @@
-native "std:native.dylib" add_str(x: str, y: str): str
-native "std:native.dylib" mul_str(x: str, y: int): str
-native "std:native.dylib" to_string<A>(x: A): str
-native "std:native.dylib" string_length(x: str): int
-native "std:native.dylib" eq_string(x: str, y: str): bool
+native "std:native" add_str(x: str, y: str): str
+native "std:native" mul_str(x: str, y: int): str
+native "std:native" to_string<A>(x: A): str
+native "std:native" string_length(x: str): int
+native "std:native" eq_string(x: str, y: str): bool
 
 extend (c: str) with
   operator + (d: str) => add_str(c, d)
