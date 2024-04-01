@@ -198,6 +198,9 @@ assembleProgram (Pre.DPFunction n args stmts) = do
           }
       res <- concatMapM assembleStmt stmts
 
+      modifyIORef' assemblerState $ \s ->
+        s {locals = mempty, currentSize = s.currentSize + length res}
+
       return
         ( [BC.MakeLambda (length res) (length (args <> freed))]
             ++ res
