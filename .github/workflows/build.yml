@@ -82,7 +82,7 @@ jobs:
       
       - name: Create ZIP archive on Windows
         if: startsWith(matrix.os, 'windows')
-        run: Compress-Archive -CompressionLevel Optimal -Force -Path bin, standard, README.md LICENSE -DestinationPath plume-${{matrix.os}}.zip
+        run: Compress-Archive -CompressionLevel Optimal -Force -Path bin, standard, README.md, LICENSE -DestinationPath plume-${{matrix.os}}.zip
 
       - name: Archive production artifacts
         uses: actions/upload-artifact@v3
