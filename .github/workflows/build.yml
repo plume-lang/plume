@@ -32,7 +32,6 @@ jobs:
       
       - name: Checking for dependencies
         run: |
-          cc --version
           python3 --version
           xmake --version --root
     
