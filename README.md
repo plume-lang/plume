@@ -1,5 +1,6 @@
 <br/>
 <p align="center">
+  <img src="docs/logo.png" style="border-radius:25px" width="128">
   <h3 align="center">The Plume Programming Language</h3>
 
   <p align="center">
