@@ -4,13 +4,19 @@
 #include <string.h>
 #include <value.h>
 
-#ifdef WIN32
-#include <io.h>
-#define F_OK 0
-#define access _access
-#else
-#include <unistd.h>
-#endif
+typedef int bool;
+#define true 1
+#define false 0
+
+bool file_exists(const char* filename) {
+  FILE* fp = fopen(filename, "r");
+  bool is_exist = false;
+  if (fp != NULL) {
+    is_exist = true;
+    fclose(fp);
+  }
+  return is_exist;
+}
 
 void print_helper(Value v) {
   switch (v.type) {
@@ -68,7 +74,7 @@ Value does_file_exist(int arg_n, Module* mod, Value* args) {
   ASSERT(args[0].type == VALUE_STRING,
          "DoesFileExists expects a string argument");
 
-  return MAKE_INTEGER(access(args[0].string_value, F_OK) == 0);
+  return MAKE_INTEGER(file_exists(args[0].string_value));
 }
 
 Value get_args(int arg_n, Module* mod, Value* args) {
