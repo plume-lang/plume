@@ -1,20 +1,12 @@
-require "std:string"
+err: Result<str, str> = Ok("Hello, ")
+x: Result<str, str> = err.map((s) => s.concat("world!"))
+y = x.isOk()
+println(x.show(show, show))
+println(y.show())
 
-type Error<T> =
-  Ok(T)
-  Err(str)
+x = 5.exp()
+println(x.show())
 
-extend<T> (this: Error<T>) with
-  show(showHelper: (T) -> str): str =>
-    switch this
-      case Ok(t) => "Ok({t.showHelper()})"
-      case Err(e) => "Err({e.show()})"
-
-  map<B>(f: (T) -> B): Error<B> =>
-    switch this
-      case Ok(t) => Ok(f(t))
-      case Err(e) => Err(e)
-
-err: Error<str> = Ok("Hello, ")
-x: Error<str> = err.map((s) => s + "world!")
-println(x.show(show))
+ls = [0, 1, 2]
+println(ls)
+println(ls.flatMap((x) => [x, x + 1, x]))
