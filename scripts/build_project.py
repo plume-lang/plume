@@ -36,9 +36,8 @@ system(f"cp {executable} bin/{executable_name}")
 
 runtime_executable = f"plume-vm{'.exe' if platform.system() == 'Windows' else ''}"
 
-os.chdir('runtime')
-system('xmake b plume-vm')
-os.chdir('..')
+system('xmake --root -P runtime')
 system(f"cp runtime/bin/{runtime_executable} bin/{runtime_executable}")
+system("xmake --root -P standard")
 
 print('Build ran successfully')
