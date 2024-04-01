@@ -32,6 +32,8 @@ index-*
 bc
 *.bin
 *.dylib
+*.so
+*.dll
 build
 .xmake
 .vscode
