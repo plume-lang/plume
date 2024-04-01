@@ -83,3 +83,66 @@ Value eq_string(int arg_n, Module* mod, Value* args) {
 
   return MAKE_INTEGER(strcmp(args[0].string_value, args[1].string_value) == 0);
 }
+
+Value list_append(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 2) THROW("List_append expects 2 arguments");
+  ASSERT(args[0].type == VALUE_LIST,
+         "List_append expects a list as the first argument");
+
+  Value list = args[0];
+  Value value = args[1];
+
+  ValueList new_list;
+  new_list.length = list.list_value.length + 1;
+  new_list.values = malloc(new_list.length * sizeof(Value));
+
+  for (int i = 0; i < list.list_value.length; i++) {
+    new_list.values[i] = list.list_value.values[i];
+  }
+
+  new_list.values[list.list_value.length] = value;
+
+  return MAKE_LIST(new_list);
+}
+
+Value list_prepend(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 2) THROW("List_prepend expects 2 arguments");
+  ASSERT(args[0].type == VALUE_LIST,
+         "List_prepend expects a list as the first argument");
+
+  Value list = args[0];
+  Value value = args[1];
+
+  ValueList new_list;
+  new_list.length = list.list_value.length + 1;
+  new_list.values = malloc(new_list.length * sizeof(Value));
+
+  new_list.values[0] = value;
+  for (int i = 0; i < list.list_value.length; i++) {
+    new_list.values[i + 1] = list.list_value.values[i];
+  }
+
+  return MAKE_LIST(new_list);
+}
+
+Value list_concat(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 2) THROW("List_concat expects 2 arguments");
+  ASSERT(args[0].type == VALUE_LIST && args[1].type == VALUE_LIST,
+         "List_concat expects list arguments");
+
+  ValueList new_list;
+  new_list.length = args[0].list_value.length + args[1].list_value.length;
+  new_list.values = malloc(new_list.length * sizeof(Value));
+
+  size_t sz = args[0].list_value.length;
+
+  for (int i = 0; i < args[0].list_value.length; i++) {
+    new_list.values[i] = args[0].list_value.values[i];
+  }
+
+  for (int i = 0; i < args[1].list_value.length; i++) {
+    new_list.values[i + sz] = args[1].list_value.values[i];
+  }
+
+  return MAKE_LIST(new_list);
+}

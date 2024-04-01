@@ -1,0 +1,25 @@
+require "string"
+
+native "std:native.dylib" list_append<A>(x: [A], y: A): [A]
+native "std:native.dylib" list_prepend<A>(x: [A], y: A): [A]
+native "std:native.dylib" list_concat<A>(x: [A], y: [A]): [A]
+
+extend<A> (c: [A]) with
+  append(d: A) => list_append(c, d)
+  prepend(d: A) => list_prepend(c, d)
+  concat(d: [A]) => list_concat(c, d)
+
+  map<B>(f: (A) -> B): [B] =>
+    switch c
+      case [] => []
+      case [x, ..xs] => xs.map(f).prepend(f(x))
+  
+  flatMap<B>(f: (A) -> [B]): [B] =>
+    switch c
+      case [] => []
+      case [x_, ..xs_] => 
+        x1 = f(x_)
+        x2 = xs_.flatMap(f)
+        return x1.concat(x2)
+
+  show(showHelper: (A) -> str): str => "[{c.map(showHelper).join(", ")}]"

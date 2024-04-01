@@ -1,0 +1,7 @@
+type Dict<V> =
+  Empty
+  Node(str, V, Dict<V>)
+
+extend<V> (this: Dict<V>) with
+  
+  

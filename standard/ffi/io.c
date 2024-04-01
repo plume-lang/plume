@@ -55,7 +55,7 @@ Value print(int arg_n, Module* mod, Value* args) {
 }
 
 Value println(int arg_n, Module* mod, Value* args) {
-  print(arg_n, mod, args);
+  print_helper(args[0]);
   printf("\n");
   return MAKE_INTEGER(0);
 }
