@@ -55,8 +55,11 @@ Value print(int arg_n, Module* mod, Value* args) {
 }
 
 Value println(int arg_n, Module* mod, Value* args) {
-  print_helper(args[0]);
-  printf("\n");
+  if (arg_n < 1) THROW("Print expects at least 1 argument");
+  Value v = args[0];
+  ASSERT(v.type == VALUE_STRING, "Println expects a string argument");
+
+  printf("%s\n", v.string_value);
   return MAKE_INTEGER(0);
 }
 

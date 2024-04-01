@@ -7,11 +7,19 @@ native "std:native.dylib" float_to_int(x: float): int
 native "std:native.dylib" int_to_float(x: int): float
 native "std:native.dylib" eq_int(x: int, y: int): bool
 native "std:native.dylib" lt_int(x: int, y: int): bool
+
+native "std:native.dylib" add_float(x: float, y: float): float
+native "std:native.dylib" sub_float(x: float, y: float): float
+native "std:native.dylib" mul_float(x: float, y: float): float
+native "std:native.dylib" div_float(x: float, y: float): float
+native "std:native.dylib" mod_float(x: float, y: float): float
+native "std:native.dylib" pow_float(x: float, y: float): float
 native "std:native.dylib" eq_float(x: float, y: float): bool
 native "std:native.dylib" lt_float(x: float, y: float): bool
 
 require "string"
 require "bool"
+require "list"
 
 infix 3 ^
 
@@ -50,13 +58,6 @@ extend (c: int) with
 
   negate(): int => 0 - c
 
-native "std:native.dylib" add_float(x: float, y: float): float
-native "std:native.dylib" sub_float(x: float, y: float): float
-native "std:native.dylib" mul_float(x: float, y: float): float
-native "std:native.dylib" div_float(x: float, y: float): float
-native "std:native.dylib" mod_float(x: float, y: float): float
-native "std:native.dylib" pow_float(x: float, y: float): float
-
 extend (c: float) with
   operator * (d: float) => mul_float(c, d)
   operator / (d: float) => div_float(c, d)
@@ -77,3 +78,20 @@ extend (c: float) with
 @e = 2.718282
 expf(x: float): float => @e ^ x
 exp(x: int): float => expf(x.to_float())
+
+extend (c: [int]) with
+  sum(): int =>
+    switch c
+      case [] => 0
+      case [x, ..xs] => x + xs.sum()
+
+  product(): int =>
+    switch c
+      case [] => 1
+      case [x, ..xs] => x * xs.product()
+
+range(start: int, end: int): [int] =>
+  if start < end then
+    return range(start + 1, end).prepend(start)
+  else 
+    return []
