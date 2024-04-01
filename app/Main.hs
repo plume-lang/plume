@@ -14,13 +14,11 @@ import Plume.Compiler.Desugaring.Desugar
 import Plume.Compiler.SSA
 import Plume.Compiler.TypeErasure.EraseType
 import Plume.Syntax.Abstract.Internal.Pretty ()
-import Plume.Syntax.Parser
 import Plume.Syntax.Parser.Modules.ParseImports
 import Plume.Syntax.Translation.ConcreteToAbstract
 import Plume.TypeChecker.Checker
 import System.Directory
 import System.FilePath
-import System.IO.Pretty
 import Prelude hiding (putStrLn, readFile)
 
 fromEither :: a -> Either b a -> a
