@@ -5,7 +5,8 @@ on:
       - '*'
 
 permissions:
-  contents: read
+  contents: write
+  
 
 jobs:
   build:
