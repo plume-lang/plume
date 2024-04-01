@@ -15,6 +15,14 @@ import Plume.Syntax.Translation.ConcreteToAbstract.UFCS
 import Plume.Syntax.Translation.Generics
 import System.Directory
 import System.FilePath
+import System.Info
+
+sharedLibExt :: String
+sharedLibExt = case os of
+  "darwin" -> "dylib"
+  "linux" -> "so"
+  "mingw32" -> "dll"
+  _ -> error "Unsupported operating system"
 
 interpretSpreadable
   :: Spreadable [AST.Expression] AST.Expression -> AST.Expression
@@ -124,7 +132,7 @@ concreteToAbstract (CST.ETypeExtension g ann ems) = do
     fmap flat . sequence <$> mapM concreteToAbstractExtensionMember ems
   transRet $ AST.ETypeExtension g ann <$> ems'
 concreteToAbstract (CST.ENativeFunction fp n gens t) = do
-  let strModName = toString fp
+  let strModName = toString fp -<.> sharedLibExt
   let isStd = "std:" `T.isPrefixOf` fp
   cwd <- ask
   let modPath =
