@@ -16,8 +16,10 @@ type Desugar'' = Desugar Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
 type DesugarSwitch =
   (Desugar'', Desugar') -> Desugar''
 
-desugarSwitch :: DesugarSwitch
-desugarSwitch (fExpr, _) (Pre.CESwitch x cases) = do
+type IsToplevel = Bool
+
+desugarSwitch :: IsToplevel -> DesugarSwitch
+desugarSwitch isTop (fExpr, _) (Pre.CESwitch x cases) = do
   (x', stmts) <- fExpr x
   let (conds, maps) = unzip $ map (createCondition x' . fst) cases
 
@@ -30,7 +32,8 @@ desugarSwitch (fExpr, _) (Pre.CESwitch x cases) = do
           (i, expr, m) -> do
             let pat = maybeAt i conds
             (expr', stmts'') <- fExpr expr
-            let stmts''' = substituteMany (M.toList m) (stmts'' <> [Post.DSReturn expr'])
+            let lastStmt = if isTop then Post.DSReturn expr' else Post.DSExpr expr'
+            let stmts''' = substituteMany (M.toList m) (stmts'' <> [lastStmt])
             case pat of
               Just conds_ -> do
                 let cond = createConditionExpr conds_
@@ -42,7 +45,7 @@ desugarSwitch (fExpr, _) (Pre.CESwitch x cases) = do
   let ifs' = createIfsStatement $ concat res
 
   return (Post.DEVar "nil", stmts <> ifs')
-desugarSwitch _ _ = error "Received incorrect expression, not a switch."
+desugarSwitch _ _ _ = error "Received incorrect expression, not a switch."
 
 createConditionExpr :: [Post.DesugaredExpr] -> Post.DesugaredExpr
 createConditionExpr [] = Post.DELiteral (LBool True)

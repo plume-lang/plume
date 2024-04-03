@@ -13,74 +13,76 @@ import Plume.Syntax.Translation.Generics
 import Plume.Compiler.Desugaring.Modules.ANF
 import Plume.Compiler.Desugaring.Modules.Switch
 
-desugarExpr :: Desugar Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
-desugarExpr = \case
+desugarExpr
+  :: IsToplevel -> Desugar Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
+desugarExpr isTop = \case
   Pre.CESpecial -> return' Post.DESpecial
   Pre.CEVar x -> return' $ Post.DEVar x
-  x@(Pre.CEApplication _ _) -> desugarANF desugarExpr x
+  x@(Pre.CEApplication _ _) -> desugarANF (desugarExpr isTop) x
   Pre.CELiteral x -> return' $ Post.DELiteral x
   Pre.CEList xs -> do
-    (xs', stmts) <- mapAndUnzipM desugarExpr xs
+    (xs', stmts) <- mapAndUnzipM (desugarExpr isTop) xs
     return (Post.DEList xs', concat stmts)
   Pre.CEProperty x i -> do
-    (x', stmts) <- desugarExpr x
+    (x', stmts) <- desugarExpr isTop x
     return (Post.DEProperty x' i, stmts)
   Pre.CEDictionary xs -> do
     (dicts, stmts) <-
       mapAndUnzipM
         ( \(i, x) -> do
-            (x', stmts) <- desugarExpr x
+            (x', stmts) <- desugarExpr isTop x
             return (M.singleton i x', stmts)
         )
         (M.toList xs)
     let m = mconcat dicts
     return (Post.DEDictionary m, concat stmts)
-  c@Pre.CEConditionBranch {} -> desugarANF desugarExpr c
+  c@Pre.CEConditionBranch {} -> desugarANF (desugarExpr isTop) c
   Pre.CEEqualsType x t -> do
-    (x', stmts) <- desugarExpr x
+    (x', stmts) <- desugarExpr isTop x
     return (Post.DEEqualsTo (Post.DETypeOf x') (Post.DELiteral (LString t)), stmts)
-  d@(Pre.CEDeclaration {}) -> desugarANF desugarExpr d
-  s@(Pre.CESwitch {}) -> desugarSwitch (desugarExpr, desugarStatement) s
+  d@(Pre.CEDeclaration {}) -> desugarANF (desugarExpr isTop) d
+  s@(Pre.CESwitch {}) -> desugarSwitch isTop (desugarExpr isTop, desugarStatement isTop) s
   Pre.CEBlock xs -> do
-    res <- concat <$> mapM desugarStatement xs
+    res <- concat <$> mapM (desugarStatement isTop) xs
     return (Post.DEVar "nil", createBlock res)
   Pre.CEAnd x y -> do
-    (x', stmts1) <- desugarExpr x
-    (y', stmts2) <- desugarExpr y
+    (x', stmts1) <- desugarExpr isTop x
+    (y', stmts2) <- desugarExpr isTop y
     return (Post.DEAnd x' y', stmts1 ++ stmts2)
   Pre.CEIndex x y -> do
-    (x', stmts1) <- desugarExpr x
-    (y', stmts2) <- desugarExpr y
+    (x', stmts1) <- desugarExpr isTop x
+    (y', stmts2) <- desugarExpr isTop y
     return (Post.DEIndex x' y', stmts1 ++ stmts2)
 
 desugarStatement
-  :: Desugar Pre.ClosedStatement [ANFResult (Maybe Post.DesugaredStatement)]
-desugarStatement = \case
+  :: IsToplevel
+  -> Desugar Pre.ClosedStatement [ANFResult (Maybe Post.DesugaredStatement)]
+desugarStatement isTop = \case
   Pre.CSExpr x -> do
-    (x', stmts) <- desugarExpr x
+    (x', stmts) <- desugarExpr isTop x
     case x' of
       Post.DEVar "nil" -> return [(Nothing, stmts)]
       _ -> return [(Just $ Post.DSExpr x', stmts)]
   Pre.CSReturn x -> do
-    (x', stmts) <- desugarExpr x
+    (x', stmts) <- desugarExpr False x
     return [(Just $ Post.DSReturn x', stmts)]
   Pre.CSDeclaration n e -> do
-    (e', stmts) <- desugarExpr e
+    (e', stmts) <- desugarExpr False e
     return [(Just $ Post.DSDeclaration n e', stmts)]
   Pre.CSConditionBranch x y z -> do
-    (x', stmts1) <- desugarExpr x
-    ys <- desugarStatement y
-    zs <- desugarStatement z
+    (x', stmts1) <- desugarExpr False x
+    ys <- desugarStatement isTop y
+    zs <- desugarStatement isTop z
     return
       [(Just $ Post.DSConditionBranch x' (createBlock ys) (createBlock zs), stmts1)]
 
 desugarProgram :: Pre.ClosedProgram -> IO [Post.DesugaredProgram]
 desugarProgram = \case
   Pre.CPFunction x xs y -> do
-    ys <- desugarStatement y
+    ys <- desugarStatement True y
     return [Post.DPFunction x xs (createBlock ys)]
   Pre.CPStatement x -> do
-    x' <- desugarStatement x
+    x' <- desugarStatement False x
     return $ map Post.DPStatement $ createBlock x'
   Pre.CPNativeFunction fp x y -> do
     modifyIORef' nativeFunctions $ Set.insert x
