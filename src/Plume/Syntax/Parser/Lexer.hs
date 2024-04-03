@@ -303,6 +303,19 @@ indent p = do
       return (x : xs)
     else return []
 
+indentOne :: Parser a -> Parser a
+indentOne p = do
+  ilevel <- ask
+  level <- eol >> optional (try emptyLineWithEOL) >> consumeIndents
+  if level > ilevel
+    then local (const level) p
+    else
+      fail $
+        "Indentation level mismatch, expected "
+          <> show ilevel
+          <> " but received "
+          <> show level
+
 indentSepBy :: Parser a -> Parser b -> Parser [a]
 indentSepBy p sep = do
   ilevel <- ask
@@ -320,6 +333,18 @@ indentSepBy p sep = do
 -- If it's not, then it returns Nothing
 indentSameOrNothing :: Int -> Parser a -> Parser (Maybe a)
 indentSameOrNothing = (optional <$>) . indentSame
+
+indentSameOrHigher :: Int -> Parser a -> Parser a
+indentSameOrHigher ilevel p = do
+  level <- eol *> optional (try emptyLineWithEOL) *> consumeIndents
+  if level >= ilevel
+    then local (const level) p
+    else
+      fail $
+        "Indentation level mismatch, expected "
+          ++ show ilevel
+          ++ " but received "
+          ++ show level
 
 -- Indent parser that takes a parser and applies it only and only if the
 -- indentation level is equal to the current indentation level or on the

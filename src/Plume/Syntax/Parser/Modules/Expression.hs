@@ -42,6 +42,10 @@ indentOrInline :: Parser Expression
 indentOrInline = do
   eBlock parseStatement <|> eExpression
 
+indentOrInlineGen :: Parser a -> Parser a
+indentOrInlineGen p = do
+  indentOne p <|> p
+
 -- Actual parsing functions
 
 gGeneric :: Parser PlumeGeneric
@@ -357,28 +361,11 @@ eExpression = eLocated $ do
     Postfix $
       makeUnaryOp $
         choice
-          [ do
-              arguments <- do
-                _ <- symbol "("
-                ilevel <- ask
-
-                -- Parsing function call args either inlined or indented
-                args <-
-                  indentSepBy eExpression comma
-                    <|> (eExpression `sepBy` comma)
-
-                _ <- indentSameOrInline ilevel $ symbol ")"
-                return args
-
-              -- Optional syntaxic sugar for callback argument
-              lambdaArg <- optional $ do
-                _ <- symbol "=>"
-                EClosure [] Nothing <$> indentOrInline
-
-              return \e -> EApplication e (arguments ++ maybeToList lambdaArg)
+          [ functionCallOperator
           , -- Record selection e.x where e may be a record and x a label to
             -- select from the record
             EProperty <$> (char '.' *> field <* scn)
+          , try $ EProperty <$> indentOne (char '.' *> field)
           ]
 
 tRequire :: Parser Expression
@@ -400,6 +387,32 @@ tCustomOperator = do
   name <- some operator
   let op = map (\n -> CustomOperator n prec opTy) name
   modifyIORef' customOperators (op <>)
+
+functionCallOperator :: Parser (Expression -> Expression)
+functionCallOperator = do
+  arguments <- do
+    _ <- symbol "("
+    ilevel <- ask
+
+    -- Parsing function call args either inlined or indented
+    args <-
+      indentSepBy eExpression comma
+        <|> (eExpression `sepBy` comma)
+
+    _ <-
+      indentSameOrInline ilevel (symbol ")")
+        <|> indentSameOrHigher ilevel (symbol ")")
+
+    return args
+
+  -- Optional syntaxic sugar for callback argument
+  lambdaArg <- optional $ do
+    _ <- symbol "=>"
+    EClosure [] Nothing <$> indentOrInline
+
+  let newArgs = arguments ++ maybeToList lambdaArg
+
+  return $ flip EApplication newArgs
 
 parseToplevel :: Parser (Maybe Expression)
 parseToplevel =
