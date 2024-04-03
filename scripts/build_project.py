@@ -17,7 +17,9 @@ if not os.path.isdir('runtime'):
 # Build the compiler project
 system('cabal build')
 
-executable_name = f"plume-language{'.exe' if platform.system() == 'Windows' else ''}"
+ext = '.out' if platform.system() == 'Windows' else ''
+
+executable_name = f"plume-language{ext}"
 
 found_executables = glob(f"dist-newstyle/**/{executable_name}", recursive=True)
 executable_files = [file for file in found_executables if os.path.isfile(file)]
@@ -27,17 +29,19 @@ if len(executable_files) == 0:
   exit(1)
 
 executable = executable_files[0]
+executable_out = f"plumec{ext}"
 
 if not os.path.isdir('bin'): os.mkdir('bin')
 
-system(f"cp {executable} bin/{executable_name}")
+system(f"cp {executable} bin/{executable_out}")
 
 # Build the runtime project
 
-runtime_executable = f"plume-vm{'.exe' if platform.system() == 'Windows' else ''}"
+runtime_executable = f"plume-vm{ext}"
+runtime_executable_out = f"plume{ext}"
 
 system('xmake --root -P runtime')
-system(f"cp runtime/bin/{runtime_executable} bin/{runtime_executable}")
+system(f"cp runtime/bin/{runtime_executable} bin/{runtime_executable_out}")
 system("xmake --root -P standard")
 
 print('Build ran successfully')
