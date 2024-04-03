@@ -34,19 +34,21 @@ findExtensionWithType
 findExtensionWithType n t fallback = do
   sub <- getSubst
   exts <- apply sub . Set.toList <$> gets extensions
+
+  let extOriginTy = case t of
+        (ty : _) :->: _ -> ty
+        _ -> fallback
+
   let found =
         filter
           ( \(MkExtension n' ty (Forall _ sndTy)) ->
               n == n'
-                && ( case mgu t sndTy of
-                      Right _ -> True
-                      Left _ | isNotTVar fallback -> isRight (mgu fallback ty)
-                      _ -> False
-                   )
+                && isRight (mgu ty extOriginTy)
+                && isRight (mgu t sndTy)
           )
           exts
   case found of
-    [ext] -> pure $ Right ext
+    [ext'] -> pure $ Right ext'
     [] -> Left <$> throw' (NoExtensionFound n t)
     _ -> do
       let found' = map (\(MkExtension _ ty _) -> ty) found
@@ -118,3 +120,10 @@ solveExtend (_ : xs) = solveExtend xs
 solveExtend [] = do
   s <- getSubst
   pure (s, [])
+
+solveConstraints :: Constraints -> Checker Substitution
+solveConstraints cs = do
+  writeIORef cyclicCounter 0
+  s <- solve cs.tyConstraints
+  (s', _) <- resolveCyclic cs.extConstraints
+  pure $ s' <> s

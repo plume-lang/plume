@@ -12,6 +12,11 @@ t1 `unifiesTo` t2 = do
   p <- fetchPosition
   pushConstraint @"tyConstraints" (p, t1 :~: t2)
 
+createConstraint :: TypeConstraint -> Checker PlumeConstraint
+createConstraint c = do
+  p <- fetchPosition
+  pure (p, c)
+
 doesExtend :: PlumeType -> Text -> PlumeType -> Checker ()
 doesExtend t n a = do
   p <- fetchPosition
@@ -30,7 +35,7 @@ mgu
   -> Either TypeError Substitution
 mgu (TypeVar i) t = variable i t
 mgu t (TypeVar i) = variable i t
-mgu (TypeApp t1 t2) (TypeApp t3 t4) = mguMany (t2 ++ [t1]) (t4 ++ [t3])
+mgu (TypeApp t1 t2) (TypeApp t3 t4) = mguMany (t1 : t2) (t3 : t4)
 mgu t1@(TypeId n) t2@(TypeId n') =
   if n == n'
     then Right Map.empty

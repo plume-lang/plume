@@ -6,6 +6,8 @@ import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Common.Annotation
 import Plume.TypeChecker.Checker.Closure (createEnvFromAnnotations)
 import Plume.TypeChecker.Checker.Monad
+import Plume.TypeChecker.Constraints.Definition
+import Plume.TypeChecker.Constraints.Solver
 import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
@@ -57,26 +59,35 @@ synthExtMember
     let argSchemes = createEnvFromAnnotations convertedArgs
     let schemes = Map.insert extVar (Forall [] extTy) argSchemes
     insertEnvWith @"typeEnv" (<>) schemes
-    (retTy, body') <- extractFromArray $ infer body
-
-    retTy `unifiesTo` convertedRet
+    ((retTy, body'), cs) <- getLocalConstraints $ extractFromArray $ infer body
 
     let closureTy = (extTy : map (.annotationValue) convertedArgs) :->: retTy
 
-    convertedTy `unifiesTo` closureTy
+    c1 <- createConstraint (convertedTy :~: closureTy)
+    c2 <- createConstraint (retTy :~: convertedRet)
 
-    let newScheme = Forall (extGens <> convertedGenerics) closureTy
-    let newExt = MkExtension name extTy newScheme
+    let cs' = cs.tyConstraints <> [c1, c2]
+
+    writeIORef cyclicCounter 0
+    s1 <- solve cs'
+
+    let newScheme = Forall (apply s1 $ extGens <> convertedGenerics) (apply s1 closureTy)
+    let newExt = apply s1 $ MkExtension name extTy newScheme
 
     modifyIORef' checkState $ \s ->
       s {extensions = Set.delete ext (extensions s) <> Set.singleton newExt}
 
-    pure
-      ( Post.EExtensionDeclaration
-          name
-          extTy
-          (Annotation extVar extTy)
-          (Post.EClosure convertedArgs retTy body')
-      )
+    (s2, _) <- resolveCyclic (cs.extConstraints)
+    let s3 = s2 <> s1
+
+    modifyIORef' checkState $ \s ->
+      s {extensions = Set.insert newExt (extensions s)}
+
+    pure . apply s3 $
+      Post.EExtensionDeclaration
+        name
+        extTy
+        (Annotation extVar extTy)
+        (Post.EClosure convertedArgs retTy body')
 synthExtMember _ _ _ =
   throw $ CompilerError "Only extension members are supported"

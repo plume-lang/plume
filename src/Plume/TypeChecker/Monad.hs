@@ -23,10 +23,12 @@ module Plume.TypeChecker.Monad (
   pushConstraint,
   getSubst,
   updateSubst,
+  getLocalConstraints,
 ) where
 
 import Control.Monad.Except
 import Control.Monad.Exception
+import Data.List qualified as L
 import Data.Map qualified as Map
 import Data.Text.IO qualified as T
 import GHC.Records
@@ -241,3 +243,41 @@ instance MonadReader CheckState Checker where
         , returnType = s.returnType
         }
     pure a
+
+getLocalConstraints :: Checker a -> Checker (a, Constraints)
+getLocalConstraints m = do
+  old <- readIORef checkState
+  a <- m
+  s <- readIORef checkState
+  writeIORef
+    checkState
+    ( old
+        { constraints = removeNewEntriesCons s.constraints old.constraints
+        , nextTyVar = s.nextTyVar
+        , extensions = s.extensions
+        , positions = s.positions
+        }
+    )
+  let sCons = s.constraints
+      oCons = old.constraints
+  let mkCons =
+        MkConstraints
+          (sCons.tyConstraints L.\\ oCons.tyConstraints)
+          (sCons.extConstraints L.\\ oCons.extConstraints)
+          (sCons.substitution <> oCons.substitution)
+  return (a, mkCons)
+
+removeNewEntriesCons :: Constraints -> Constraints -> Constraints
+removeNewEntriesCons xs ys =
+  MkConstraints
+    (removeNewEntries ty1 ty2)
+    (removeNewEntries ext1 ext2)
+    (xs.substitution <> ys.substitution)
+ where
+  ty1 = xs.tyConstraints
+  ty2 = ys.tyConstraints
+  ext1 = xs.extConstraints
+  ext2 = ys.extConstraints
+
+removeNewEntries :: (Eq a) => [a] -> [a] -> [a]
+removeNewEntries xs ys = xs L.\\ (xs L.\\ ys)
