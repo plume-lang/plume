@@ -1,8 +1,10 @@
 require "string"
 
-native "std:native" list_append<A>(x: [A], y: A): [A]
-native "std:native" list_prepend<A>(x: [A], y: A): [A]
-native "std:native" list_concat<A>(x: [A], y: [A]): [A]
+native "std:native" with
+  list_append<A>(x: [A], y: A): [A]
+  list_prepend<A>(x: [A], y: A): [A]
+  list_concat<A>(x: [A], y: [A]): [A]
+  ffi_get_index<A>(x: [A], i: int): Option<A>
 
 extend<A> (c: [A]) with
   append(d: A) => list_append(c, d)
@@ -23,3 +25,5 @@ extend<A> (c: [A]) with
         return x1.concat(x2)
 
   show(showHelper: (A) -> str): str => "[{c.map(showHelper).join(", ")}]"
+
+  get_index(i: int): Option<A> => ffi_get_index(c, i)

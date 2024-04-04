@@ -4,6 +4,8 @@
 #include <string.h>
 #include <value.h>
 
+#include "cons.h"
+
 Value add_str(int arg_n, Module* mod, Value* args) {
   if (arg_n != 2) THROW("Add expects 2 arguments");
   ASSERT(args[0].type == VALUE_STRING && args[1].type == VALUE_STRING,
@@ -145,4 +147,17 @@ Value list_concat(int arg_n, Module* mod, Value* args) {
   }
 
   return MAKE_LIST(new_list);
+}
+
+Value get_index_str(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 2) THROW("GetIndex expects 2 arguments");
+  ASSERT(args[0].type == VALUE_STRING && args[1].type == VALUE_INT,
+         "GetIndex expects string and integer arguments");
+
+  int idx = args[1].int_value;
+  char* str = args[0].string_value;
+
+  if (idx < 0 || idx >= strlen(str)) return make_none();
+
+  return make_some(MAKE_CHAR(str[idx]));
 }

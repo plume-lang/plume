@@ -3,6 +3,7 @@ native "std:native" mul_str(x: str, y: int): str
 native "std:native" to_string<A>(x: A): str
 native "std:native" string_length(x: str): int
 native "std:native" eq_string(x: str, y: str): bool
+native "std:native" get_index_str(x: str, i: int): Option<char>
 
 extend (c: str) with
   operator + (d: str) => add_str(c, d)
@@ -11,6 +12,8 @@ extend (c: str) with
   concat(d: str) => c + d
   show() => "\"{c}\""
   len() => string_length(c)
+
+  get_index(i: int): Option<char> => get_index_str(c, i)
   
 extend (c: [str]) with
   join(sep: str) =>

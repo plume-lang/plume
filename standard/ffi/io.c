@@ -4,6 +4,8 @@
 #include <string.h>
 #include <value.h>
 
+#include "cons.h"
+
 typedef int bool;
 #define true 1
 #define false 0
@@ -87,4 +89,17 @@ Value execute_command(int arg_n, Module* mod, Value* args) {
          "ExecuteCommand expects a string argument");
 
   return MAKE_INTEGER(system(args[0].string_value));
+}
+
+Value ffi_get_index(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 2) THROW("GetIndex expects 2 arguments");
+  ASSERT(args[0].type == VALUE_LIST, "GetIndex expects a list argument");
+  ASSERT(args[1].type == VALUE_INT, "GetIndex expects an integer argument");
+
+  int idx = args[1].int_value;
+  ValueList l = args[0].list_value;
+
+  if (idx < 0 || idx >= l.length) return make_none();
+
+  return make_some(l.values[idx]);
 }
