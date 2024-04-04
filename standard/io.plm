@@ -1,8 +1,8 @@
 native "std:native" print(x: str): int
-native "std:native" println<A>(x: A): int
+native "std:native" println(x: str): int
 native "std:native" get_args(): [str]
 native "std:native" does_file_exist(path: str): bool
-native "std:native" execute_command(path: str): str
+native "std:native" execute_command(path: str): int
 
 @print(x) =>
   print(x.show())
