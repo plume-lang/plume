@@ -58,6 +58,7 @@ data ConcreteExpression t
       (ConcreteExpression t)
   | EBlock [ConcreteExpression t]
   | EProperty Text (ConcreteExpression t)
+  | EListIndex (ConcreteExpression t) (ConcreteExpression t)
   | ERequire Text
   | ELocated (ConcreteExpression t) Position
   | EMacro Text (ConcreteExpression t)

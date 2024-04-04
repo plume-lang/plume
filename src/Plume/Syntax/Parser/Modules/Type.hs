@@ -37,7 +37,11 @@ tTuple = do
     case tys of
       [] -> TUnit
       [x] -> x
-      _ -> TTuple tys
+      _ -> buildTuple tys
+ where
+  buildTuple [] = TUnit
+  buildTuple [x] = x
+  buildTuple (x : xs) = TTuple [x, buildTuple xs]
 
 -- [t] where t is a concrete type. It represents list where the list's elements
 -- are of t's type

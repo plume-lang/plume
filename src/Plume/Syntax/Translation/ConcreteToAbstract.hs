@@ -127,6 +127,10 @@ concreteToAbstract (CST.EReturn e) = do
   -- them into a block.
   e' <- fmap interpretSpreadable <$> concreteToAbstract e
   transRet $ AST.EReturn <$> e'
+concreteToAbstract (CST.EListIndex e i) = do
+  e' <- shouldBeAlone <$> concreteToAbstract e
+  i' <- shouldBeAlone <$> concreteToAbstract i
+  transRet $ AST.EApplication (AST.EVariable "get_index") <$> sequence [e', i']
 concreteToAbstract (CST.ETypeExtension g ann ems) = do
   ems' <-
     fmap flat . sequence <$> mapM concreteToAbstractExtensionMember ems

@@ -10,14 +10,24 @@ parsePattern :: Parser Pattern
 parsePattern =
   choice
     [ parseWildcard
+    , parseTuple
     , parseList
+    , parseLiteral
     , try parseConstructor
     , parseVariable
-    , parseLiteral
     ]
 
 parseVariable :: Parser Pattern
 parseVariable = PVariable <$> identifier
+
+parseTuple :: Parser Pattern
+parseTuple = do
+  items <- parens (parsePattern `sepBy` comma)
+  return $ buildTuple items
+ where
+  buildTuple [] = PVariable "unit"
+  buildTuple [x] = x
+  buildTuple (x : xs) = PConstructor "tuple" [x, buildTuple xs]
 
 parseLiteral :: Parser Pattern
 parseLiteral =

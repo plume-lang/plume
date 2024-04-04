@@ -94,6 +94,7 @@ prettyExpr _ (EClosure as t e) =
   ppRet (Just t') = ":" <+> prettyTy t'
 prettyExpr _ (EBlock es) =
   line <> indent 4 (vsep (map (prettyExpr 0) es))
+prettyExpr _ (EListIndex e1' e2') = prettyExpr 0 e1' <> brackets (prettyExpr 0 e2')
 prettyExpr _ (ERequire l) = anCol Blue "require" <+> anCol Green (dquotes $ pretty l)
 prettyExpr _ (ELocated e _) = prettyExpr 0 e
 prettyExpr _ (EMacro n e) = anCol Yellow "@" <> anCol Yellow (pretty n) <+> "=" <+> prettyExpr 0 e

@@ -352,6 +352,15 @@ pattern CustomPrefix, CustomPostfix :: Text -> Expression -> Expression
 pattern CustomPrefix name e = EApplication (EVariable name) [e]
 pattern CustomPostfix name e = EApplication (EVariable name) [e]
 
+eTuple :: Parser Expression
+eTuple = do
+  tuple <- parens (eExpression `sepBy` comma)
+  return (buildTuple tuple)
+ where
+  buildTuple [] = EVariable "unit"
+  buildTuple [x] = x
+  buildTuple (x : xs) = EApplication (EVariable "tuple") [x, buildTuple xs]
+
 -- Main expression parsing function
 eExpression :: Parser Expression
 eExpression = eLocated $ do
@@ -361,7 +370,8 @@ eExpression = eLocated $ do
  where
   eTerm =
     choice
-      [ parseLiteral eExpression
+      [ try eTuple
+      , parseLiteral eExpression
       , eList
       , try eMacroApplication
       , eMacroVariable
@@ -388,6 +398,7 @@ eExpression = eLocated $ do
             -- select from the record
             EProperty <$> (char '.' *> field <* scn)
           , try $ EProperty <$> indentOne (char '.' *> field)
+          , flip EListIndex <$> brackets eExpression
           ]
 
 tRequire :: Parser [Expression]

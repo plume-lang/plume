@@ -25,10 +25,10 @@ pattern TFunction args ret = TApp (TApp (TId "->") [ret]) args
 pattern xs :->: ret = TFunction xs ret
 
 pattern TTuple :: [PlumeType] -> PlumeType
-pattern TTuple ts = TApp (TId ",") ts
+pattern TTuple ts = TApp (TId "tuple") ts
 
 pattern TList :: PlumeType -> PlumeType
-pattern TList t = TApp (TId "[]") [t]
+pattern TList t = TApp (TId "list") [t]
 
 pattern TCon :: Text -> [PlumeType] -> PlumeType
 pattern TCon s ts = TApp (TId s) ts
@@ -39,4 +39,4 @@ pattern TBool = TId "bool"
 pattern TString = TId "str"
 pattern TChar = TId "char"
 pattern TFloat = TId "float"
-pattern TUnit = TTuple []
+pattern TUnit = TId "unit"
