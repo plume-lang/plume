@@ -17,7 +17,7 @@ if not os.path.isdir('runtime'):
 # Build the compiler project
 system('cabal build')
 
-ext = '.out' if platform.system() == 'Windows' else ''
+ext = '.exe' if platform.system() == 'Windows' else ''
 
 executable_name = f"plume{ext}"
 
