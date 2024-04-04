@@ -54,7 +54,7 @@ synthExtMember
 
     let ext = MkExtension name extTy sch
     modifyIORef' checkState $ \s ->
-      s {extensions = Set.insert ext s.extensions}
+      s {extensions = removeDuplicates $ Set.insert ext s.extensions}
 
     let argSchemes = createEnvFromAnnotations convertedArgs
     let schemes = Map.insert extVar (Forall [] extTy) argSchemes
@@ -75,13 +75,16 @@ synthExtMember
     let newExt = apply s1 $ MkExtension name extTy newScheme
 
     modifyIORef' checkState $ \s ->
-      s {extensions = Set.delete ext (extensions s) <> Set.singleton newExt}
+      s
+        { extensions =
+            removeDuplicates $ Set.delete ext (extensions s) <> Set.singleton newExt
+        }
 
     (s2, _) <- resolveCyclic (cs.extConstraints)
     let s3 = s2 <> s1
 
     modifyIORef' checkState $ \s ->
-      s {extensions = Set.insert newExt (extensions s)}
+      s {extensions = removeDuplicates $ Set.insert newExt (extensions s)}
 
     pure . apply s3 $
       Post.EExtensionDeclaration
@@ -91,3 +94,17 @@ synthExtMember
         (Post.EClosure convertedArgs retTy body')
 synthExtMember _ _ _ =
   throw $ CompilerError "Only extension members are supported"
+
+removeDuplicates :: Set Extension -> Set Extension
+removeDuplicates xs = Set.fromList $ go (Set.toList xs) []
+ where
+  go [] acc = acc
+  go (x : xs') acc
+    | doesExtensionExist x acc = go xs' acc
+    | otherwise = go xs' (x : acc)
+
+  doesExtensionExist :: Extension -> [Extension] -> Bool
+  doesExtensionExist e@(MkExtension n1 t1 (Forall _ s1)) (MkExtension n2 t2 (Forall _ s2) : xs')
+    | n1 == n2 && (isRight (mgu t1 t2) || isRight (mgu s1 s2)) = True
+    | otherwise = doesExtensionExist e xs'
+  doesExtensionExist _ [] = False

@@ -16,8 +16,8 @@ rtti (TypeId n) = Single n
 
 createCondition
   :: TypedExpression PlumeType -> RTTIResult -> [TypedExpression PlumeType]
-createCondition e (Item (Single "[]") [x]) =
-  [EEqualsType e "[]"] <> createCondition (EIndex e (ELiteral (LInt 0))) x
+createCondition e (Item (Single "list") [x]) =
+  [EEqualsType e "list"] <> createCondition (EIndex e (ELiteral (LInt 0))) x
 createCondition e (Single n) = [EEqualsType e n]
 createCondition _ Nil = []
 createCondition e (Item (Single x) xs) =

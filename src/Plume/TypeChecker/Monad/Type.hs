@@ -20,10 +20,10 @@ pattern TFunction args ret = TypeApp (TypeApp (TypeId "->") [ret]) args
 pattern xs :->: ret = TFunction xs ret
 
 pattern TTuple :: [PlumeType] -> PlumeType
-pattern TTuple ts = TypeApp (TypeId ",") ts
+pattern TTuple ts = TypeApp (TypeId "tuple") ts
 
 pattern TList :: PlumeType -> PlumeType
-pattern TList t = TypeApp (TypeId "[]") [t]
+pattern TList t = TypeApp (TypeId "list") [t]
 
 pattern TInt, TBool, TString, TChar, TFloat, TUnit :: PlumeType
 pattern TInt = TypeId "int"
@@ -31,4 +31,4 @@ pattern TBool = TypeId "bool"
 pattern TString = TypeId "str"
 pattern TChar = TypeId "char"
 pattern TFloat = TypeId "float"
-pattern TUnit = TTuple []
+pattern TUnit = TypeId "unit"
