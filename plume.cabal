@@ -1,5 +1,5 @@
 cabal-version:   3.0
-name:            plume-language
+name:            plume
 version:         0.1.0.0
 license:         MIT
 license-file:    LICENSE
@@ -134,7 +134,7 @@ library
         relude (Relude as Prelude),
         relude
 
-executable plume-language
+executable plume
     main-is:            Main.hs
     hs-source-dirs:     app
     default-language:   GHC2021
@@ -142,7 +142,7 @@ executable plume-language
     ghc-options:        -Wall
     build-depends:
         base ^>=4.19.0.0,
-        plume-language,
+        plume,
         megaparsec ^>=9.6.1,
         relude,
         filepath,
@@ -153,7 +153,7 @@ executable plume-language
         relude (Relude as Prelude),
         relude
 
-test-suite plume-language-test
+test-suite plume-test
     type:             exitcode-stdio-1.0
     main-is:          Main.hs
     hs-source-dirs:   test
@@ -161,4 +161,4 @@ test-suite plume-language-test
     ghc-options:      -Wall
     build-depends:
         base ^>=4.19.0.0,
-        plume-language
+        plume
