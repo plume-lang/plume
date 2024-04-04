@@ -35,7 +35,6 @@ instance Free Pre.DesugaredStatement where
   free (Pre.DSExpr e) = free e
   free (Pre.DSReturn e) = free e
   free (Pre.DSDeclaration n e) = [n] <> free e
-  free (Pre.DSConditionBranch e1 e2 e3) = free e1 <> foldMap free e2 <> foldMap free e3
 
 instance Free Pre.DesugaredProgram where
   free (Pre.DPFunction name _ _) = List.singleton name
@@ -111,8 +110,8 @@ assemble (Pre.DEDictionary es) = do
   pure $ es' ++ [BC.MakeList $ length es]
 assemble (Pre.DEIf e1 e2 e3) = do
   e1' <- assemble e1
-  e2' <- assemble e2
-  e3' <- assemble e3
+  e2' <- concatMapM assembleStmt e2
+  e3' <- concatMapM assembleStmt e3
   pure $
     e1'
       ++ [BC.JumpIfRel $ if containsReturn e2' then length e2' + 1 else length e2' + 2]
@@ -150,16 +149,6 @@ assembleStmt (Pre.DSExpr e) = assemble e
 assembleStmt (Pre.DSReturn e) = do
   e' <- assemble e
   pure $ e' ++ [BC.Return]
-assembleStmt (Pre.DSConditionBranch e1 e2 e3) = do
-  e1' <- assemble e1
-  e2' <- concatMapM assembleStmt e2
-  e3' <- concatMapM assembleStmt e3
-  pure $
-    e1'
-      ++ [BC.JumpIfRel $ if containsReturn e2' then length e2' + 1 else length e2' + 2]
-      ++ e2'
-      ++ [BC.JumpRel $ length e3' + 1 | not (containsReturn e2')]
-      ++ e3'
 assembleStmt (Pre.DSDeclaration n e) = do
   e' <- assemble e
   AssemblerState {locals, globals} <- readIORef assemblerState

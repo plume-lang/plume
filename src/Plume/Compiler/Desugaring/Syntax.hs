@@ -11,7 +11,7 @@ data DesugaredExpr
   | DEIndex DesugaredExpr DesugaredExpr
   | DEProperty DesugaredExpr Int
   | DEDictionary (IntMap DesugaredExpr)
-  | DEIf DesugaredExpr DesugaredExpr DesugaredExpr
+  | DEIf DesugaredExpr [DesugaredStatement] [DesugaredStatement]
   | DETypeOf DesugaredExpr
   | DEIsConstructor DesugaredExpr Text
   | DEEqualsTo DesugaredExpr DesugaredExpr
@@ -26,7 +26,6 @@ data DesugaredStatement
   = DSExpr DesugaredExpr
   | DSReturn DesugaredExpr
   | DSDeclaration Text DesugaredExpr
-  | DSConditionBranch DesugaredExpr [DesugaredStatement] [DesugaredStatement]
   deriving (Eq, Show, Ord)
 
 data DesugaredProgram
@@ -42,8 +41,6 @@ instance Substitutable DesugaredStatement DesugaredExpr where
   substitute (name, expr) (DSDeclaration n e)
     | n == name = DSDeclaration n expr
     | otherwise = DSDeclaration n (substitute (name, expr) e)
-  substitute s (DSConditionBranch e1 e2 e3) =
-    DSConditionBranch (substitute s e1) (substitute s e2) (substitute s e3)
 
 instance Substitutable DesugaredExpr DesugaredExpr where
   substitute s (DEVar x)

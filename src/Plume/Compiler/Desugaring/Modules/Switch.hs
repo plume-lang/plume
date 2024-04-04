@@ -17,9 +17,10 @@ type DesugarSwitch =
   (Desugar'', Desugar') -> Desugar''
 
 type IsToplevel = Bool
+type IsReturned = Bool
 
-desugarSwitch :: IsToplevel -> DesugarSwitch
-desugarSwitch isTop (fExpr, _) (Pre.CESwitch x cases) = do
+desugarSwitch :: (IsToplevel, IsReturned) -> DesugarSwitch
+desugarSwitch (isNotTop, isReturned) (fExpr, _) (Pre.CESwitch x cases) = do
   (x', stmts) <- fExpr x
   let (conds, maps) = unzip $ map (createCondition x' . fst) cases
 
@@ -32,12 +33,15 @@ desugarSwitch isTop (fExpr, _) (Pre.CESwitch x cases) = do
           (i, expr, m) -> do
             let pat = maybeAt i conds
             (expr', stmts'') <- fExpr expr
-            let lastStmt = if isTop then Post.DSReturn expr' else Post.DSExpr expr'
+            let lastStmt =
+                  if isNotTop && not isReturned
+                    then Post.DSReturn expr'
+                    else Post.DSExpr expr'
             let stmts''' = substituteMany (M.toList m) (stmts'' <> [lastStmt])
             case pat of
               Just conds_ -> do
                 let cond = createConditionExpr conds_
-                return [Post.DSConditionBranch cond stmts''' []]
+                return [Post.DSExpr $ Post.DEIf cond stmts''' []]
               Nothing ->
                 return stmts'''
       )
@@ -56,21 +60,10 @@ createIfsStatement
   :: [Post.DesugaredStatement]
   -> [Post.DesugaredStatement]
 createIfsStatement [] = []
-createIfsStatement (Post.DSConditionBranch c t [] : xs)
+createIfsStatement (Post.DSExpr (Post.DEIf c t []) : xs)
   | c == Post.DELiteral (LBool True) = t
-  | otherwise = [Post.DSConditionBranch c t (createIfsStatement xs)]
-createIfsStatement _ = []
-
-createIfs
-  :: [([Post.DesugaredExpr], Post.DesugaredExpr)] -> Post.DesugaredExpr
-createIfs [x] = snd x
-createIfs ((cond, body) : xs) =
-  if cond' == Post.DELiteral (LBool True)
-    then body
-    else Post.DEIf cond' body (createIfs xs)
- where
-  cond' = createConditionExpr cond
-createIfs [] = error "Switch should have at least one case."
+  | otherwise = [Post.DSExpr (Post.DEIf c t (createIfsStatement xs))]
+createIfsStatement (x : xs) = x : createIfsStatement xs
 
 createLets :: Map Text Post.DesugaredExpr -> [Post.DesugaredStatement]
 createLets = M.foldrWithKey (\k v acc -> Post.DSDeclaration k v : acc) []

@@ -22,7 +22,7 @@ removeDeadCodeStmt _ e = Just e
 
 doesContainReturn :: DesugaredStatement -> Bool
 doesContainReturn (DSReturn _) = True
-doesContainReturn (DSConditionBranch _ e1 e2) =
+doesContainReturn (DSExpr (DEIf _ e1 e2)) =
   any doesContainReturn e1 || any doesContainReturn e2
 doesContainReturn _ = False
 
@@ -69,7 +69,6 @@ instance Free DesugaredStatement where
   free (DSExpr e) = free e
   free (DSReturn e) = free e
   free (DSDeclaration n e) = free e S.\\ S.singleton n
-  free (DSConditionBranch e1 e2 e3) = free e1 <> free e2 <> free e3
 
 instance Free DesugaredProgram where
   free (DPFunction n args stmts) = free stmts S.\\ (S.fromList args <> S.singleton n)
