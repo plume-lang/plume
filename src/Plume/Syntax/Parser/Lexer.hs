@@ -389,11 +389,11 @@ sameLine p = try $ do
 -- no indentation.
 -- This indent sensitive parsing function is quite special as it does not
 -- consume any newlines. Often used to parse top-level constructs.
-nonIndented :: Parser (Maybe a) -> Parser (Maybe a)
+nonIndented :: Parser a -> Parser (Maybe a)
 nonIndented p = do
   ilevel <- consumeIndents
   if ilevel == 0
-    then local (const 0) p
+    then Just <$> local (const 0) p
     else do
       p' <- optional (notFollowedBy eol)
       case p' of

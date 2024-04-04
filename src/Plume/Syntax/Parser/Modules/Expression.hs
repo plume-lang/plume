@@ -27,6 +27,13 @@ eLocated p = do
   end <- getSourcePos
   return (res :>: (start, end))
 
+eLocatedMany :: Parser [Expression] -> Parser [Expression]
+eLocatedMany p = do
+  start <- getSourcePos
+  res <- p
+  end <- getSourcePos
+  return (map (:>: (start, end)) res)
+
 -- Used to parse variable annotations such as (x: t)
 -- where x is an identifier and t is a concrete type
 annotated :: Parser (Annotation (Maybe PlumeType))
@@ -160,14 +167,14 @@ eClosure = do
   clMonoArg = pure <$> (Annotation <$> identifier <*> pure Nothing)
   clPolyArg = parens (annotated `sepBy` comma)
 
-eExtension :: Parser Expression
+eExtension :: Parser [Expression]
 eExtension = do
   _ <- reserved "extend"
   gens <- option [] $ angles (gGeneric `sepBy` comma)
   ty <- parens ((:@:) <$> (identifier <* colon) <*> tType)
   _ <- reserved "with"
   members <- indent eExtensionMember
-  return (ETypeExtension gens ty members)
+  return [ETypeExtension gens ty members]
 
 eExtensionMember :: Parser (ExtensionMember PlumeType)
 eExtensionMember =
@@ -213,13 +220,13 @@ indentOrInlineTC = do
       [] -> fail "Block should contain at least one expression"
       _ -> return bl
 
-eType :: Parser Expression
+eType :: Parser [Expression]
 eType = do
   _ <- reserved "type"
   name <- identifier
   gens <- option [] $ angles (gGeneric `sepBy` comma)
   void $ symbol "="
-  EType (Annotation name gens) <$> indentOrInlineTC
+  (: []) . EType (Annotation name gens) <$> indentOrInlineTC
 
 typeConstructor :: Parser (TypeConstructor PlumeType)
 typeConstructor =
@@ -228,7 +235,7 @@ typeConstructor =
     , TVariable <$> identifier
     ]
 
-eNativeFunction :: Parser Expression
+eNativeFunction :: Parser [Expression]
 eNativeFunction = do
   _ <- reserved "native"
   path <- stringLiteral
@@ -237,7 +244,22 @@ eNativeFunction = do
   args <- parens ((optional (identifier >> colon) *> tType) `sepBy` comma)
   ret <- symbol ":" *> tType
   let funTy = args :->: ret
-  return (ENativeFunction path name gens funTy)
+  return [ENativeFunction path name gens funTy]
+
+eNativeGroup :: Parser [Expression]
+eNativeGroup = do
+  _ <- reserved "native"
+  path <- stringLiteral
+  _ <- reserved "with"
+  indent (nativeFun path)
+ where
+  nativeFun path = do
+    name <- identifier
+    gens <- option [] (angles (identifier `sepBy` comma))
+    args <- parens ((optional (identifier >> colon) *> tType) `sepBy` comma)
+    ret <- symbol ":" *> tType
+    let funTy = args :->: ret
+    return (ENativeFunction path name gens funTy)
 
 -- name(a: t1, b: t2, ..., z: tn): ret -> e where name is the function name,
 -- parenthesized elements are function arguments, ret is function return type
@@ -271,19 +293,19 @@ eSwitch = do
   branches <- indent eCasePattern
   return (ESwitch cond branches)
 
-eMacro :: Parser Expression
+eMacro :: Parser [Expression]
 eMacro = do
   name <- try $ char '@' *> identifier <* symbol "="
-  EMacro name <$> indentOrInline
+  (: []) . EMacro name <$> indentOrInline
 
-eMacroFunction :: Parser Expression
+eMacroFunction :: Parser [Expression]
 eMacroFunction = do
   (name, args) <- try $ do
     name <- char '@' *> identifier
     args <- parens (identifier `sepBy` comma)
     _ <- symbol "=>"
     return (name, args)
-  EMacroFunction name args <$> indentOrInline
+  (: []) . EMacroFunction name args <$> indentOrInline
 
 eMacroVariable :: Parser Expression
 eMacroVariable = EMacroVariable <$> (char '@' *> identifier)
@@ -368,12 +390,12 @@ eExpression = eLocated $ do
           , try $ EProperty <$> indentOne (char '.' *> field)
           ]
 
-tRequire :: Parser Expression
+tRequire :: Parser [Expression]
 tRequire = do
   _ <- reserved "require"
-  ERequire <$> stringLiteral
+  (: []) . ERequire <$> stringLiteral
 
-tCustomOperator :: Parser ()
+tCustomOperator :: Parser [Expression]
 tCustomOperator = do
   opTy <-
     choice
@@ -387,6 +409,7 @@ tCustomOperator = do
   name <- some operator
   let op = map (\n -> CustomOperator n prec opTy) name
   modifyIORef' customOperators (op <>)
+  mempty
 
 functionCallOperator :: Parser (Expression -> Expression)
 functionCallOperator = do
@@ -414,24 +437,23 @@ functionCallOperator = do
 
   return $ flip EApplication newArgs
 
-parseToplevel :: Parser (Maybe Expression)
+parseToplevel :: Parser [Expression]
 parseToplevel =
-  try (tCustomOperator $> Nothing)
-    <|> ( Just
-            <$> eLocated
-              ( choice
-                  [ tRequire
-                  , eType
-                  , eNativeFunction
-                  , eExtension
-                  , eMacroFunction
-                  , eMacro
-                  , parseStatement
-                  ]
-              )
-        )
+  eLocatedMany
+    ( choice
+        [ tCustomOperator
+        , tRequire
+        , eType
+        , try eNativeGroup
+        , eNativeFunction
+        , eExtension
+        , eMacroFunction
+        , eMacro
+        , (: []) <$> parseStatement
+        ]
+    )
 
 parseProgram :: Parser Program
 parseProgram =
-  catMaybes
+  concat . catMaybes
     <$> many (nonIndented parseToplevel <* optional indentSc)
