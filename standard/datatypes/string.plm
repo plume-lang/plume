@@ -4,6 +4,8 @@ native "std:native" to_string<A>(x: A): str
 native "std:native" string_length(x: str): int
 native "std:native" eq_string(x: str, y: str): bool
 native "std:native" get_index_str(x: str, i: int): Option<char>
+native "std:native" char_to_string(x: char): str
+native "std:native" eq_char(x: char, y: char): bool
 
 extend (c: str) with
   operator + (d: str) => add_str(c, d)
@@ -21,3 +23,8 @@ extend (c: [str]) with
       case [] => ""
       case [x] => x
       case [x, ..xs] => x + sep + xs.join(sep)
+
+extend (c: char) with
+  show() => "'{char_to_string(c)}'"
+  to_str(): str => char_to_string(c)
+  operator ==(d: char) => c == d

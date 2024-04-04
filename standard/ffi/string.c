@@ -161,3 +161,25 @@ Value get_index_str(int arg_n, Module* mod, Value* args) {
 
   return make_some(MAKE_CHAR(str[idx]));
 }
+
+Value char_to_string(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 1) THROW("CharToString expects 1 argument");
+  ASSERT(args[0].type == VALUE_STRING,
+         "CharToString expects a string argument");
+
+  return MAKE_STRING(args[0].string_value);
+}
+
+Value eq_char(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 2) THROW("Eq expects 2 arguments");
+  ASSERT(args[0].type == VALUE_STRING && args[1].type == VALUE_STRING,
+         "Eq expects string arguments");
+
+  ASSERT(strlen(args[0].string_value) == 1 && strlen(args[1].string_value) == 1,
+         "Eq expects char arguments");
+
+  char x = args[0].string_value[0];
+  char y = args[1].string_value[0];
+
+  return MAKE_INTEGER(x == y);
+}
