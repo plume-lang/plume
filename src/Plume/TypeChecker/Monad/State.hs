@@ -16,6 +16,7 @@ data CheckState = MkCheckState
   , extensions :: Set Extension
   , returnType :: Maybe PlumeType
   , positions :: [Position]
+  , natives :: Map Text (PlumeScheme, Position)
   }
   deriving (Eq)
 
@@ -50,6 +51,7 @@ emptyState =
     , extensions = mempty
     , returnType = Nothing
     , positions = []
+    , natives = mempty
     }
 
 deriveHasField ''CheckState

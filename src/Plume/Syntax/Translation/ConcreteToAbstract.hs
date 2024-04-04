@@ -8,6 +8,7 @@ import Data.Text qualified as T
 import Plume.Syntax.Abstract qualified as AST
 import Plume.Syntax.Common qualified as Common
 import Plume.Syntax.Concrete qualified as CST
+import Plume.Syntax.Parser
 import Plume.Syntax.Translation.ConcreteToAbstract.MacroResolver
 import Plume.Syntax.Translation.ConcreteToAbstract.Operations
 import Plume.Syntax.Translation.ConcreteToAbstract.Require
@@ -85,8 +86,11 @@ concreteToAbstract (CST.EBlock es) = do
       writeIORef macroState oldMacroSt
       return res
   transRet $ AST.EBlock <$> es'
-concreteToAbstract r@(CST.ERequire _) =
-  convertRequire concreteToAbstract r
+concreteToAbstract r@(CST.ERequire _) = do
+  isImport <- asks snd
+  if isImport
+    then convertRequire concreteToAbstract r
+    else bireturn Empty
 concreteToAbstract (CST.ELocated e p) = do
   old <- readIORef positionRef
   writeIORef positionRef (Just p)
@@ -138,7 +142,7 @@ concreteToAbstract (CST.ETypeExtension g ann ems) = do
 concreteToAbstract (CST.ENativeFunction fp n gens t) = do
   let strModName = toString fp -<.> sharedLibExt
   let isStd = "std:" `T.isPrefixOf` fp
-  cwd <- ask
+  cwd <- asks fst
   let modPath =
         if isStd
           then do
@@ -190,7 +194,7 @@ runConcreteToAbstract std dir paths fp = do
         imports' <-
           sequenceMapM
             ( \(i, p) ->
-                withMaybePos p $
+                withMaybePos p . local (second (const True)) $
                   convertRequire concreteToAbstract $
                     CST.ERequire i
             )
@@ -199,23 +203,15 @@ runConcreteToAbstract std dir paths fp = do
           Left err -> throwError' err
           Right exprs -> do
             newCWD <- liftIO getCurrentDirectory
-            mainModule <-
-              local (const newCWD) $
-                convertRequire
-                  concreteToAbstract
-                  (CST.ERequire (fromString fp))
-
-            case mainModule of
-              Left err -> throwError' err
-              Right mainModule' -> do
-                let mainModuleExprs = fromSpreadable mainModule'
-                bireturn (exprs <> mainModuleExprs)
+            content <- liftIO $ decodeUtf8 @Text <$> readFileBS fp
+            local (const (newCWD, False)) $ do
+              ops <- liftIO $ readIORef operators
+              liftIO (parsePlumeFile fp content ops) >>= \case
+                Left err -> throwError' $ ParserError err
+                Right (cst, ops') -> do
+                  modifyIORef' operators (ops' ++)
+                  sequenceMapM concreteToAbstract cst >>= \case
+                    Left err -> throwError' err
+                    Right ast -> bireturn $ exprs <> flat ast
     )
-    cwd
-
-loadPrelude :: Maybe FilePath -> [CST.Expression] -> [CST.Expression]
-loadPrelude (Just path) = do
-  let preludePath = path </> "prelude"
-  let require = CST.ERequire (fromString preludePath)
-  (require :)
-loadPrelude Nothing = id
+    (cwd, False)

@@ -19,6 +19,7 @@ data TypeError
     EmptyMatch
   | UnboundTypeVariable Int
   | UnboundVariable Text
+  | DuplicateNative Text PlumeScheme
   | -- Internal errors
     CompilerError Text
   deriving (Eq, Show)
@@ -51,6 +52,11 @@ instance Throwable TypeError where
   showError (UnboundTypeVariable i) = "Unbound type variable " <> show i
   showError (UnboundVariable v) = "Unbound variable " <> show v
   showError (CompilerError e) = "Compiler error: " <> e
+  showError (DuplicateNative n s) =
+    "Native function " <> showError (n, s) <> " already defined"
+
+instance Throwable (Text, PlumeScheme) where
+  showError (n, Forall vs t) = n <> "<" <> showError vs <> ">: " <> showError t
 
 type PlumeError = (Position, TypeError)
 

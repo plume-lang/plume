@@ -8,10 +8,20 @@ import Plume.TypeChecker.TLIR qualified as Post
 
 synthNative :: Infer
 synthNative (Pre.ENativeFunction fp name generics ty) = do
+  nats <- gets natives
+  case Map.lookup name nats of
+    Just (sch, pos) -> throwRaw (pos, DuplicateNative name sch)
+    Nothing -> pure ()
+
   convertedGenerics <- convert generics
   convertedTy <- convert ty
   let scheme = Forall convertedGenerics convertedTy
+
   insertEnvWith @"typeEnv" (<>) $ Map.singleton name scheme
+  pos <- fetchPosition
+  modifyIORef' checkState $ \s ->
+    s {natives = Map.insert name (scheme, pos) s.natives}
+
   pure
     ( TUnit
     , [Post.ENativeFunction fp name convertedTy]

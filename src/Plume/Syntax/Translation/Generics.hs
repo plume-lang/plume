@@ -60,9 +60,12 @@ instance Throwable Error where
 -- that takes an error type and a value type.
 type TranslatorError err b = Either err (Spreadable [b] b)
 
+type IsImportConversion = Bool
+
 -- A translator reader is a type that represents a reader monad that takes
 -- a file path and a translator error type.
-type TranslatorReader err b = IOReader FilePath (TranslatorError err b)
+type TranslatorReader err b =
+  IOReader (FilePath, IsImportConversion) (TranslatorError err b)
 
 -- A translator is a utility function type that takes a main converter
 -- function and a value to convert. It returns an IO action that
@@ -91,7 +94,7 @@ maybeM f = maybe (return Nothing) (fmap Just . f)
 throwError :: err -> TranslatorReader err b
 throwError err = return $ Left err
 
-throwError' :: err -> IOReader FilePath (Either err b)
+throwError' :: err -> IOReader (FilePath, IsImportConversion) (Either err b)
 throwError' = return . Left
 
 {-# NOINLINE imports #-}

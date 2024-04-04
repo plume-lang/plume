@@ -27,7 +27,7 @@ convertRequire
 convertRequire f (CST.ERequire modName) = do
   -- Retrieve the current working directory to use it as a base for the
   -- module path.
-  cwd <- ask
+  cwd <- asks fst
 
   -- Creating the absolute module path by joining the current working
   -- directory with the module name.
@@ -67,11 +67,12 @@ convertRequire f (CST.ERequire modName) = do
             imports' <-
               sequenceMapM
                 ( \(i, p) ->
-                    local (const newCurrentDirectory)
+                    local (const (newCurrentDirectory, True))
                       . withMaybePos p
                       $ convertRequire f (CST.ERequire i)
                 )
                 paths
+
             let exprs = fromEither [] $ flat <$> imports'
 
             -- Parsing the module file and converting it to an abstract syntax tree.
@@ -79,7 +80,7 @@ convertRequire f (CST.ERequire modName) = do
             -- without globally changing it.
             -- Returning the generated AST as a spreadable AST (just a list of
             -- expressions represented as a single expression).
-            local (const newCurrentDirectory) $ do
+            local (const (newCurrentDirectory, False)) $ do
               ops <- liftIO $ readIORef operators
               liftIO (parsePlumeFile path content ops) >>= \case
                 Left err -> throwError $ ParserError err
