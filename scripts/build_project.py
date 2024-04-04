@@ -19,7 +19,7 @@ system('cabal build')
 
 ext = '.out' if platform.system() == 'Windows' else ''
 
-executable_name = f"plume-language{ext}"
+executable_name = f"plume{ext}"
 
 found_executables = glob(f"dist-newstyle/**/{executable_name}", recursive=True)
 executable_files = [file for file in found_executables if os.path.isfile(file)]
