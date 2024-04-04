@@ -4,6 +4,12 @@ import Data.Set qualified as S
 import Plume.Compiler.ClosureConversion.Free
 import Plume.Compiler.Desugaring.Syntax
 
+removeNilReturn :: [DesugaredStatement] -> [DesugaredStatement]
+removeNilReturn (DSReturn (DEVar "nil") : xs) = removeNilReturn xs
+removeNilReturn (DSExpr (DEVar "nil") : xs) = removeNilReturn xs
+removeNilReturn (x : xs) = x : removeNilReturn xs
+removeNilReturn [] = []
+
 removeDeadCodeStmt
   :: S.Set Text -> DesugaredStatement -> Maybe DesugaredStatement
 removeDeadCodeStmt _ (DSExpr e) = case e of
@@ -16,15 +22,18 @@ removeDeadCodeStmt _ (DSExpr e) = case e of
   DEIsConstructor _ _ -> Nothing
   DEEqualsTo _ _ -> Nothing
   DEAnd _ _ -> Nothing
-  _ -> Just $ DSExpr e
+  DESlice _ _ -> Nothing
+  DEGreaterThan _ _ -> Nothing
+  DEListLength _ -> Nothing
+  DESpecial -> Nothing
+  DEIndex _ _ -> Nothing
+  DEApplication _ _ -> Just $ DSExpr e
+  DEIf c t el ->
+    Just $
+      DSExpr $
+        DEIf c (removeNilReturn t) (removeNilReturn el)
 removeDeadCodeStmt _ (DSReturn (DEVar "nil")) = Nothing
 removeDeadCodeStmt _ e = Just e
-
-doesContainReturn :: DesugaredStatement -> Bool
-doesContainReturn (DSReturn _) = True
-doesContainReturn (DSExpr (DEIf _ e1 e2)) =
-  any doesContainReturn e1 || any doesContainReturn e2
-doesContainReturn _ = False
 
 removeDeadCodeProg :: DesugaredProgram -> Maybe DesugaredProgram
 removeDeadCodeProg (DPFunction name args stmts) = case stmts' of
@@ -48,6 +57,7 @@ removeDeadCode :: [DesugaredProgram] -> [DesugaredProgram]
 removeDeadCode = mapMaybe removeDeadCodeProg
 
 instance Free DesugaredExpr where
+  free (DEVar "nil") = S.empty
   free (DEVar x) = S.singleton x
   free (DEApplication f args) = S.singleton f <> free args
   free (DELiteral _) = S.empty

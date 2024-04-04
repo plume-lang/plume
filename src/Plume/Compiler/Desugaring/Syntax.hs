@@ -66,3 +66,9 @@ instance Substitutable DesugaredExpr DesugaredExpr where
   substitute s (DEGreaterThan e1 e2) =
     DEGreaterThan (substitute s e1) (substitute s e2)
   substitute s (DEListLength e) = DEListLength (substitute s e)
+
+doesContainReturn :: DesugaredStatement -> Bool
+doesContainReturn (DSReturn _) = True
+doesContainReturn (DSExpr (DEIf _ e1 e2)) =
+  any doesContainReturn e1 || any doesContainReturn e2
+doesContainReturn _ = False

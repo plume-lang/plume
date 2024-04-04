@@ -44,7 +44,7 @@ desugarExpr isTop = \case
   d@(Pre.CEDeclaration {}) -> desugarANF isTop (desugarExpr isTop) d
   s@(Pre.CESwitch {}) -> desugarSwitch isTop (desugarExpr isTop, desugarStatement isTop) s
   Pre.CEBlock xs -> do
-    res <- concat <$> mapM (desugarStatement isTop) xs
+    res <- concat <$> mapM (desugarStatement (fst isTop, False)) xs
     return (Post.DEVar "nil", createBlock res)
   Pre.CEAnd x y -> do
     (x', stmts1) <- desugarExpr isTop x
@@ -80,7 +80,7 @@ desugarStatement isTop = \case
 desugarProgram :: Pre.ClosedProgram -> IO [Post.DesugaredProgram]
 desugarProgram = \case
   Pre.CPFunction x xs y -> do
-    ys <- desugarStatement (True, False) y
+    ys <- desugarStatement (True, True) y
     return [Post.DPFunction x xs (createBlock ys)]
   Pre.CPStatement x -> do
     x' <- desugarStatement (False, False) x

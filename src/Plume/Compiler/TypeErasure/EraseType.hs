@@ -29,7 +29,10 @@ program = unsafePerformIO $ newIORef ([], [], [])
 eraseType :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]
 eraseType (Pre.EDeclaration (Annotation name _) (Pre.EClosure args _ body) Nothing : xs) = do
   let args' = map (\(Annotation n _) -> n) args
-  fun <- Post.UPFunction name args' . Post.USExpr <$> eraseExpr body
+  b' <- eraseExpr body
+  let fun = Post.UPFunction name args' $ case b' of
+        b@Post.UEBlock {} -> Post.USExpr b
+        _ -> Post.USReturn b'
   modifyIORef'
     program
     ( \(natives, exts, stmts) ->

@@ -22,7 +22,9 @@ type IsReturned = Bool
 desugarSwitch :: (IsToplevel, IsReturned) -> DesugarSwitch
 desugarSwitch (isNotTop, isReturned) (fExpr, _) (Pre.CESwitch x cases) = do
   (x', stmts) <- fExpr x
-  let (conds, maps) = unzip $ map (createCondition x' . fst) cases
+  let decl = createLets $ M.singleton "$switch" x'
+  let declVar = Post.DEVar "$switch"
+  let (conds, maps) = unzip $ map (createCondition declVar . fst) cases
 
   let bodies = map snd cases
   let cases' = zip3 [0 ..] bodies maps
@@ -46,9 +48,12 @@ desugarSwitch (isNotTop, isReturned) (fExpr, _) (Pre.CESwitch x cases) = do
                 return stmts'''
       )
       cases'
+  -- putStrLn "======================"
+  -- mapM_ print (concat res)
+
   let ifs' = createIfsStatement $ concat res
 
-  return (Post.DEVar "nil", stmts <> ifs')
+  return (Post.DEVar "nil", decl <> stmts <> ifs')
 desugarSwitch _ _ _ = error "Received incorrect expression, not a switch."
 
 createConditionExpr :: [Post.DesugaredExpr] -> Post.DesugaredExpr
