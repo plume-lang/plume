@@ -48,6 +48,7 @@ concreteToAbstract (CST.EVariable n) = transRet . Right $ AST.EVariable n
 concreteToAbstract (CST.ELiteral l) = transRet . Right $ AST.ELiteral l
 concreteToAbstract e@(CST.EBinary {}) = convertOperation concreteToAbstract e
 concreteToAbstract e@(CST.EPrefix {}) = convertOperation concreteToAbstract e
+concreteToAbstract e@(CST.EPostfix {}) = convertOperation concreteToAbstract e
 concreteToAbstract (CST.EApplication e args)
   | Just (_, e') <- spanProperty e = do
       convertUFCS concreteToAbstract (CST.EApplication e' args)

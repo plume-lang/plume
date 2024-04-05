@@ -34,9 +34,11 @@ prettyBin StrictlyGreatherThan = ">"
 prettyBin StrictlyLesserThan = "<"
 prettyBin And = anCol Blue "and"
 prettyBin Or = anCol Blue "or"
+prettyBin BinarySlice = ".."
 
 prettyPrefix :: PrefixOperator -> Doc AnsiStyle
 prettyPrefix Not = anCol Blue "not"
+prettyPrefix PrefixSlice = ".."
 
 prettyTyCons :: TypeConstructor PlumeType -> Doc AnsiStyle
 prettyTyCons (TConstructor n ts) = anItalic (pretty n) <> parens (hsep . punctuate comma $ map ansiPretty ts)
@@ -105,6 +107,7 @@ prettyExpr _ (EMacroFunction n args e) =
       <+> "=>"
       <+> prettyExpr 0 e
 prettyExpr _ (EMacroVariable n) = anCol Yellow "@" <> anCol Yellow (pretty n)
+prettyExpr _ (EPostfix PostfixSlice e) = prettyExpr 0 e <> brackets ".."
 prettyExpr _ (EMacroApplication n es) =
   anCol Yellow "@"
     <> anCol Yellow (pretty n)

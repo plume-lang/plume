@@ -31,9 +31,14 @@ data BinaryOperator
   | StrictlyLesserThan
   | And
   | Or
+  | BinarySlice
 
 data PrefixOperator
   = Not
+  | PrefixSlice
+
+data PostfixOperator
+  = PostfixSlice
 
 data ConcreteExpression t
   = EVariable Text
@@ -42,6 +47,7 @@ data ConcreteExpression t
   | EApplication (ConcreteExpression t) [ConcreteExpression t]
   | EBinary BinaryOperator (ConcreteExpression t) (ConcreteExpression t)
   | EPrefix PrefixOperator (ConcreteExpression t)
+  | EPostfix PostfixOperator (ConcreteExpression t)
   | EType (Annotation [PlumeGeneric]) [TypeConstructor t]
   | EDeclaration
       [PlumeGeneric]

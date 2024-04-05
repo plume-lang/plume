@@ -394,12 +394,36 @@ eExpression = eLocated $ do
       makeUnaryOp $
         choice
           [ functionCallOperator
+          , transformSlice <$> brackets (parseSlice eTerm)
           , -- Record selection e.x where e may be a record and x a label to
             -- select from the record
             EProperty <$> (char '.' *> field <* scn)
           , try $ EProperty <$> indentOne (char '.' *> field)
-          , flip EListIndex <$> brackets eExpression
           ]
+
+parseSlice :: Parser Expression -> Parser Expression
+parseSlice eTerm = do
+  res <-
+    optional . try $
+      (,)
+        <$> optional eTerm
+        <*> (symbol ":" *> optional eTerm)
+  case res of
+    Just (Nothing, Nothing) -> fail "Invalid slice"
+    Just (Just e1, Nothing) -> return (EPostfix PostfixSlice e1)
+    Just (Nothing, Just e2) -> return (EPrefix PrefixSlice e2)
+    Just (Just e1, Just e2) -> return (EBinary BinarySlice e1 e2)
+    Nothing -> eTerm
+
+transformSlice :: Expression -> Expression -> Expression
+transformSlice (ELocated e p) e1 = ELocated (transformSlice e e1) p
+transformSlice (EBinary BinarySlice e1 e2) e3 =
+  EApplication (EProperty "slice" e3) [e1, e2]
+transformSlice (EPostfix PostfixSlice e1) e2 =
+  EApplication (EProperty "slice" e2) [e1, ELiteral (LInt (-1))]
+transformSlice (EPrefix PrefixSlice e2) e1 =
+  EApplication (EProperty "slice" e1) [ELiteral (LInt 0), e2]
+transformSlice e1 e2 = EListIndex e2 e1
 
 tRequire :: Parser [Expression]
 tRequire = do

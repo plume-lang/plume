@@ -25,4 +25,7 @@ convertOperation f (CST.EBinary op e1 e2) = do
 convertOperation f (CST.EPrefix op e) = do
   e' <- fmap (: []) . shouldBeAlone <$> f e
   transRet $ AST.EApplication (AST.EVariable (toText op)) <$> e'
+convertOperation f (CST.EPostfix op e) = do
+  e' <- fmap (: []) . shouldBeAlone <$> f e
+  transRet $ AST.EApplication (AST.EVariable (toText op)) <$> e'
 convertOperation _ _ = return $ Left (CompilerError "Received invalid operation expression")

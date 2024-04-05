@@ -16,6 +16,11 @@ instance ToText BinaryOperator where
   toText StrictlyLesserThan = "<"
   toText And = "and"
   toText Or = "or"
+  toText BinarySlice = "slice"
 
 instance ToText PrefixOperator where
   toText Not = "not"
+  toText PrefixSlice = "slice"
+
+instance ToText PostfixOperator where
+  toText PostfixSlice = "slice"
