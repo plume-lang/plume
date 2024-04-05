@@ -195,11 +195,6 @@ makeReturn :: Post.ClosedExpr -> [Post.ClosedStatement]
 makeReturn (Post.CEBlock es) = es
 makeReturn e = [Post.CSReturn e]
 
-makeReturnStmt :: Post.ClosedStatement -> Post.ClosedStatement
-makeReturnStmt e@(Post.CSExpr (Post.CEBlock _)) = e
-makeReturnStmt (Post.CSExpr e) = Post.CSReturn e
-makeReturnStmt e = e
-
 makeReturnBody :: Post.ClosedExpr -> Post.ClosedStatement
 makeReturnBody e = Post.CSExpr (Post.CEBlock $ makeReturn e)
 
@@ -209,7 +204,7 @@ closeProgram (Pre.UPFunction name args e) = do
   modifyIORef' reserved (<> S.singleton name)
   modifyIORef' functions (M.insert name (length args))
   (stmts, e') <- closeStatement e
-  pure $ stmts ++ [Post.CPFunction name args (makeReturnStmt e')]
+  pure $ stmts ++ [Post.CPFunction name args e']
 closeProgram (Pre.UPNativeFunction fp name arity) = do
   modifyIORef' reserved (S.insert name)
   modifyIORef' functions (M.insert name arity)

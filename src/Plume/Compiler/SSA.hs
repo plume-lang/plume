@@ -6,5 +6,5 @@ import Plume.Compiler.SSA.DeadCode
 
 runSSA :: [DesugaredProgram] -> [DesugaredProgram]
 runSSA xs = do
-  let xs' = analyseDeadCode xs
+  let xs' = removeDeadCode mempty xs
   bundle xs'

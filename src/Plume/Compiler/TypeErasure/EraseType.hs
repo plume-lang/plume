@@ -26,13 +26,20 @@ program
   :: IORef ([Post.UntypedProgram], [Post.UntypedProgram], [Post.UntypedProgram])
 program = unsafePerformIO $ newIORef ([], [], [])
 
+insertReturnStmt :: Pre.Expression -> Pre.Expression
+insertReturnStmt (Pre.EBlock es) =
+  case (viaNonEmpty init es, viaNonEmpty last es) of
+    (Just _, Just (Pre.EReturn _)) -> Pre.EBlock es
+    (Just es', Just e) -> Pre.EBlock (es' <> [Pre.EReturn e])
+    (Nothing, Just e) -> Pre.EBlock [Pre.EReturn e]
+    _ -> Pre.EBlock es
+insertReturnStmt e = Pre.EBlock [Pre.EReturn e]
+
 eraseType :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]
 eraseType (Pre.EDeclaration (Annotation name _) (Pre.EClosure args _ body) Nothing : xs) = do
   let args' = map (\(Annotation n _) -> n) args
-  b' <- eraseExpr body
-  let fun = Post.UPFunction name args' $ case b' of
-        b@Post.UEBlock {} -> Post.USExpr b
-        _ -> Post.USReturn b'
+  b' <- eraseStatement (insertReturnStmt body)
+  let fun = Post.UPFunction name args' b'
   modifyIORef'
     program
     ( \(natives, exts, stmts) ->
@@ -59,9 +66,9 @@ eraseType (Pre.EExtensionDeclaration name _ arg (Pre.EClosure args _ b) : xs) = 
   modifyIORef
     dispatched
     (Map.insert (arg.annotationValue, name) name')
-
+  let b' = insertReturnStmt b
   fun <-
-    Post.UPFunction name' (arg' : map (.annotationName) args) <$> eraseStatement b
+    Post.UPFunction name' (arg' : map (.annotationName) args) <$> eraseStatement b'
 
   modifyIORef'
     program

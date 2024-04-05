@@ -9,7 +9,7 @@ import Plume.Compiler.Desugaring.Monad
 import Plume.Compiler.Desugaring.Syntax qualified as Post
 
 desugarANF
-  :: (IsToplevel, IsReturned)
+  :: (IsToplevel, IsReturned, IsExpression)
   -> DesugarModule Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
 desugarANF _ f (Pre.CEApplication x xs) = do
   (x', stmts1) <- f x
@@ -50,7 +50,7 @@ desugarANF t f (Pre.CEDeclaration name expr body) = do
           <> [Post.DSDeclaration fresh body']
 
   return (Post.DEVar fresh, stmts)
-desugarANF (isNotTop, isReturned) f (Pre.CEConditionBranch e1 e2 e3) = do
+desugarANF (isNotTop, isReturned, _) f (Pre.CEConditionBranch e1 e2 e3) = do
   (e1', stmts1) <- f e1
   r1@(e2', stmts2) <- f e2
   r2@(e3', stmts3) <- f e3

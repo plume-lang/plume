@@ -5,6 +5,7 @@ module Plume.Compiler.Bytecode.Assembler where
 import Data.IntMap qualified as IMap
 import Data.List qualified as List
 import Data.Map qualified as Map
+import Data.Text qualified as Text
 import GHC.IO
 import Plume.Compiler.Bytecode.Syntax qualified as BC
 import Plume.Compiler.Desugaring.Syntax qualified as Pre
@@ -269,7 +270,7 @@ assembleConstants = map fst . sortOn snd . map (first convert) . Map.toList
   convert (LInt i) = BC.CInt (fromInteger i)
   convert (LFloat f) = BC.CFloat f
   convert (LBool b) = BC.CInt $ if b then 1 else 0
-  convert (LChar c) = BC.CString (show c)
+  convert (LChar c) = BC.CString (Text.pack [c])
 
 convertMetadata :: IntMap BC.FunctionMetaData -> [BC.FunctionMetaData]
 convertMetadata = IMap.elems

@@ -14,7 +14,7 @@ import Plume.Compiler.Desugaring.Modules.ANF
 import Plume.Compiler.Desugaring.Modules.Switch
 
 desugarExpr
-  :: (IsToplevel, IsReturned)
+  :: (IsToplevel, IsReturned, IsExpression)
   -> Desugar Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
 desugarExpr isTop = \case
   Pre.CESpecial -> return' Post.DESpecial
@@ -44,7 +44,7 @@ desugarExpr isTop = \case
   d@(Pre.CEDeclaration {}) -> desugarANF isTop (desugarExpr isTop) d
   s@(Pre.CESwitch {}) -> desugarSwitch isTop (desugarExpr isTop, desugarStatement isTop) s
   Pre.CEBlock xs -> do
-    res <- concat <$> mapM (desugarStatement (fst isTop, False)) xs
+    res <- concat <$> mapM (desugarStatement (fst3 isTop, False, False)) xs
     return (Post.DEVar "nil", createBlock res)
   Pre.CEAnd x y -> do
     (x', stmts1) <- desugarExpr isTop x
@@ -56,7 +56,7 @@ desugarExpr isTop = \case
     return (Post.DEIndex x' y', stmts1 ++ stmts2)
 
 desugarStatement
-  :: (IsToplevel, IsReturned)
+  :: (IsToplevel, IsReturned, IsExpression)
   -> Desugar Pre.ClosedStatement [ANFResult (Maybe Post.DesugaredStatement)]
 desugarStatement isTop = \case
   Pre.CSExpr x -> do
@@ -65,25 +65,34 @@ desugarStatement isTop = \case
       Post.DEVar "nil" -> return [(Nothing, stmts)]
       _ -> return [(Just $ Post.DSExpr x', stmts)]
   Pre.CSReturn x -> do
-    (x', stmts) <- desugarExpr (False, True) x
+    (x', stmts) <- desugarExpr (False, True, True) x
     return [(Just $ Post.DSReturn x', stmts)]
   Pre.CSDeclaration n e -> do
-    (e', stmts) <- desugarExpr (False, False) e
+    (e', stmts) <- desugarExpr (False, False, True) e
     return [(Just $ Post.DSDeclaration n e', stmts)]
   Pre.CSConditionBranch x y z -> do
-    (x', stmts1) <- desugarExpr (False, snd isTop) x
+    (x', stmts1) <- desugarExpr (False, snd3 isTop, False) x
     ys <- desugarStatement isTop y
     zs <- desugarStatement isTop z
     return
       [(Just . Post.DSExpr $ Post.DEIf x' (createBlock ys) (createBlock zs), stmts1)]
 
+fst3 :: (a, b, c) -> a
+fst3 (x, _, _) = x
+
+snd3 :: (a, b, c) -> b
+snd3 (_, x, _) = x
+
+thd3 :: (a, b, c) -> c
+thd3 (_, _, x) = x
+
 desugarProgram :: Pre.ClosedProgram -> IO [Post.DesugaredProgram]
 desugarProgram = \case
   Pre.CPFunction x xs y -> do
-    ys <- desugarStatement (True, True) y
+    ys <- desugarStatement (True, False, False) y
     return [Post.DPFunction x xs (createBlock ys)]
   Pre.CPStatement x -> do
-    x' <- desugarStatement (False, False) x
+    x' <- desugarStatement (False, False, False) x
     return $ map Post.DPStatement $ createBlock x'
   Pre.CPNativeFunction fp x y -> do
     modifyIORef' nativeFunctions $ Set.insert x

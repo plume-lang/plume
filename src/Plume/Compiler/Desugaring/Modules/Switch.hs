@@ -18,9 +18,10 @@ type DesugarSwitch =
 
 type IsToplevel = Bool
 type IsReturned = Bool
+type IsExpression = Bool
 
-desugarSwitch :: (IsToplevel, IsReturned) -> DesugarSwitch
-desugarSwitch (isNotTop, isReturned) (fExpr, _) (Pre.CESwitch x cases) = do
+desugarSwitch :: (IsToplevel, IsReturned, IsExpression) -> DesugarSwitch
+desugarSwitch (isToplevel, shouldReturn, isExpr) (fExpr, _) (Pre.CESwitch x cases) = do
   (x', stmts) <- fExpr x
   let decl = createLets $ M.singleton "$switch" x'
   let declVar = Post.DEVar "$switch"
@@ -36,7 +37,7 @@ desugarSwitch (isNotTop, isReturned) (fExpr, _) (Pre.CESwitch x cases) = do
             let pat = maybeAt i conds
             (expr', stmts'') <- fExpr expr
             let lastStmt =
-                  if isNotTop && not isReturned
+                  if isToplevel && shouldReturn
                     then Post.DSReturn expr'
                     else Post.DSExpr expr'
             let stmts''' = substituteMany (M.toList m) (stmts'' <> [lastStmt])
@@ -48,13 +49,20 @@ desugarSwitch (isNotTop, isReturned) (fExpr, _) (Pre.CESwitch x cases) = do
                 return stmts'''
       )
       cases'
-  -- putStrLn "======================"
-  -- mapM_ print (concat res)
 
-  let ifs' = createIfsStatement $ concat res
-
-  return (Post.DEVar "nil", decl <> stmts <> ifs')
+  if isExpr
+    then do
+      let ifs' = map unboxStatement (concat res)
+      let ifs'' = createIfsExpr ifs'
+      return (ifs'', stmts <> decl)
+    else do
+      let ifs' = createIfsStatement $ concat res
+      return (Post.DEVar "nil", stmts <> decl <> ifs')
 desugarSwitch _ _ _ = error "Received incorrect expression, not a switch."
+
+unboxStatement :: Post.DesugaredStatement -> Post.DesugaredExpr
+unboxStatement (Post.DSExpr x) = x
+unboxStatement _ = error "Incorrect statement"
 
 createConditionExpr :: [Post.DesugaredExpr] -> Post.DesugaredExpr
 createConditionExpr [] = Post.DELiteral (LBool True)
@@ -69,6 +77,16 @@ createIfsStatement (Post.DSExpr (Post.DEIf c t []) : xs)
   | c == Post.DELiteral (LBool True) = t
   | otherwise = [Post.DSExpr (Post.DEIf c t (createIfsStatement xs))]
 createIfsStatement (x : xs) = x : createIfsStatement xs
+
+createIfsExpr
+  :: [Post.DesugaredExpr]
+  -> Post.DesugaredExpr
+createIfsExpr [] = Post.DEVar "nil"
+createIfsExpr [x] = x
+createIfsExpr (Post.DEIf c t _ : xs) = Post.DEIf c t [e]
+ where
+  e = Post.DSExpr $ createIfsExpr xs
+createIfsExpr _ = error "Incorrect list of conditions"
 
 createLets :: Map Text Post.DesugaredExpr -> [Post.DesugaredStatement]
 createLets = M.foldrWithKey (\k v acc -> Post.DSDeclaration k v : acc) []

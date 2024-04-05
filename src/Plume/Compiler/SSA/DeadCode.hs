@@ -4,57 +4,39 @@ import Data.Set qualified as S
 import Plume.Compiler.ClosureConversion.Free
 import Plume.Compiler.Desugaring.Syntax
 
+-- DEAD CODE ELIMINATION
+--
+-- For a given program, we want to remove all the statements that
+-- are not reachable or are not used in the program.
+-- To achive such a thing, we need to follow these steps:
+--
+-- - When dealing with a toplevel declaration, we need to compute
+--   dead code elimination on the remaining toplevel statements and
+--   then analyse the deadcode eliminated statements to get a fully
+--   list of used variables.
+--     - If the declaration name is not included in the used variables,
+--       we can safely remove the declaration.
+--     - Otherwise, we need to keep the declaration
+--
+-- - That's the same for functions, local functions and local
+--   declarations.
+--
+-- HOW TO PERFORM DEAD CODE ANALYSIS
+--
+-- Analysis is performed by computing the free variables of a given
+-- statement list or expression. We need to compute free variables on
+-- list to keep track of the variables that may be definedin the given
+-- list.
+--
+-- So freeing variable is just a way to keep track of the variables that
+-- are not bound in the given list. Unbound variables may refer to
+-- backward declarations.
+
 removeNilReturn :: [DesugaredStatement] -> [DesugaredStatement]
 removeNilReturn (DSReturn (DEVar "nil") : xs) = removeNilReturn xs
 removeNilReturn (DSExpr (DEVar "nil") : xs) = removeNilReturn xs
 removeNilReturn (x : xs) = x : removeNilReturn xs
 removeNilReturn [] = []
-
-removeDeadCodeStmt
-  :: S.Set Text -> DesugaredStatement -> Maybe DesugaredStatement
-removeDeadCodeStmt _ (DSExpr e) = case e of
-  DEVar _ -> Nothing
-  DELiteral _ -> Nothing
-  DEList _ -> Nothing
-  DEProperty _ _ -> Nothing
-  DEDictionary _ -> Nothing
-  DETypeOf _ -> Nothing
-  DEIsConstructor _ _ -> Nothing
-  DEEqualsTo _ _ -> Nothing
-  DEAnd _ _ -> Nothing
-  DESlice _ _ -> Nothing
-  DEGreaterThan _ _ -> Nothing
-  DEListLength _ -> Nothing
-  DESpecial -> Nothing
-  DEIndex _ _ -> Nothing
-  DEApplication _ _ -> Just $ DSExpr e
-  DEIf c t el ->
-    Just $
-      DSExpr $
-        DEIf c (removeNilReturn t) (removeNilReturn el)
-removeDeadCodeStmt _ (DSReturn (DEVar "nil")) = Nothing
-removeDeadCodeStmt _ e = Just e
-
-removeDeadCodeProg :: DesugaredProgram -> Maybe DesugaredProgram
-removeDeadCodeProg (DPFunction name args stmts) = case stmts' of
-  [] -> Nothing
-  _ ->
-    if any doesContainReturn stmts'
-      then Just $ DPFunction name args stmts'
-      else case last' of
-        DSExpr e -> Just $ DPFunction name args (init' <> [DSReturn e])
-        DSReturn _ -> Just $ DPFunction name args stmts'
-        _ -> Just $ DPFunction name args (stmts' <> [DSReturn (DEVar "nil")])
- where
-  stmts' = mapMaybe (removeDeadCodeStmt mempty) stmts
-  last' = fromMaybe (error "Cannot have empty body") $ viaNonEmpty last stmts'
-  init' = fromMaybe [] $ viaNonEmpty init stmts'
-removeDeadCodeProg (DPStatement s) = removeDeadCodeStmt mempty s >>= Just . DPStatement
-removeDeadCodeProg (DPNativeFunction fp name arity) = Just $ DPNativeFunction fp name arity
-removeDeadCodeProg z@DPDeclaration {} = Just z
-
-removeDeadCode :: [DesugaredProgram] -> [DesugaredProgram]
-removeDeadCode = mapMaybe removeDeadCodeProg
 
 instance Free DesugaredExpr where
   free (DEVar "nil") = S.empty
@@ -67,7 +49,7 @@ instance Free DesugaredExpr where
   free (DEIsConstructor e _) = free e
   free (DEEqualsTo e1 e2) = free e1 <> free e2
   free (DEAnd e1 e2) = free e1 <> free e2
-  free (DEIf e1 e2 e3) = free e1 <> free e2 <> free e3
+  free (DEIf e1 e2 e3) = free e1 <> fst (freeStmtList e2) <> fst (freeStmtList e3)
   free (DEDictionary es) = free es
   free (DEIndex e1 e2) = free e1 <> free e2
   free DESpecial = S.empty
@@ -80,39 +62,100 @@ instance Free DesugaredStatement where
   free (DSReturn e) = free e
   free (DSDeclaration n e) = free e S.\\ S.singleton n
 
+type BoundVariables = Set Text
+type FreeVariables = Set Text
+type Variables = (BoundVariables, FreeVariables)
+
+freeStmtList :: [DesugaredStatement] -> Variables
+freeStmtList xs = go xs (S.empty, S.empty)
+ where
+  go
+    :: [DesugaredStatement]
+    -> Variables
+    -> Variables
+  go (DSExpr e : rest) s =
+    let freeE = free e
+     in go rest (first (S.union freeE) s)
+  go (DSDeclaration n e : rest) s =
+    let freeE = S.delete n $ free e
+     in go rest (bimap (S.union freeE) (S.insert n) s)
+  go (DSReturn e : rest) s =
+    let freeE = free e
+     in go rest (first (S.union freeE) s)
+  go [] s = s
+
+freeProgList :: [DesugaredProgram] -> FreeVariables
+freeProgList xs = fst $ go xs (S.empty, S.empty)
+ where
+  go
+    :: [DesugaredProgram]
+    -> Variables
+    -> Variables
+  go (DPFunction n args stmts : rest) s =
+    let (freeStmts, bound) = freeStmtList stmts
+        freeE = freeStmts S.\\ (S.fromList args <> S.singleton n)
+        bound' = S.insert n bound
+     in go rest (bimap (S.union freeE) (S.union bound') s)
+  go (DPStatement stmt : rest) s =
+    let freeStmt = freeStmtList [stmt]
+     in go rest (freeStmt <> s)
+  go (DPNativeFunction _ n _ : rest) s = go rest (second (S.insert n) s)
+  go (DPDeclaration n e : rest) s =
+    let freeE = free e S.\\ S.singleton n
+     in go rest (bimap (S.union freeE) (S.insert n) s)
+  go [] s = s
+
 instance Free DesugaredProgram where
   free (DPFunction n args stmts) = free stmts S.\\ (S.fromList args <> S.singleton n)
   free (DPStatement s) = free s
   free (DPNativeFunction {}) = S.empty
   free (DPDeclaration n e) = free e S.\\ S.singleton n
 
-analyseDeadCodeStmt
-  :: S.Set Text -> [DesugaredStatement] -> [DesugaredStatement]
-analyseDeadCodeStmt freed (DSDeclaration name expr : xs) =
-  case free xs <> freed of
-    freeExpr
-      | S.member name freeExpr ->
-          DSDeclaration name expr : analyseDeadCodeStmt (S.insert name freed) xs
-    _ -> xs
-analyseDeadCodeStmt freed (x : xs) = case removeDeadCodeStmt freed x of
-  Just x' -> x' : analyseDeadCodeStmt freed xs
-  Nothing -> analyseDeadCodeStmt freed xs
-analyseDeadCodeStmt _ [] = []
+removeDeadCode
+  :: BoundVariables
+  -> [DesugaredProgram]
+  -> [DesugaredProgram]
+removeDeadCode s (DPFunction n args stmts : rest) =
+  let bound = S.fromList args <> S.singleton n
+      rest' = removeDeadCode (S.insert n s) rest
+      freeVars = freeProgList rest'
+      stmts' = removeDeadCodeStmt bound stmts
+   in if n `S.member` freeVars
+        then DPFunction n args (removeNilReturn stmts') : rest'
+        else rest'
+removeDeadCode s (DPStatement stmt : rest) =
+  let (_, b) = freeStmtList [stmt]
+      rest' = removeDeadCode s rest
+      freeVars' = freeProgList rest'
+   in if null b || b `S.isSubsetOf` freeVars'
+        then DPStatement stmt : rest'
+        else rest'
+removeDeadCode s (DPDeclaration n e : rest) =
+  let rest' = removeDeadCode (S.insert n s) rest
+      freeVars = freeProgList rest'
+   in if n `S.member` freeVars
+        then DPDeclaration n e : rest'
+        else rest'
+removeDeadCode s (DPNativeFunction fp n arity : rest) =
+  let rest' = removeDeadCode (S.insert n s) rest
+      freeVars = freeProgList rest'
+   in if n `S.member` freeVars
+        then DPNativeFunction fp n arity : rest'
+        else rest'
+removeDeadCode _ [] = []
 
-analyseDeadCode :: [DesugaredProgram] -> [DesugaredProgram]
-analyseDeadCode (DPFunction name args stmts : xs) =
-  case free xs of
-    freeProg
-      | S.member name freeProg -> do
-          let fun = removeDeadCodeProg (DPFunction name args stmts')
-          case fun of
-            Just fun' -> fun' : analyseDeadCode xs
-            Nothing -> analyseDeadCode xs
-     where
-      stmts' = analyseDeadCodeStmt (S.fromList (name : args)) stmts
-    _ -> analyseDeadCode xs
-analyseDeadCode (DPStatement s : xs) = case removeDeadCodeStmt mempty s of
-  Just s' -> DPStatement s' : analyseDeadCode xs
-  Nothing -> analyseDeadCode xs
-analyseDeadCode (x : xs) = x : analyseDeadCode xs
-analyseDeadCode [] = []
+removeDeadCodeStmt
+  :: BoundVariables
+  -> [DesugaredStatement]
+  -> [DesugaredStatement]
+removeDeadCodeStmt s (DSExpr e : rest) =
+  let rest' = removeDeadCodeStmt s rest
+   in DSExpr e : rest'
+removeDeadCodeStmt _ (DSReturn e : _) = [DSReturn e]
+removeDeadCodeStmt s (DSDeclaration n e : rest) =
+  let rest' = removeDeadCodeStmt (S.insert n s) rest
+      (freeVars, b) = freeStmtList rest'
+   in if n `S.member` freeVars && n `S.notMember` (b <> s)
+        then DSDeclaration n e : rest'
+        else rest'
+removeDeadCodeStmt _ [] = []
