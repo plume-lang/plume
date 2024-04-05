@@ -19,7 +19,15 @@ data TempAST
   | Other
 
 parseImports :: Parser [TempAST]
-parseImports = many (eRequire <|> (anySingle $> Other))
+parseImports =
+  scn
+    *> many
+      ( choice
+          [ eRequire
+          , Other <$ anySingle
+          ]
+      )
+    <* scn
 
 getRequire :: [TempAST] -> [(Text, Maybe Position)]
 getRequire = foldr f []
