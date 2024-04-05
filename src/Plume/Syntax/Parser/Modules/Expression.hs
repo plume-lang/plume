@@ -420,7 +420,9 @@ transformSlice (ELocated e p) e1 = ELocated (transformSlice e e1) p
 transformSlice (EBinary BinarySlice e1 e2) e3 =
   EApplication (EProperty "slice" e3) [e1, e2]
 transformSlice (EPostfix PostfixSlice e1) e2 =
-  EApplication (EProperty "slice" e2) [e1, ELiteral (LInt (-1))]
+  EApplication (EProperty "slice" e2) [e1, len]
+ where
+  len = EApplication (EProperty "len" e2) []
 transformSlice (EPrefix PrefixSlice e2) e1 =
   EApplication (EProperty "slice" e1) [ELiteral (LInt 0), e2]
 transformSlice e1 e2 = EListIndex e2 e1
