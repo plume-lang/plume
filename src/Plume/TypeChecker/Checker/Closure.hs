@@ -15,7 +15,11 @@ synthClosure infer (Pre.EClosure args ret body) = local id $ do
 
   let argSchemes = createEnvFromAnnotations convertedArgs
   insertEnvWith @"typeEnv" (<>) argSchemes
-  (retTy, body') <- extractFromArray $ infer body
+
+  (retTy, body') <-
+    local (\s -> s {returnType = Just convertedRet}) $
+      extractFromArray $
+        infer body
 
   retTy `unifiesTo` convertedRet
 
