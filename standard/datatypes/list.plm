@@ -1,4 +1,5 @@
 require "string"
+require "number"
 
 native "std:native" with
   list_append<A>(x: [A], y: A): [A]
@@ -27,3 +28,31 @@ extend<A> (c: [A]) with
   show(showHelper: (A) -> str): str => "[{c.map(showHelper).join(", ")}]"
 
   get_index(i: int): Option<A> => ffi_get_index(c, i)
+
+  slice(start: int, end: int): [A] =>
+    switch c
+      case [] => []
+      case [x, ..xs] =>
+        if start == 0 and end == 0 then
+          return []
+        else if start == 0 then
+          return [x].concat(xs.slice(0, end - 1))
+        else
+          return xs.slice(start - 1, end - 1)
+
+extend (c: [int]) with
+  sum(): int =>
+    switch c
+      case [] => 0
+      case [x, ..xs] => x + xs.sum()
+
+  product(): int =>
+    switch c
+      case [] => 1
+      case [x, ..xs] => x * xs.product()
+
+range(start: int, end: int): [int] =>
+  if start < end then
+    return range(start + 1, end).prepend(start)
+  else 
+    return []

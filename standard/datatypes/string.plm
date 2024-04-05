@@ -6,6 +6,7 @@ native "std:native" eq_string(x: str, y: str): bool
 native "std:native" get_index_str(x: str, i: int): Option<char>
 native "std:native" char_to_string(x: char): str
 native "std:native" eq_char(x: char, y: char): bool
+native "std:native" str_slice(x: str, start: int, end: int): str
 
 extend (c: str) with
   operator + (d: str) => add_str(c, d)
@@ -16,6 +17,7 @@ extend (c: str) with
   len() => string_length(c)
 
   get_index(i: int): Option<char> => get_index_str(c, i)
+  slice(start: int, end: int): str => str_slice(c, start, end)
   
 extend (c: [str]) with
   join(sep: str) =>

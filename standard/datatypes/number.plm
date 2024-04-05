@@ -19,7 +19,6 @@ native "std:native" lt_float(x: float, y: float): bool
 
 require "string"
 require "bool"
-require "list"
 
 infix 3 ^
 
@@ -78,20 +77,3 @@ extend (c: float) with
 @e = 2.718282
 expf(x: float): float => @e ^ x
 exp(x: int): float => expf(x.to_float())
-
-extend (c: [int]) with
-  sum(): int =>
-    switch c
-      case [] => 0
-      case [x, ..xs] => x + xs.sum()
-
-  product(): int =>
-    switch c
-      case [] => 1
-      case [x, ..xs] => x * xs.product()
-
-range(start: int, end: int): [int] =>
-  if start < end then
-    return range(start + 1, end).prepend(start)
-  else 
-    return []
