@@ -218,6 +218,7 @@ reservedOperators =
   [ "->"
   , ":"
   , "."
+  , ".."
   ]
 
 operator :: Parser Text

@@ -407,7 +407,7 @@ parseSlice eTerm = do
     optional . try $
       (,)
         <$> optional eTerm
-        <*> (symbol ":" *> optional eTerm)
+        <*> (symbol ".." *> optional eTerm)
   case res of
     Just (Nothing, Nothing) -> fail "Invalid slice"
     Just (Just e1, Nothing) -> return (EPostfix PostfixSlice e1)
