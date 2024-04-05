@@ -27,4 +27,4 @@ extend (c: [str]) with
 extend (c: char) with
   show() => "'{char_to_string(c)}'"
   to_str(): str => char_to_string(c)
-  operator ==(d: char) => c == d
+  operator ==(d: char) => eq_char(c, d)

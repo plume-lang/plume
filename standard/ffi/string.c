@@ -36,38 +36,64 @@ Value mul_str(int arg_n, Module* mod, Value* args) {
 
 Value to_string(int arg_n, Module* mod, Value* args) {
   if (arg_n != 1) THROW("To_string expects 1 argument");
-
-  char* new_str = malloc(100);
   switch (args[0].type) {
-    case VALUE_INT:
+    case VALUE_INT: {
+      size_t sz = snprintf(NULL, 0, "%lld", args[0].int_value);
+      char* new_str = malloc((sz + 1) * sizeof(char));
       sprintf(new_str, "%lld", args[0].int_value);
-      break;
-    case VALUE_FLOAT:
+      return MAKE_STRING(new_str);
+    }
+    case VALUE_FLOAT: {
+      size_t sz = snprintf(NULL, 0, "%f", args[0].float_value);
+      char* new_str = malloc((sz + 1) * sizeof(char));
       sprintf(new_str, "%f", args[0].float_value);
-      break;
-    case VALUE_STRING:
-      sprintf(new_str, "\"%s\"", args[0].string_value);
-      break;
-    case VALUE_LIST:
-      sprintf(new_str, "[");
+      return MAKE_STRING(new_str);
+    }
+    case VALUE_STRING: {
+      char* str = args[0].string_value;
+      size_t sz = strlen(str);
+      char* new_str = malloc(sz + 3);
+      new_str[0] = '"';
+      strcpy(new_str + 1, str);
+      new_str[sz + 1] = '"';
+      return MAKE_STRING(new_str);
+    }
+    case VALUE_LIST: {
+      size_t sz = 1;
       for (int i = 0; i < args[0].list_value.length; i++) {
-        strcat(new_str, args[0].list_value.values[i].string_value);
+        sz += strlen(
+            to_string(1, mod, &args[0].list_value.values[i]).string_value);
+      }
+
+      char* new_str = malloc(sz * sizeof(char));
+      new_str[0] = '[';
+      new_str[1] = '\0';
+
+      for (int i = 0; i < args[0].list_value.length; i++) {
+        strcat(new_str,
+               to_string(1, mod, &args[0].list_value.values[i]).string_value);
         if (i < args[0].list_value.length - 1) strcat(new_str, ", ");
       }
+
       strcat(new_str, "]");
-      break;
-    case VALUE_ADDRESS:
+
+      return MAKE_STRING(new_str);
+    }
+    case VALUE_ADDRESS: {
+      size_t sz = snprintf(NULL, 0, "<function 0x%x>", args[0].address_value);
+      char* new_str = malloc((sz + 1) * sizeof(char));
       sprintf(new_str, "<function 0x%x>", args[0].address_value);
-      break;
-    case VALUE_NATIVE:
-      sprintf(new_str, "<native>");
-      break;
-    case VALUE_SPECIAL:
-      sprintf(new_str, "<special>");
-      break;
+      return MAKE_STRING(new_str);
+    }
+    case VALUE_NATIVE: {
+      return MAKE_STRING("<native>");
+    }
+    case VALUE_SPECIAL: {
+      return MAKE_STRING("<special>");
+    }
   }
 
-  return MAKE_STRING(new_str);
+  return MAKE_STRING("unknown");
 }
 
 Value string_length(int arg_n, Module* mod, Value* args) {
@@ -173,7 +199,7 @@ Value char_to_string(int arg_n, Module* mod, Value* args) {
 Value eq_char(int arg_n, Module* mod, Value* args) {
   if (arg_n != 2) THROW("Eq expects 2 arguments");
   ASSERT(args[0].type == VALUE_STRING && args[1].type == VALUE_STRING,
-         "Eq expects string arguments");
+         "Eq expects char arguments");
 
   ASSERT(strlen(args[0].string_value) == 1 && strlen(args[1].string_value) == 1,
          "Eq expects char arguments");
