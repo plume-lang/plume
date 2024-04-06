@@ -18,7 +18,9 @@ solve ((p, c) : cs) = do
   s <- withPosition p $ solveConstraint (apply stSub c)
   updateSubst s
   s' <- solve (map (second $ apply s) cs)
-  pure $ s' <> s
+  let s'' = s' <> s
+  updateSubst s''
+  pure s''
 
 solveConstraint :: TypeConstraint -> Checker Substitution
 solveConstraint (t1 :~: t2) = case mgu t1 t2 of
@@ -93,8 +95,11 @@ resolveCyclic cs = do
               <> show maxCyclicCounter
               <> " attempts"
   modifyIORef' cyclicCounter (+ 1)
-  s <- gets (substitution . constraints)
-  solveExtend (map (second (apply s)) cs)
+  s <- getSubst
+  s' <- solveExtend (map (second (apply s)) cs)
+  modifyIORef' cyclicCounter (const 0)
+  updateSubst (fst s')
+  pure s'
 
 solveExtend
   :: [PlumeConstraint] -> Checker (Substitution, [PlumeConstraint])
@@ -125,5 +130,5 @@ solveConstraints :: Constraints -> Checker Substitution
 solveConstraints cs = do
   writeIORef cyclicCounter 0
   s <- solve cs.tyConstraints
-  (s', _) <- resolveCyclic cs.extConstraints
+  (s', _) <- solveExtend (map (second $ apply s) cs.extConstraints)
   pure $ s' <> s

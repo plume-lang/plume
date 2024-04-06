@@ -4,11 +4,6 @@ module Plume.TypeChecker.Checker where
 
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Translation.Generics hiding (Error (..), withPosition)
-import Plume.TypeChecker.Constraints.Solver
-import Plume.TypeChecker.Constraints.Unification
-import Plume.TypeChecker.Monad
-import Plume.TypeChecker.TLIR qualified as Post
-
 import Plume.TypeChecker.Checker.Application
 import Plume.TypeChecker.Checker.Closure
 import Plume.TypeChecker.Checker.Condition
@@ -17,6 +12,10 @@ import Plume.TypeChecker.Checker.Declaration
 import Plume.TypeChecker.Checker.Extension
 import Plume.TypeChecker.Checker.Native
 import Plume.TypeChecker.Checker.Switch
+import Plume.TypeChecker.Constraints.Solver
+import Plume.TypeChecker.Constraints.Unification
+import Plume.TypeChecker.Monad
+import Plume.TypeChecker.TLIR qualified as Post
 
 synthesize :: Pre.Expression -> Checker (PlumeType, [Post.Expression])
 -- Some basic and primitive expressions
@@ -82,10 +81,8 @@ synthesizeMany :: [Pre.Expression] -> Checker [Post.Expression]
 synthesizeMany xs = do
   xs' <- concatMapM (fmap snd . localPosition . synthesize) xs
   cs <- gets constraints
-  s1 <- solve cs.tyConstraints
-  (s2, _) <- resolveCyclic cs.extConstraints
-  let s3 = s2 <> s1
-  pure (apply s3 xs')
+  s1 <- solveConstraints cs
+  pure (apply s1 xs')
 
 runSynthesize :: [Pre.Expression] -> IO (Either PlumeError [Post.Expression])
 runSynthesize = runChecker . synthesizeMany

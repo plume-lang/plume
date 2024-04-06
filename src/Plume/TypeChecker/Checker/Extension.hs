@@ -50,7 +50,8 @@ synthExtMember
     convertedRet :: PlumeType <- convert ret
 
     let preFun = (extTy : map (.annotationValue) convertedArgs) :->: convertedRet
-    let sch = Forall (extGens <> convertedGenerics) preFun
+    let gens' = extGens <> convertedGenerics
+    let sch = Forall gens' preFun
 
     let ext = MkExtension name extTy sch
     modifyIORef' checkState $ \s ->
@@ -59,32 +60,51 @@ synthExtMember
     let argSchemes = createEnvFromAnnotations convertedArgs
     let schemes = Map.insert extVar (Forall [] extTy) argSchemes
     insertEnvWith @"typeEnv" (<>) schemes
-    ((retTy, body'), cs) <- getLocalConstraints $ extractFromArray $ infer body
+    ((retTy, body'), finalExt, s3) <- case gens' of
+      [] -> do
+        r@(retTy, _) <- extractFromArray (infer body)
+        retTy `unifiesTo` convertedRet
 
-    let closureTy = (extTy : map (.annotationValue) convertedArgs) :->: retTy
+        let closureTy = (extTy : map (.annotationValue) convertedArgs) :->: retTy
 
-    c1 <- createConstraint (convertedTy :~: closureTy)
-    c2 <- createConstraint (retTy :~: convertedRet)
+        convertedTy `unifiesTo` closureTy
 
-    let cs' = cs.tyConstraints <> [c1, c2]
+        let newScheme = Forall (extGens <> convertedGenerics) closureTy
+        let newExt = MkExtension name extTy newScheme
 
-    writeIORef cyclicCounter 0
-    s1 <- solve cs'
+        pure (r, newExt, mempty)
+      _ -> do
+        (r@(retTy, _), cs) <- getLocalConstraints $ extractFromArray $ infer body
+        let closureTy = (extTy : map (.annotationValue) convertedArgs) :->: retTy
 
-    let newScheme = Forall (apply s1 $ extGens <> convertedGenerics) (apply s1 closureTy)
-    let newExt = apply s1 $ MkExtension name extTy newScheme
+        c1 <- createConstraint (convertedTy :~: closureTy)
+        c2 <- createConstraint (retTy :~: convertedRet)
+
+        let cs' = cs.tyConstraints <> [c1, c2]
+
+        writeIORef cyclicCounter 0
+        s1 <- solve cs'
+
+        let newScheme = Forall (apply s1 gens') (apply s1 closureTy)
+        let newExt = apply s1 $ MkExtension name extTy newScheme
+
+        modifyIORef' checkState $ \s ->
+          s
+            { extensions =
+                removeDuplicates $ Set.delete ext (extensions s) <> Set.singleton newExt
+            }
+
+        (s2, _) <- solveExtend (cs.extConstraints)
+        let s3 = s2 <> s1
+        updateSubst s3
+
+        let finalScheme = Forall (apply s3 gens') (apply s3 closureTy)
+        let finalExt = apply s3 $ MkExtension name extTy finalScheme
+
+        return (r, finalExt, s3)
 
     modifyIORef' checkState $ \s ->
-      s
-        { extensions =
-            removeDuplicates $ Set.delete ext (extensions s) <> Set.singleton newExt
-        }
-
-    (s2, _) <- resolveCyclic (cs.extConstraints)
-    let s3 = s2 <> s1
-
-    modifyIORef' checkState $ \s ->
-      s {extensions = removeDuplicates $ Set.insert newExt (extensions s)}
+      s {extensions = removeDuplicates $ Set.insert finalExt (extensions s)}
 
     pure . apply s3 $
       Post.EExtensionDeclaration
