@@ -84,8 +84,8 @@ eBlock p = eLocated $ do
     _ -> return (EBlock bl)
 
 -- (e) where e is an expression
-eParenthized :: Parser Expression
-eParenthized = parens eExpression
+eParenthesized :: Parser Expression
+eParenthesized = parens eExpression
 
 -- All variables must be either alpha-numerical or special characters
 -- such as: _
@@ -370,16 +370,16 @@ eExpression = eLocated $ do
  where
   eTerm =
     choice
-      [ try eTuple
-      , parseLiteral eExpression
+      [ parseLiteral eExpression
       , eList
       , try eMacroApplication
       , eMacroVariable
       , eSwitch
-      , eClosure
+      , try eClosure
+      , eTuple
       , eConditionBranch False
       , eVariable
-      , eParenthized
+      , eParenthesized
       ]
   -- Extending operators in order to add function call support. A function
   -- call is just a postfix operator where operand is the callee and operator
