@@ -11,6 +11,10 @@ extend<A> (c: [A]) with
   append(d: A) => list_append(c, d)
   prepend(d: A) => list_prepend(c, d)
   concat(d: [A]) => list_concat(c, d)
+  len(): int => 
+    switch c
+      case [] => 0
+      case [_, ..xs] => 1 + xs.len()
 
   map<B>(f: (A) -> B): [B] =>
     switch c
@@ -51,8 +55,7 @@ extend (c: [int]) with
       case [] => 1
       case [x, ..xs] => x * xs.product()
 
-range(start: int, end: int): [int] =>
-  if start < end then
-    return range(start + 1, end).prepend(start)
-  else 
-    return []
+extend (c: int) with
+  slice(to: int): [int] => switch to
+    case 0 => []
+    case ? => [c].concat((c + 1).slice(to - 1))
