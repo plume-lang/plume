@@ -35,7 +35,10 @@ findExtensionWithType
   :: Text -> PlumeType -> PlumeType -> Checker (Either PlumeError Extension)
 findExtensionWithType n t fallback = do
   sub <- getSubst
-  exts <- apply sub . Set.toList <$> gets extensions
+  exts <- Set.toList . applyExts sub <$> gets extensions
+
+  when (n == "or_") $ do
+    print (find (\(MkExtension n' _ _) -> n' == n) exts)
 
   let extOriginTy = case t of
         (ty : _) :->: _ -> ty
@@ -104,22 +107,25 @@ resolveCyclic cs = do
 solveExtend
   :: [PlumeConstraint] -> Checker (Substitution, [PlumeConstraint])
 solveExtend (x@(p, DoesExtend t name funTy) : xs) = withPosition p $ do
-  ext <- findExtensionWithType name funTy t
+  s1 <- getSubst
+  ext <- findExtensionWithType name (apply s1 funTy) (apply s1 t)
   case ext of
     Right (MkExtension _ _ sch) -> do
-      s1 <- getSubst
       extFun <- apply s1 <$> instantiate sch
-      let s2 = mgu funTy extFun
+      let s2 = mgu (apply s1 funTy) extFun
       case s2 of
         Right s -> do
-          updateSubst s
-          solveExtend (map (second $ apply s) xs)
+          let s' = s <> s1
+          updateSubst s'
+          solveExtend (map (second $ apply s') xs)
         Left e -> throw e
     Left e@(_, err) -> do
       modifyIORef' errorStack (e :)
-      (s1', cs1) <- resolveCyclic (xs <> [x])
+      (s1', _) <- solveExtend xs
+      (s2', cs1) <- resolveCyclic [second (apply s1') x]
+      let s3 = s2' <> s1'
       case cs1 of
-        [] -> updateSubst s1' $> (s1', cs1)
+        [] -> updateSubst s3 $> (s3, cs1)
         _ -> throw err
 solveExtend (_ : xs) = solveExtend xs
 solveExtend [] = do

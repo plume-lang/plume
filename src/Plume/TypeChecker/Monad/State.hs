@@ -69,6 +69,12 @@ instance Free Extension where
   apply s (MkExtension n t (Forall gens ty)) =
     MkExtension n (apply s t) (Forall (apply s gens) (apply s ty))
 
+applyExts :: Substitution -> Set Extension -> Set Extension
+applyExts s = Set.map applyE
+ where
+  applyE (MkExtension n t sc) =
+    MkExtension n (apply s t) (apply s sc)
+
 instance Free TyVar where
   free = Set.singleton
 

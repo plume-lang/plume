@@ -1,9 +1,12 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Plume.TypeChecker.Checker.Extension where
 
 import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Common.Annotation
+import Plume.Syntax.Common.Type qualified as Pre
 import Plume.TypeChecker.Checker.Closure (createEnvFromAnnotations)
 import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Constraints.Definition
@@ -16,14 +19,11 @@ synthExt :: Infer -> Infer
 synthExt
   infer
   (Pre.ETypeExtension generics (Annotation extVar extTy) methods) = do
-    convertedGenerics :: [TyVar] <- mapM convert generics
-    convertedAnnot :: PlumeType <- convert extTy
-
     methods' <-
       mapM
         ( synthExtMember
             infer
-            (extVar, convertedAnnot, convertedGenerics)
+            (extVar, extTy, generics)
         )
         methods
 
@@ -32,26 +32,26 @@ synthExt _ _ = throw $ CompilerError "Only type extensions are supported"
 
 synthExtMember
   :: Infer
-  -> (Text, PlumeType, [TyVar])
+  -> (Text, Pre.PlumeType, [Pre.PlumeGeneric])
   -> Pre.ExtensionMem
   -> Checker Post.Expression
 synthExtMember
   infer
-  (extVar, extTy, extGens)
+  (extVar, preExtTy, extGens)
   ( Pre.ExtDeclaration
       generics
       (Annotation name ty)
       (Pre.EClosure args ret body)
     ) = local id $ do
-    convertedGenerics :: [TyVar] <- mapM convert generics
+    convertedGenerics :: [TyVar] <- mapM convert (extGens <> generics)
     convertedTy :: PlumeType <- convert ty
+    extTy <- convert preExtTy
 
     convertedArgs :: [Annotation PlumeType] <- convert args
     convertedRet :: PlumeType <- convert ret
 
     let preFun = (extTy : map (.annotationValue) convertedArgs) :->: convertedRet
-    let gens' = extGens <> convertedGenerics
-    let sch = Forall gens' preFun
+    let sch = Forall convertedGenerics preFun
 
     let ext = MkExtension name extTy sch
     modifyIORef' checkState $ \s ->
@@ -60,7 +60,7 @@ synthExtMember
     let argSchemes = createEnvFromAnnotations convertedArgs
     let schemes = Map.insert extVar (Forall [] extTy) argSchemes
     insertEnvWith @"typeEnv" (<>) schemes
-    ((retTy, body'), finalExt, s3) <- case gens' of
+    ((retTy, body'), finalExt, s3) <- case convertedGenerics of
       [] -> do
         r@(retTy, _) <- extractFromArray (infer body)
         retTy `unifiesTo` convertedRet
@@ -69,7 +69,7 @@ synthExtMember
 
         convertedTy `unifiesTo` closureTy
 
-        let newScheme = Forall (extGens <> convertedGenerics) closureTy
+        let newScheme = Forall convertedGenerics closureTy
         let newExt = MkExtension name extTy newScheme
 
         pure (r, newExt, mempty)
@@ -85,7 +85,7 @@ synthExtMember
         writeIORef cyclicCounter 0
         s1 <- solve cs'
 
-        let newScheme = Forall (apply s1 gens') (apply s1 closureTy)
+        let newScheme = Forall (apply s1 convertedGenerics) (apply s1 closureTy)
         let newExt = apply s1 $ MkExtension name extTy newScheme
 
         modifyIORef' checkState $ \s ->
@@ -93,18 +93,25 @@ synthExtMember
             { extensions =
                 removeDuplicates $ Set.delete ext (extensions s) <> Set.singleton newExt
             }
-
-        (s2, _) <- solveExtend (cs.extConstraints)
+        -- mapM_ (print . snd) (map (second (apply s1)) cs.extConstraints)
+        (s2, _) <- solveExtend (map (second (apply s1)) cs.extConstraints)
         let s3 = s2 <> s1
         updateSubst s3
 
-        let finalScheme = Forall (apply s3 gens') (apply s3 closureTy)
+        let finalScheme = Forall (apply s3 convertedGenerics) (apply s3 closureTy)
         let finalExt = apply s3 $ MkExtension name extTy finalScheme
 
         return (r, finalExt, s3)
 
     modifyIORef' checkState $ \s ->
       s {extensions = removeDuplicates $ Set.insert finalExt (extensions s)}
+
+    mapM_
+      ( \case
+          Pre.GVar v -> deleteEnv @"genericsEnv" v
+          _ -> pure ()
+      )
+      generics
 
     pure . apply s3 $
       Post.EExtensionDeclaration
