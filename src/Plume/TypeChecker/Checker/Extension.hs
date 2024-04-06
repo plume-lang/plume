@@ -93,7 +93,6 @@ synthExtMember
             { extensions =
                 removeDuplicates $ Set.delete ext (extensions s) <> Set.singleton newExt
             }
-        -- mapM_ (print . snd) (map (second (apply s1)) cs.extConstraints)
         (s2, _) <- solveExtend (map (second (apply s1)) cs.extConstraints)
         let s3 = s2 <> s1
         updateSubst s3

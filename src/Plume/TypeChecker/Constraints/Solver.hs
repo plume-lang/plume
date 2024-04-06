@@ -37,9 +37,6 @@ findExtensionWithType n t fallback = do
   sub <- getSubst
   exts <- Set.toList . applyExts sub <$> gets extensions
 
-  when (n == "or_") $ do
-    print (find (\(MkExtension n' _ _) -> n' == n) exts)
-
   let extOriginTy = case t of
         (ty : _) :->: _ -> ty
         _ -> fallback
