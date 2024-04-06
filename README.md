@@ -43,13 +43,13 @@ Plume is a programming language that aims to be as simple as existing languages 
 
 Its syntax has been designed to be non-aggressive and free, resulting in a pleasant-to-use and very extensible language. Plume supports some very cool features such as:
 
-- **Powerful data structures** enabled with ADTs to let you take serious advantage of the language type system
+- **Powerful data structures** enabled with ADTs let you take serious advantage of the language type system
 - **Extension system**, allowing you to define generalized behaviors for your types
-- **Strict type system**, letting you to serenely compile your programs without worrying about runtime errors
+- **Strict type system**, letting you serenely compile your programs without worrying about runtime errors
 - **Safe standard library** to avoid basic but hard-to-find bugs
 - **Macro system** to expand actual syntax and to avoid unnecessary function calls
 
-These are some of the language features available with Plume. But it stills have other interesting properties to offer to you like platform-independent code or binary (because it either runs on a virtual machine or compiles down to WASM), great runtime performances and so on..
+These are some of the language features available with Plume. But it still has other interesting properties to offer to you like platform-independent code or binary (because it either runs on a virtual machine or compiles down to WASM), great runtime performances, and so on..
 
 ## Built With
 
@@ -100,9 +100,9 @@ See the [open issues](https://github.com/sisypheus-dev/plume-language/issues) fo
 
 ## Contributing
 
-Contributions are what make the open source community such an amazing place to be learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+Contributions are what make open-source communities such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
-- If you have suggestions for adding or removing projects, feel free to [open an issue](https://github.com/sisypheus-dev/plume-language/issues/new) to discuss it, or directly create a pull request after you edit the _README.md_ file with necessary changes.
+- If you have suggestions for adding or removing projects, feel free to [open an issue](https://github.com/sisypheus-dev/plume-language/issues/new) to discuss it, or directly create a pull request after you edit the _README.md_ file with the necessary changes.
 - Please make sure you check your spelling and grammar.
 - Create individual PR for each suggestion.
 - Please also read through the [Code Of Conduct](https://github.com/sisypheus-dev/plume-language/blob/main/CODE_OF_CONDUCT.md) before posting your first idea as well.
