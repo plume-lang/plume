@@ -171,7 +171,12 @@ eraseExpr (Pre.EExtVariable x fun t) = do
   case t of
     TypeVar _ -> case fun of
       (t' : _) :->: _ | isNotTVar t' -> Post.UEVar <$> getName t'
-      _ -> error "Invalid function type"
+      _ ->
+        error $
+          "Invalid function type for extension variable: "
+            <> x
+            <> " with type"
+            <> show fun
     _ -> Post.UEVar <$> getName t
  where
   getName :: PlumeType -> IO Text
