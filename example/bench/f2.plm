@@ -1,0 +1,5 @@
+facto(n: int) => switch n 
+  case 0 => 1
+  case ? => n * facto(n - 1)
+
+@println(facto(20))

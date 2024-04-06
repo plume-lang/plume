@@ -1,0 +1,2 @@
+facto(n: int) => product(1.slice(n))
+@println(facto(20))
