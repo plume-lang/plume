@@ -7,9 +7,10 @@ println(y.show())
 x = 5.exp()
 println(x.show())
 
-facto(n) => product(range(1, n + 1))
+facto(n) => product(1.slice(n))
 
-ls = [0, 1, 2]
+ls: [int] = [0, 1, 2]
 println(ls.show(show))
 @println(facto(5))
-println(ls.flatMap((x) => [x, x + 1, x + 2]).sum().show())
+println(ls.flatMap((x) => [x, x + 1, x + 2]).show(show))
+println(ls[1..].show(show))
