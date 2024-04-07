@@ -30,10 +30,10 @@ extend (c: int) with
   operator % (d: int) => mod_int(c, d)
   operator - (d: int) => sub_int(c, d)
   operator + (d: int) => add_int(c, d)
-  operator ^ (d: int) =>
-    switch d
-      case 0 => 1
-      case ? => c * (c ^ (d - 1))
+  operator ^ (d: int) => switch d
+    case 0 => 1
+    case ? => 
+      return c * (c ^ (d - 1))
   operator == (d: int) => eq_int(c, d)
   operator < (d: int) => lt_int(c, d)
   operator > (d: int) => lt_int(d, c)

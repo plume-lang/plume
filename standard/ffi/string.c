@@ -8,11 +8,12 @@
 
 Value add_str(int arg_n, Module* mod, Value* args) {
   if (arg_n != 2) THROW("Add expects 2 arguments");
-  ASSERT(args[0].type == VALUE_STRING && args[1].type == VALUE_STRING,
-         "Add expects string arguments");
+  ASSERT_FMT(args[0].type == VALUE_STRING && args[1].type == VALUE_STRING,
+             "Add expects string arguments, received %d and %d", args[0].type,
+             args[1].type);
 
   char* new_str =
-      malloc(strlen(args[0].string_value) + strlen(args[1].string_value) + 1);
+      malloc(strlen(args[0].string_value) + strlen(args[1].string_value));
   strcpy(new_str, args[0].string_value);
   strcat(new_str, args[1].string_value);
 
@@ -59,7 +60,7 @@ Value to_string(int arg_n, Module* mod, Value* args) {
       return MAKE_STRING(new_str);
     }
     case VALUE_LIST: {
-      size_t sz = 1;
+      size_t sz = 2;
       for (int i = 0; i < args[0].list_value.length; i++) {
         sz += strlen(
             to_string(1, mod, &args[0].list_value.values[i]).string_value);
@@ -192,7 +193,6 @@ Value char_to_string(int arg_n, Module* mod, Value* args) {
   if (arg_n != 1) THROW("CharToString expects 1 argument");
   ASSERT(args[0].type == VALUE_STRING,
          "CharToString expects a string argument");
-
   return MAKE_STRING(args[0].string_value);
 }
 
@@ -219,20 +219,29 @@ Value str_slice(size_t argc, Module* mod, Value* args) {
 
   int len = strlen(str);
 
-  if (start < 0) start = len + start;
-  if (end < 0) end = len + end;
+  size_t final_len = end - start;
+  if (final_len < 0) final_len = 0;
 
-  if (start < 0) start = 0;
-  if (end < 0) end = 0;
-
-  if (start > len) start = len;
-  if (end > len) end = len;
-
-  if (start > end) start = end;
-
-  char* slice = malloc((end - start + 1) * sizeof(char));
-  strncpy(slice, str + start, end - start);
-  slice[end - start] = '\0';
+  char* slice = malloc((final_len + 1) * sizeof(char));
+  strncpy(slice, str + start, final_len);
 
   return MAKE_STRING(slice);
+}
+
+Value ffi_slice_list(size_t argc, Module* mod, Value* args) {
+  ASSERT_FMT(argc == 3, "Expected 3 arguments, but got %zu", argc);
+
+  Value list = args[0];
+  int start = args[1].int_value;
+  int end = args[2].int_value;
+
+  ValueList new_list;
+  new_list.length = end - start;
+  new_list.values = malloc(new_list.length * sizeof(Value));
+
+  for (int i = 0; i < new_list.length; i++) {
+    new_list.values[i] = list.list_value.values[start + i];
+  }
+
+  return MAKE_LIST(new_list);
 }
