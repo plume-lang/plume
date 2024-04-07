@@ -354,7 +354,7 @@ pattern CustomPostfix name e = EApplication (EVariable name) [e]
 
 eTuple :: Parser Expression
 eTuple = do
-  tuple <- parens (eExpression `sepBy` comma)
+  tuple <- parens (eExpression `sepBy1` comma)
   return (buildTuple tuple)
  where
   buildTuple [] = EVariable "unit"
