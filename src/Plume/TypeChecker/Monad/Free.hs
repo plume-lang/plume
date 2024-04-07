@@ -3,6 +3,7 @@ module Plume.TypeChecker.Monad.Free where
 import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Plume.Syntax.Common.Annotation
+import Plume.TypeChecker.Monad.Error
 import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR
 
@@ -74,3 +75,10 @@ instance (Free t) => Free (TypedPattern t) where
   apply s (PSpecialVar n t) = PSpecialVar n (apply s t)
   apply _ PWildcard = PWildcard
   apply s (PList xs sl) = PList (apply s xs) (apply s sl)
+
+instance Free TypeError where
+  free _ = mempty
+  apply _ (CompilerError e) = CompilerError e
+  apply s (NoExtensionFound n t) = NoExtensionFound n (apply s t)
+  apply s (MultipleExtensionsFound n ts t) = MultipleExtensionsFound n (apply s ts) (apply s t)
+  apply _ e = e

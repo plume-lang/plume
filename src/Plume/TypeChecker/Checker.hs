@@ -31,7 +31,7 @@ synthesize (Pre.EVariable name) = do
           ty <- instantiate sch
           pure (ty, [Post.EVariable name ty])
         Nothing -> do
-          extExists <- doesExtensionExist name
+          extExists <- doesExtensionExistM name
           if extExists
             then do
               ty <- fresh

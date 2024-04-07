@@ -23,11 +23,12 @@ synthDecl
     insertEnv @"typeEnv" name scheme
     ((exprTy, expr'), s1) <- case convertedGenerics of
       [] -> do
-        r@(exprTy, _) <- extractFromArray (infer expr)
+        r@(exprTy, _) <- extractFromArray (local id $ infer expr)
         exprTy `unifiesTo` convertedTy
         pure (r, mempty)
       _ -> do
-        (r@(exprTy, _), cs') <- getLocalConstraints $ extractFromArray $ infer expr
+        (r@(exprTy, _), cs') <-
+          local id $ getLocalConstraints $ extractFromArray $ infer expr
         c1 <- createConstraint (exprTy :~: convertedTy)
         let cs'' = cs'.tyConstraints <> [c1]
         writeIORef cyclicCounter 0

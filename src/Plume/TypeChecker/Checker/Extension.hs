@@ -59,7 +59,7 @@ synthExtMember
 
     let argSchemes = createEnvFromAnnotations convertedArgs
     let schemes = Map.insert extVar (Forall [] extTy) argSchemes
-    insertEnvWith @"typeEnv" (<>) schemes
+    insertEnvWith @"typeEnv" Map.union schemes
     ((retTy, body'), finalExt, s3) <- case convertedGenerics of
       [] -> do
         r@(retTy, _) <- extractFromArray (infer body)

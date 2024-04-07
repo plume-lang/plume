@@ -33,28 +33,24 @@ solveConstraint (Hole _) =
 
 findExtensionWithType
   :: Text -> PlumeType -> PlumeType -> Checker (Either PlumeError Extension)
-findExtensionWithType n t fallback = do
+findExtensionWithType n t _ = do
   sub <- getSubst
   exts <- Set.toList . applyExts sub <$> gets extensions
-
-  let extOriginTy = case t of
-        (ty : _) :->: _ -> ty
-        _ -> fallback
+  let t' = apply sub t
 
   let found =
         filter
-          ( \(MkExtension n' ty (Forall _ sndTy)) ->
+          ( \(MkExtension n' _ (Forall _ sndTy)) ->
               n == n'
-                && isRight (mgu ty extOriginTy)
-                && isRight (mgu t sndTy)
+                && isRight (mgu t' sndTy)
           )
           exts
   case found of
     [ext'] -> pure $ Right ext'
-    [] -> Left <$> throw' (NoExtensionFound n t)
+    [] -> Left <$> throw' (NoExtensionFound n t')
     _ -> do
       let found' = map (\(MkExtension _ ty _) -> ty) found
-      Left <$> throw' (MultipleExtensionsFound n found' t)
+      Left <$> throw' (MultipleExtensionsFound n found' t')
 
 isNotTVar :: PlumeType -> Bool
 isNotTVar (TypeVar _) = False
@@ -79,15 +75,16 @@ cyclicCounter :: IORef Int
 cyclicCounter = unsafePerformIO $ newIORef 0
 
 maxCyclicCounter :: Int
-maxCyclicCounter = 5
+maxCyclicCounter = 15
 
 resolveCyclic :: [PlumeConstraint] -> Checker (Substitution, [PlumeConstraint])
 resolveCyclic cs = do
+  s <- getSubst
   counter <- readIORef cyclicCounter
   when (counter > maxCyclicCounter) $ do
     errors <- readIORef errorStack
     case viaNonEmpty last errors of
-      Just e -> throwRaw e
+      Just e -> throwRaw (second (apply s) e)
       Nothing ->
         throw $
           CompilerError $
@@ -95,7 +92,6 @@ resolveCyclic cs = do
               <> show maxCyclicCounter
               <> " attempts"
   modifyIORef' cyclicCounter (+ 1)
-  s <- getSubst
   s' <- solveExtend (map (second (apply s)) cs)
   modifyIORef' cyclicCounter (const 0)
   updateSubst (fst s')
@@ -123,7 +119,7 @@ solveExtend (x@(p, DoesExtend t name funTy) : xs) = withPosition p $ do
       let s3 = s2' <> s1'
       case cs1 of
         [] -> updateSubst s3 $> (s3, cs1)
-        _ -> throw err
+        _ -> throw (apply s3 err)
 solveExtend (_ : xs) = solveExtend xs
 solveExtend [] = do
   s <- getSubst

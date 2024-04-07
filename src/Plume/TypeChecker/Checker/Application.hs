@@ -7,21 +7,35 @@ import Plume.TypeChecker.TLIR qualified as Post
 
 synthApp :: Infer -> Infer
 synthApp infer (Pre.EApplication f xs) = local id $ do
-  (t, f') <- extractFromArray $ infer f
+  f' <- parseLocated f
+  exts <- gets extensions
+  (t, f'') <- extractFromArray $ infer f
   (ts, xs') <- mapAndUnzipM (extractFromArray . infer) xs
   ret <- fresh
   t `unifiesTo` ts :->: ret
-  pure (ret, [Post.EApplication f' xs'])
+
+  case f' of
+    Pre.EVariable name | doesExtensionExist name exts -> do
+      case ts of
+        [] -> throw $ CompilerError "Empty list of types"
+        (x : _) -> do
+          doesExtend x name (ts :->: ret)
+    _ -> return ()
+
+  pure (ret, [Post.EApplication f'' xs'])
 synthApp _ _ = throw $ CompilerError "Only applications are supported"
 
-doesExtensionExist :: Text -> Checker Bool
-doesExtensionExist name = do
+doesExtensionExistM :: Text -> Checker Bool
+doesExtensionExistM name = do
   exts <- gets extensions
   pure . isJust $ find ((== name) . extName) exts
 
+doesExtensionExist :: Text -> Set Extension -> Bool
+doesExtensionExist name exts = isJust $ find ((== name) . extName) exts
+
 isExtension :: Pre.Expression -> Checker Bool
 isExtension (Pre.ELocated expr _) = isExtension expr
-isExtension (Pre.EVariable name) = doesExtensionExist name
+isExtension (Pre.EVariable name) = doesExtensionExistM name
 isExtension _ = pure False
 
 parseLocated :: Pre.Expression -> Checker Pre.Expression
