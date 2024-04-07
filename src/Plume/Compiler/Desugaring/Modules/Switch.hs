@@ -3,6 +3,7 @@
 module Plume.Compiler.Desugaring.Modules.Switch where
 
 import Data.Map qualified as M
+import Data.Set qualified as S
 import Plume.Compiler.ClosureConversion.Free
 import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Compiler.Desugaring.Monad
@@ -23,8 +24,9 @@ type IsExpression = Bool
 desugarSwitch :: (IsToplevel, IsReturned, IsExpression) -> DesugarSwitch
 desugarSwitch (_, shouldReturn, isExpr) (fExpr, _) (Pre.CESwitch x cases) = do
   (x', stmts) <- fExpr x
+  let freedPat = foldMap (free . fst) cases
   let (decl, declVar) = case x' of
-        Post.DEVar _ -> ([], x')
+        Post.DEVar n | n `S.notMember` freedPat -> ([], x')
         _ -> (createLets (M.singleton "$switch" x'), Post.DEVar "$switch")
   let (conds, maps) = unzip $ map (createCondition declVar . fst) cases
 
