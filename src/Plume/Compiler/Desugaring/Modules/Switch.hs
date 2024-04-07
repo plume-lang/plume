@@ -42,17 +42,17 @@ desugarSwitch (_, shouldReturn, isExpr) (fExpr, _) (Pre.CESwitch x cases) = do
                     then Post.DSReturn expr'
                     else Post.DSExpr expr'
             let stmts''' = substituteMany (M.toList m) (stmts'' <> [lastStmt])
-            return (createConditionExpr (fromMaybe [] pat) stmts''')
+            let cond = createConditionExpr (fromMaybe [] pat)
+            return (Post.DEIf cond stmts''' [])
       )
       cases'
 
   if isExpr
     then do
-      let ifs' = map unboxStatement (concat res)
-      let ifs'' = createIfsExpr ifs'
+      let ifs'' = createIfsExpr res
       return (ifs'', stmts <> decl)
     else do
-      let ifs' = createIfsStatement $ concat res
+      let ifs' = createIfsStatement res
       return (Post.DEVar "nil", stmts <> decl <> ifs')
 desugarSwitch _ _ _ = error "Received incorrect expression, not a switch."
 
@@ -60,19 +60,27 @@ unboxStatement :: Post.DesugaredStatement -> Post.DesugaredExpr
 unboxStatement (Post.DSExpr x) = x
 unboxStatement _ = error "Incorrect statement"
 
-createConditionExpr
-  :: [Post.DesugaredExpr] -> [Post.DesugaredStatement] -> [Post.DesugaredStatement]
-createConditionExpr [] e = [Post.DSExpr (Post.DEIf (Post.DELiteral (LBool True)) e [])]
-createConditionExpr (x : xs) e = [Post.DSExpr $ Post.DEIf x (createConditionExpr xs e) []]
+createConditionExpr :: [Post.DesugaredExpr] -> Post.DesugaredExpr
+createConditionExpr [] = Post.DELiteral (LBool True)
+createConditionExpr [x] = x
+createConditionExpr (x : xs) = Post.DEAnd x (createConditionExpr xs)
 
 createIfsStatement
-  :: [Post.DesugaredStatement]
+  :: [Post.DesugaredExpr]
   -> [Post.DesugaredStatement]
 createIfsStatement [] = []
-createIfsStatement (Post.DSExpr (Post.DEIf c t []) : xs)
+createIfsStatement (Post.DEIf c t _ : xs)
   | c == Post.DELiteral (LBool True) = t
   | otherwise = [Post.DSExpr (Post.DEIf c t (createIfsStatement xs))]
-createIfsStatement (x : xs) = x : createIfsStatement xs
+createIfsStatement (x : xs) = Post.DSExpr x : createIfsStatement xs
+
+shouldNotHappen :: Text -> Post.DesugaredStatement
+shouldNotHappen x =
+  Post.DSExpr
+    ( Post.DEApplication
+        "println"
+        [Post.DELiteral (LString ("Should not happen" <> x))]
+    )
 
 createIfsExpr
   :: [Post.DesugaredExpr]
