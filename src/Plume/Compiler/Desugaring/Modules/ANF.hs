@@ -64,8 +64,10 @@ desugarANF (isNotTop, isReturned, _) f (Pre.CEConditionBranch e1 e2 e3) = do
       let br = Post.DSExpr $ Post.DEIf e1' br1 br2
       return (Post.DEVar "nil", stmts1 <> [br])
     else do
-      let stmts = stmts1 <> stmts2 <> stmts3
-      return (Post.DEIf e1' [Post.DSExpr e2'] [Post.DSExpr e3'], stmts)
+      return
+        ( Post.DEIf e1' (stmts2 <> [Post.DSExpr e2']) (stmts3 <> [Post.DSExpr e3'])
+        , stmts1
+        )
  where
   createBr (e, st) = st <> [Post.DSReturn e]
 desugarANF _ _ _ =

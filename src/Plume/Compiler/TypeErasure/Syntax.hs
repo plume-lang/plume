@@ -38,4 +38,5 @@ data UntypedProgram
   = UPFunction Text [Text] UntypedStatement
   | UPStatement UntypedStatement
   | UPNativeFunction Text Text Int
+  | UPDeclaration Text UntypedExpr
   deriving (Eq, Show, Ord)

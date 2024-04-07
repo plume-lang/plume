@@ -1,5 +1,6 @@
 module Plume.Compiler.SSA.DeadCode where
 
+import Data.IntMap qualified as IMap
 import Data.Set qualified as S
 import Plume.Compiler.ClosureConversion.Free
 import Plume.Compiler.Desugaring.Syntax
@@ -126,15 +127,17 @@ removeDeadCode s (DPFunction n args stmts : rest) =
 removeDeadCode s (DPStatement stmt : rest) =
   let (_, b) = freeStmtList [stmt]
       rest' = removeDeadCode s rest
+      stmt' = removeDeadCodeStmt s [stmt]
       freeVars' = freeProgList rest'
    in if null b || b `S.isSubsetOf` freeVars'
-        then DPStatement stmt : rest'
+        then map DPStatement stmt' ++ rest'
         else rest'
 removeDeadCode s (DPDeclaration n e : rest) =
-  let rest' = removeDeadCode (S.insert n s) rest
+  let e' = maybeToList $ removeDeadCodeExpr s e
+      rest' = removeDeadCode (S.insert n s) rest
       freeVars = freeProgList rest'
    in if n `S.member` freeVars
-        then DPDeclaration n e : rest'
+        then (DPDeclaration n <$> e') <> rest'
         else rest'
 removeDeadCode s (DPNativeFunction fp n arity : rest) =
   let rest' = removeDeadCode (S.insert n s) rest
@@ -149,13 +152,66 @@ removeDeadCodeStmt
   -> [DesugaredStatement]
   -> [DesugaredStatement]
 removeDeadCodeStmt s (DSExpr e : rest) =
-  let rest' = removeDeadCodeStmt s rest
-   in DSExpr e : rest'
-removeDeadCodeStmt _ (DSReturn e : _) = [DSReturn e]
+  let e' = maybe [] (\ex -> [DSExpr ex]) $ removeDeadCodeExpr s e
+      rest' = removeDeadCodeStmt s rest
+   in e' <> rest'
+removeDeadCodeStmt s (DSReturn e : _) = DSReturn <$> maybeToList (removeDeadCodeExpr s e)
 removeDeadCodeStmt s (DSDeclaration n e : rest) =
-  let rest' = removeDeadCodeStmt (S.insert n s) rest
+  let e' = maybeToList $ removeDeadCodeExpr s e
+      rest' = removeDeadCodeStmt (S.insert n s) rest
       (freeVars, b) = freeStmtList rest'
    in if n `S.member` freeVars && n `S.notMember` (b <> s)
-        then DSDeclaration n e : rest'
+        then (DSDeclaration n <$> e') <> rest'
         else rest'
 removeDeadCodeStmt _ [] = []
+
+removeDeadCodeExpr :: BoundVariables -> DesugaredExpr -> Maybe DesugaredExpr
+removeDeadCodeExpr _ (DEVar "nil") = Nothing
+removeDeadCodeExpr b (DEIf e1 e2 e3) =
+  let e1' = removeDeadCodeExpr b e1
+      e2' = removeDeadCodeStmt b e2
+      e3' = removeDeadCodeStmt b e3
+   in DEIf <$> e1' <*> pure e2' <*> pure e3'
+removeDeadCodeExpr b (DEApplication f args) =
+  let args' = map (removeDeadCodeExpr b) args
+   in DEApplication f <$> sequence args'
+removeDeadCodeExpr b (DEEqualsTo e1 e2) =
+  let e1' = removeDeadCodeExpr b e1
+      e2' = removeDeadCodeExpr b e2
+   in DEEqualsTo <$> e1' <*> e2'
+removeDeadCodeExpr b (DEAnd e1 e2) =
+  let e1' = removeDeadCodeExpr b e1
+      e2' = removeDeadCodeExpr b e2
+   in DEAnd <$> e1' <*> e2'
+removeDeadCodeExpr b (DEIndex e1 e2) =
+  let e1' = removeDeadCodeExpr b e1
+      e2' = removeDeadCodeExpr b e2
+   in DEIndex <$> e1' <*> e2'
+removeDeadCodeExpr _ l@(DELiteral _) = Just l
+removeDeadCodeExpr b (DEList es) =
+  let es' = map (removeDeadCodeExpr b) es
+   in DEList <$> sequence es'
+removeDeadCodeExpr b (DEProperty e p) =
+  let e' = removeDeadCodeExpr b e
+   in DEProperty <$> e' <*> pure p
+removeDeadCodeExpr b (DETypeOf e) =
+  let e' = removeDeadCodeExpr b e
+   in DETypeOf <$> e'
+removeDeadCodeExpr b (DEIsConstructor e c) =
+  let e' = removeDeadCodeExpr b e
+   in DEIsConstructor <$> e' <*> pure c
+removeDeadCodeExpr b (DEDictionary es) =
+  let es' = IMap.map (removeDeadCodeExpr b) es
+   in DEDictionary <$> sequence es'
+removeDeadCodeExpr b (DESlice e s) =
+  let e' = removeDeadCodeExpr b e
+   in DESlice <$> e' <*> pure s
+removeDeadCodeExpr b (DEGreaterThan e1 e2) =
+  let e1' = removeDeadCodeExpr b e1
+      e2' = removeDeadCodeExpr b e2
+   in DEGreaterThan <$> e1' <*> e2'
+removeDeadCodeExpr b (DEListLength e) =
+  let e' = removeDeadCodeExpr b e
+   in DEListLength <$> e'
+removeDeadCodeExpr _ (DEVar x) = Just $ DEVar x
+removeDeadCodeExpr _ DESpecial = Just DESpecial

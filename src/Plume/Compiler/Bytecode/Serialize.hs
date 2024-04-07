@@ -43,6 +43,7 @@ encodeInstruction Special = putWord8 19
 encodeInstruction (JumpRel i) = putWord8 20 >> encodeInteger i
 encodeInstruction (Slice i) = putWord8 21 >> encodeInteger i
 encodeInstruction ListLength = putWord8 22
+encodeInstruction Halt = putWord8 23
 
 encodeText :: Text -> Put
 encodeText w = do

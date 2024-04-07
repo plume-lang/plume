@@ -24,6 +24,7 @@ data Instruction
   | Special
   | Slice Int
   | ListLength
+  | Halt
   deriving (Show, Eq)
 
 data Comparator
@@ -51,5 +52,6 @@ data FunctionMetaData = FunctionMetaData
   { arity :: Int
   , address :: Int
   , localsSpace :: Int
+  , locals :: Map Int Text
   }
   deriving (Show, Eq)

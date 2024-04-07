@@ -27,12 +27,9 @@ program
 program = unsafePerformIO $ newIORef ([], [], [])
 
 insertReturnStmt :: Pre.Expression -> Pre.Expression
-insertReturnStmt (Pre.EBlock es) =
-  case (viaNonEmpty init es, viaNonEmpty last es) of
-    (Just _, Just (Pre.EReturn _)) -> Pre.EBlock es
-    (Just es', Just e) -> Pre.EBlock (es' <> [Pre.EReturn e])
-    (Nothing, Just e) -> Pre.EBlock [Pre.EReturn e]
-    _ -> Pre.EBlock es
+insertReturnStmt (Pre.EBlock [Pre.EReturn e]) = Pre.EBlock [Pre.EReturn e]
+insertReturnStmt (Pre.EBlock [e]) = Pre.EBlock [Pre.EReturn e]
+insertReturnStmt (Pre.EBlock es) = Pre.EBlock es
 insertReturnStmt e = Pre.EBlock [Pre.EReturn e]
 
 eraseType :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]
@@ -123,6 +120,17 @@ eraseType (Pre.EType tyName ts : xs) = do
      where
       args = map createVariant [0 .. length vars - 1]
     Nothing -> error "Type constructor not found"
+eraseType (Pre.EDeclaration (Annotation name _) e Nothing : xs) = do
+  e' <- eraseExpr e
+  modifyIORef'
+    program
+    ( \(natives, exts, stmts) ->
+        ( natives
+        , exts <> [Post.UPDeclaration name e']
+        , stmts
+        )
+    )
+  eraseType xs
 eraseType (x : xs) = do
   ys <- eraseType xs
   x' <- eraseStatement x
@@ -130,7 +138,8 @@ eraseType (x : xs) = do
 eraseType [] = return []
 
 eraseStatement :: Pre.TypedExpression PlumeType -> IO Post.UntypedStatement
-eraseStatement (Pre.EReturn e) = Post.USReturn <$> eraseExpr e
+eraseStatement (Pre.EReturn e) =
+  transformReturnE . Post.USReturn <$> eraseExpr e
 eraseStatement (Pre.EDeclaration (Annotation n _) e Nothing) = Post.USDeclaration n <$> eraseExpr e
 eraseStatement (Pre.EConditionBranch e1 e2 e3) = do
   e3' <- maybeM e3 eraseStatement
@@ -156,10 +165,10 @@ eraseExpr (Pre.EConditionBranch e1 e2 e3) = case e3 of
       <*> eraseExpr e2
       <*> eraseExpr e3'
   Nothing -> error "Condition branch without a body"
-eraseExpr (Pre.ESwitch e cases) =
-  Post.UESwitch
-    <$> eraseExpr e
-    <*> mapM (bimapM erasePattern eraseExpr) cases
+eraseExpr (Pre.ESwitch e cases) = do
+  e' <- eraseExpr e
+  cases' <- mapM (bimapM erasePattern eraseExpr) cases
+  return $ Post.UESwitch e' cases'
 eraseExpr (Pre.EBlock es) = Post.UEBlock <$> mapM eraseStatement es
 eraseExpr (Pre.EClosure args _ body) = do
   b <- eraseExpr body
@@ -212,3 +221,23 @@ erase xs = do
 
 findWithKey :: (k -> Bool) -> Map k a -> Maybe (k, a)
 findWithKey f = List.find (f . fst) . Map.toList
+
+decompose :: [a] -> ([a], Maybe a)
+decompose [] = ([], Nothing)
+decompose [x] = ([], Just x)
+decompose xs = case (viaNonEmpty init xs, viaNonEmpty last xs) of
+  (Just init', Just last') -> (init', Just last')
+  (_, _) -> ([], Nothing)
+
+transformReturn :: Post.UntypedExpr -> Post.UntypedExpr
+transformReturn (Post.UEBlock es) = case decompose es of
+  (init', Just (Post.USExpr l)) -> Post.UEBlock (init' <> [transformReturnE (Post.USReturn l)])
+  _ -> Post.UEBlock es
+transformReturn e = Post.UEBlock [transformReturnE (Post.USReturn e)]
+
+transformReturnE :: Post.UntypedStatement -> Post.UntypedStatement
+transformReturnE (Post.USReturn (Post.UESwitch e cases)) = do
+  let cases' = map (second transformReturn) cases
+  Post.USExpr (Post.UESwitch e cases')
+transformReturnE (Post.USReturn e) = Post.USReturn e
+transformReturnE e = e

@@ -7,6 +7,7 @@ import Data.List qualified as List
 import Data.Map qualified as Map
 import Data.Text qualified as Text
 import GHC.IO
+import GHC.Records
 import Plume.Compiler.Bytecode.Syntax qualified as BC
 import Plume.Compiler.Desugaring.Syntax qualified as Pre
 import Plume.Syntax.Common.Literal
@@ -54,6 +55,8 @@ data AssemblerState = AssemblerState
   , cwd :: FilePath
   }
   deriving (Show, Eq)
+
+deriveHasField ''AssemblerState
 
 {-# NOINLINE assemblerState #-}
 assemblerState :: IORef AssemblerState
@@ -115,7 +118,7 @@ assemble (Pre.DEIf e1 e2 e3) = do
   e3' <- concatMapM assembleStmt e3
   pure $
     e1'
-      ++ [BC.JumpIfRel $ if containsReturn e2' then length e2' + 1 else length e2' + 2]
+      ++ [BC.JumpIfRel $ length e2' + (if containsReturn e2' then 1 else 2)]
       ++ e2'
       ++ [BC.JumpRel $ length e3' + 1 | not (containsReturn e2')]
       ++ e3'
@@ -181,6 +184,7 @@ assembleProgram (Pre.DPFunction n args stmts) = do
                     (length args)
                     (s.currentSize + 1)
                     (length (args <> freed))
+                    (Map.fromList $ zip [0 ..] (args <> freed))
                 )
                 s.metadata
           , locals = Map.fromList $ zip (args <> freed) [0 ..]
@@ -281,7 +285,13 @@ assembleBytecode fp xs = do
   (is, s) <- runAssembler xs
   let constants = assembleConstants s.constants
   let libs = map (second length) s.nativeLibraries
-  pure $ BC.Program is constants libs
+  pure $ BC.Program (optimizeJumps (is ++ [BC.Halt])) constants libs
+
+optimizeJumps :: [BC.Instruction] -> [BC.Instruction]
+optimizeJumps (BC.JumpRel 0 : xs) = xs
+optimizeJumps [BC.JumpRel _] = []
+optimizeJumps (x : xs) = x : optimizeJumps xs
+optimizeJumps [] = []
 
 elemIndex :: (Eq a) => [(a, b)] -> a -> Maybe b
 elemIndex [] _ = Nothing

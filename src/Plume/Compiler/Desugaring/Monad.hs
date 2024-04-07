@@ -30,3 +30,13 @@ createBlock :: [ANFResult (Maybe DesugaredStatement)] -> [DesugaredStatement]
 createBlock ((Just x, stmts) : xss) = stmts ++ x : createBlock xss
 createBlock ((Nothing, stmts) : xss) = stmts ++ createBlock xss
 createBlock [] = []
+
+createBlockProg :: [DesugaredStatement] -> [DesugaredProgram]
+createBlockProg (DSDeclaration n e : xs) = DPDeclaration n e : createBlockProg xs
+createBlockProg (x : xs) = DPStatement x : createBlockProg xs
+createBlockProg [] = []
+
+createBlockProg' :: [ANFResult (Maybe DesugaredStatement)] -> [DesugaredProgram]
+createBlockProg' ((Just x, stmts) : xss) = createBlockProg (stmts <> [x]) <> createBlockProg' xss
+createBlockProg' ((Nothing, stmts) : xss) = createBlockProg stmts <> createBlockProg' xss
+createBlockProg' [] = []

@@ -66,6 +66,7 @@ instance Free ClosedProgram where
   free (CPFunction n args e) = free e S.\\ (S.fromList args <> S.singleton n)
   free (CPStatement s) = free s
   free (CPNativeFunction {}) = S.empty
+  free (CPDeclaration n e) = free e S.\\ S.singleton n
 
 instance (Free a) => Free (Map k a) where
   free = foldMap free
@@ -119,6 +120,9 @@ instance Substitutable ClosedProgram ClosedExpr where
   substitute e (CPFunction name args body) =
     CPFunction name args (substitute e body)
   substitute _ p@(CPNativeFunction {}) = p
+  substitute e (CPDeclaration name body)
+    | name == fst e = CPDeclaration name body
+    | otherwise = CPDeclaration name (substitute e body)
 
 instance Substitutable ClosedPattern ClosedExpr where
   substitute _ p = p

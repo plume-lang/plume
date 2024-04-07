@@ -209,9 +209,17 @@ closeProgram (Pre.UPNativeFunction fp name arity) = do
   modifyIORef' reserved (S.insert name)
   modifyIORef' functions (M.insert name arity)
   pure [Post.CPNativeFunction fp name arity]
+closeProgram (Pre.UPStatement (Pre.USDeclaration n e)) = do
+  modifyIORef' reserved (<> S.singleton n)
+  (stmts, e') <- closeExpression e
+  pure $ stmts ++ [Post.CPStatement (Post.CSDeclaration n e')]
 closeProgram (Pre.UPStatement s) = do
   (stmts, s') <- closeStatement s
   pure $ stmts ++ [Post.CPStatement s']
+closeProgram (Pre.UPDeclaration n e) = do
+  modifyIORef' reserved (<> S.singleton n)
+  (stmts, e') <- closeExpression e
+  pure $ stmts ++ [Post.CPDeclaration n e']
 
 runClosureConversion
   :: (MonadIO m)

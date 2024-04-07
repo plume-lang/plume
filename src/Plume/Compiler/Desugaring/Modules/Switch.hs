@@ -21,10 +21,11 @@ type IsReturned = Bool
 type IsExpression = Bool
 
 desugarSwitch :: (IsToplevel, IsReturned, IsExpression) -> DesugarSwitch
-desugarSwitch (isToplevel, shouldReturn, isExpr) (fExpr, _) (Pre.CESwitch x cases) = do
+desugarSwitch (_, shouldReturn, isExpr) (fExpr, _) (Pre.CESwitch x cases) = do
   (x', stmts) <- fExpr x
-  let decl = createLets $ M.singleton "$switch" x'
-  let declVar = Post.DEVar "$switch"
+  let (decl, declVar) = case x' of
+        Post.DEVar _ -> ([], x')
+        _ -> (createLets (M.singleton "$switch" x'), Post.DEVar "$switch")
   let (conds, maps) = unzip $ map (createCondition declVar . fst) cases
 
   let bodies = map snd cases
@@ -37,16 +38,11 @@ desugarSwitch (isToplevel, shouldReturn, isExpr) (fExpr, _) (Pre.CESwitch x case
             let pat = maybeAt i conds
             (expr', stmts'') <- fExpr expr
             let lastStmt =
-                  if isToplevel && shouldReturn
+                  if shouldReturn
                     then Post.DSReturn expr'
                     else Post.DSExpr expr'
             let stmts''' = substituteMany (M.toList m) (stmts'' <> [lastStmt])
-            case pat of
-              Just conds_ -> do
-                let cond = createConditionExpr conds_
-                return [Post.DSExpr $ Post.DEIf cond stmts''' []]
-              Nothing ->
-                return stmts'''
+            return (createConditionExpr (fromMaybe [] pat) stmts''')
       )
       cases'
 
@@ -64,10 +60,10 @@ unboxStatement :: Post.DesugaredStatement -> Post.DesugaredExpr
 unboxStatement (Post.DSExpr x) = x
 unboxStatement _ = error "Incorrect statement"
 
-createConditionExpr :: [Post.DesugaredExpr] -> Post.DesugaredExpr
-createConditionExpr [] = Post.DELiteral (LBool True)
-createConditionExpr [x] = x
-createConditionExpr (x : xs) = Post.DEAnd x (createConditionExpr xs)
+createConditionExpr
+  :: [Post.DesugaredExpr] -> [Post.DesugaredStatement] -> [Post.DesugaredStatement]
+createConditionExpr [] e = [Post.DSExpr (Post.DEIf (Post.DELiteral (LBool True)) e [])]
+createConditionExpr (x : xs) e = [Post.DSExpr $ Post.DEIf x (createConditionExpr xs e) []]
 
 createIfsStatement
   :: [Post.DesugaredStatement]
