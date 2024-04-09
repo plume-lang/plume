@@ -47,6 +47,7 @@ encodeInstruction Halt = putWord8 23
 encodeInstruction (UpdateGlobal i) = putWord8 24 >> encodeInteger i
 encodeInstruction (UpdateLocal i) = putWord8 25 >> encodeInteger i
 encodeInstruction MakeMutable = putWord8 26
+encodeInstruction UnMut = putWord8 27
 
 encodeText :: Text -> Put
 encodeText w = do

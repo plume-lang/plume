@@ -57,6 +57,7 @@ instance Free DesugaredExpr where
   free (DESlice e _) = free e
   free (DEGreaterThan e1 _) = free e1
   free (DEListLength e) = free e
+  free (DEUnMut e) = free e
 
 instance Free DesugaredStatement where
   free (DSExpr e) = free e
@@ -250,5 +251,6 @@ removeDeadCodeExpr b (DEGreaterThan e1 e2) =
 removeDeadCodeExpr b (DEListLength e) =
   let e' = removeDeadCodeExpr b e
    in DEListLength <$> e'
+removeDeadCodeExpr b (DEUnMut e) = DEUnMut <$> removeDeadCodeExpr b e
 removeDeadCodeExpr _ (DEVar x) = Just $ DEVar x
 removeDeadCodeExpr _ DESpecial = Just DESpecial

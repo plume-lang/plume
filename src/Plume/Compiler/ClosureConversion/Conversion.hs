@@ -127,6 +127,9 @@ closeExpression (Pre.UEDeclaration name e1 e2) = do
   (p1, e1') <- closeExpression e1
   (p2, e2') <- closeExpression e2
   pure (p1 <> p2, Post.CEDeclaration name e1' e2')
+closeExpression (Pre.UEUnMut e) = do
+  (stmts, e') <- closeExpression e
+  pure (stmts, Post.CEUnMut e')
 closeExpression (Pre.UEConditionBranch e1 e2 e3) = do
   (p1, e1') <- closeExpression e1
   (p2, e2') <- closeExpression e2

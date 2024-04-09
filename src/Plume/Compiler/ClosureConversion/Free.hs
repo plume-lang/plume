@@ -36,6 +36,7 @@ instance Free ClosedExpr where
   free CESpecial = S.empty
   free (CEMutDeclaration x e1 e2) = (free e1 <> free e2) S.\\ S.singleton x
   free (CEMutUpdate x e1 e2) = (free e1 <> free e2) S.\\ S.singleton x
+  free (CEUnMut e) = free e
 
 freeBody :: [ClosedStatement] -> S.Set Text
 freeBody body =
@@ -113,6 +114,7 @@ instance Substitutable ClosedExpr ClosedExpr where
     CEMutDeclaration x (substitute e e1) (substitute e e2)
   substitute e (CEMutUpdate x e1 e2) =
     CEMutUpdate x (substitute e e1) (substitute e e2)
+  substitute e (CEUnMut e') = CEUnMut (substitute e e')
 
 instance Substitutable ClosedStatement ClosedExpr where
   substitute e (CSExpr e') = CSExpr (substitute e e')

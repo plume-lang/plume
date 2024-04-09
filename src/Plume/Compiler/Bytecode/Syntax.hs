@@ -23,6 +23,7 @@ data Instruction
   | Phi Int Int
   | MakeLambda Int Int
   | MakeMutable
+  | UnMut
   | GetIndex
   | Special
   | Slice Int

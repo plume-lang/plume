@@ -24,6 +24,7 @@ data TypedExpression t
       (TypedExpression t)
       (Maybe (TypedExpression t))
   | EMutUpdate (Annotation t) (TypedExpression t) (Maybe (TypedExpression t))
+  | EUnMut (TypedExpression t)
   | EExtensionDeclaration
       Text
       t

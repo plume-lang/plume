@@ -81,6 +81,7 @@ prettyExpr (EMutUpdate a e1' e2') =
         )
  where
   arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
+prettyExpr (EUnMut e) = anBold "*" <> prettyExpr e
 prettyExpr (EConditionBranch e1' e2' e3') =
   anCol Blue "if"
     <+> prettyExpr e1'

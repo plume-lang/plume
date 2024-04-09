@@ -68,6 +68,7 @@ instance (Free t) => Free (TypedExpression t) where
   apply s (EReturn e) = EReturn (apply s e)
   apply s (ENativeFunction fp n t) = ENativeFunction fp n (apply s t)
   apply s (EExtensionDeclaration n t arg body) = EExtensionDeclaration n (apply s t) (apply s arg) (apply s body)
+  apply s (EUnMut e) = EUnMut (apply s e)
 
 instance (Free t) => Free (TypedPattern t) where
   free _ = mempty

@@ -19,6 +19,7 @@ data ClosedExpr
   | CEProperty ClosedExpr Int
   | CEEqualsType ClosedExpr Text
   | CESpecial
+  | CEUnMut ClosedExpr
   deriving (Eq, Show, Ord)
 
 data ClosedPattern

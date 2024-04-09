@@ -129,6 +129,9 @@ assemble (Pre.DEIf e1 e2 e3) = do
 assemble (Pre.DETypeOf e) = do
   e' <- assemble e
   pure $ e' ++ [BC.TypeOf]
+assemble (Pre.DEUnMut e) = do
+  e' <- assemble e
+  pure $ e' ++ [BC.UnMut]
 assemble (Pre.DEIsConstructor e t) = do
   e' <- assemble e
   lit <- assemble (Pre.DELiteral $ LString t)

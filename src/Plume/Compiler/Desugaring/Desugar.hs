@@ -56,6 +56,9 @@ desugarExpr isTop = \case
     (x', stmts1) <- desugarExpr isTop x
     (y', stmts2) <- desugarExpr isTop y
     return (Post.DEIndex x' y', stmts1 ++ stmts2)
+  Pre.CEUnMut x -> do
+    (x', stmts) <- desugarExpr isTop x
+    return (Post.DEUnMut x', stmts)
 
 desugarStatement
   :: (IsToplevel, IsReturned, IsExpression)

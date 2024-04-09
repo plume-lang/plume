@@ -158,6 +158,7 @@ eraseExpr (Pre.EVariable x _) = pure $ Post.UEVar x
 eraseExpr (Pre.EApplication f args) =
   Post.UEApplication <$> eraseExpr f <*> mapM eraseExpr args
 eraseExpr (Pre.ELiteral l) = pure $ Post.UELiteral l
+eraseExpr (Pre.EUnMut e) = Post.UEUnMut <$> eraseExpr e
 eraseExpr (Pre.EList es) = Post.UEList <$> mapM eraseExpr es
 eraseExpr (Pre.EDeclaration (Annotation n _) e1 e2) = case e2 of
   Just e2' -> Post.UEDeclaration n <$> eraseExpr e1 <*> eraseExpr e2'

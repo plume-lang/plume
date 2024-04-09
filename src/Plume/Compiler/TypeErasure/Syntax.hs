@@ -18,6 +18,7 @@ data UntypedExpr
   | UEEqualsType UntypedExpr Text
   | UEClosure [Text] UntypedStatement
   | UESpecial
+  | UEUnMut UntypedExpr
   deriving (Eq, Show, Ord)
 
 data UntypedPattern

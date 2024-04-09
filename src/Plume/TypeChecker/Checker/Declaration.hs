@@ -23,9 +23,7 @@ synthDecl
       throw $ CompilerError "Generic mutable variables are not supported"
 
     searchEnv @"typeEnv" name >>= \case
-      Just (Forall _ (TMut t)) -> do
-        print (t, convertedTy)
-        convertedTy `unifiesTo` t
+      Just (Forall _ (TMut t)) -> convertedTy `unifiesTo` t
       Just _ -> throw $ CompilerError "Variable already declared"
       _ -> pure ()
 

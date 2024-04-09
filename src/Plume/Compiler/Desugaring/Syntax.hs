@@ -20,6 +20,7 @@ data DesugaredExpr
   | DESlice DesugaredExpr Int
   | DEGreaterThan DesugaredExpr Int
   | DEListLength DesugaredExpr
+  | DEUnMut DesugaredExpr
   deriving (Eq, Show, Ord)
 
 data DesugaredStatement
@@ -72,6 +73,7 @@ instance Substitutable DesugaredExpr DesugaredExpr where
   substitute s (DEGreaterThan e1 e2) =
     DEGreaterThan (substitute s e1) e2
   substitute s (DEListLength e) = DEListLength (substitute s e)
+  substitute s (DEUnMut e) = DEUnMut (substitute s e)
 
 doesContainReturn :: DesugaredStatement -> Bool
 doesContainReturn (DSReturn _) = True
