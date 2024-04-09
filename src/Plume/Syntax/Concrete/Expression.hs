@@ -65,6 +65,7 @@ data ConcreteExpression t
       [Annotation (Maybe t, IsMutable)]
       (Maybe t)
       (ConcreteExpression t)
+  | EUnMut (ConcreteExpression t)
   | EBlock [ConcreteExpression t]
   | EProperty Text (ConcreteExpression t)
   | EListIndex (ConcreteExpression t) (ConcreteExpression t)

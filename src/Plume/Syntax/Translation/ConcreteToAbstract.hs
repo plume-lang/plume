@@ -62,6 +62,12 @@ concreteToAbstract (CST.EDeclaration g isMut ann e me) = do
   e' <- shouldBeAlone <$> concreteToAbstract e
   me' <- mapM shouldBeAlone <$> maybeM concreteToAbstract me
   transRet $ AST.EDeclaration isMut g ann <$> e' <*> me'
+concreteToAbstract (CST.EUnMut e) = do
+  -- Unmut can be a spread element, so we need to check if it is and
+  -- then combine the expressions into a single expression by wrapping
+  -- them into a block.
+  e' <- fmap interpretSpreadable <$> concreteToAbstract e
+  transRet $ AST.EUnMut <$> e'
 concreteToAbstract (CST.EConditionBranch e1 e2 e3) = do
   -- A condition should be a single expression
   e1' <- shouldBeAlone <$> concreteToAbstract e1

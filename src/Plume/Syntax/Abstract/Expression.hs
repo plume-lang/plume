@@ -34,6 +34,7 @@ data AbstractExpression t
       [Annotation (Maybe t, IsMutable)]
       (Maybe t)
       (AbstractExpression t)
+  | EUnMut (AbstractExpression t)
   | EBlock [AbstractExpression t]
   | ELocated (AbstractExpression t) Position
   | ESwitch (AbstractExpression t) [(Pattern, AbstractExpression t)]

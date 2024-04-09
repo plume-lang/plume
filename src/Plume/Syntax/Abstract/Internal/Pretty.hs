@@ -59,6 +59,7 @@ prettyExpr (EClosure as t e) =
 
   ppRet Nothing = ""
   ppRet (Just t') = ":" <+> prettyTy t'
+prettyExpr (EUnMut e) = anBold "*" <> prettyExpr e
 prettyExpr (EBlock es) =
   line' <> indent 2 (vsep (map prettyExpr es))
 prettyExpr (ELocated e _) = prettyExpr e

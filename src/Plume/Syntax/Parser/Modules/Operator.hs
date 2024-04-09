@@ -34,6 +34,7 @@ operators =
       , binary "or" (EBinary Or)
       ]
     , [prefix "not" (EPrefix Not)]
+    , [prefix "*" EUnMut]
     ,
       [ binary "==" (EBinary Equals)
       , binary "!=" (EBinary NotEquals)
