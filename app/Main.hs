@@ -35,7 +35,7 @@ main = do
       doesFileExist file >>= \case
         False -> do
           putStr "File "
-          print file
+          putStr file
           putStrLn " does not exist"
           exitFailure
         True -> pure ()
