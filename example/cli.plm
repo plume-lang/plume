@@ -4,8 +4,9 @@ y = x.isOk()
 println(x.show(show, show))
 println(y.show())
 
-x = 5.exp()
-println(x.show())
+x = 6.exp()
+
+println(x.to_string())
 
 facto(n) => product(1.slice(n))
 

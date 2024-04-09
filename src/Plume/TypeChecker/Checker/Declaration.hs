@@ -19,6 +19,10 @@ synthDecl
     convertedGenerics :: [TyVar] <- mapM convert generics
     convertedTy :: PlumeType <- convert ty
 
+    searchEnv @"typeEnv" name >>= \case
+      Just _ -> throw $ CompilerError "Variable already declared"
+      _ -> pure ()
+
     let scheme = Forall convertedGenerics convertedTy
     insertEnv @"typeEnv" name scheme
     ((exprTy, expr'), s1) <- case convertedGenerics of
