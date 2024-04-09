@@ -42,7 +42,7 @@ desugarExpr isTop = \case
     (x', stmts) <- desugarExpr isTop x
     return (Post.DEEqualsTo (Post.DETypeOf x') (Post.DELiteral (LString t)), stmts)
   d@(Pre.CEDeclaration {}) -> desugarANF isTop (desugarExpr isTop) d
-  s@(Pre.CESwitch {}) -> desugarSwitch isTop (desugarExpr isTop, desugarStatement isTop) s
+  s@Pre.CESwitch {} -> desugarSwitch isTop (desugarExpr isTop, desugarStatement isTop) s
   Pre.CEBlock xs -> do
     res <- concat <$> mapM (desugarStatement (fst3 isTop, False, False)) xs
     return (Post.DEVar "nil", createBlock res)

@@ -142,7 +142,7 @@ assemble (Pre.DESlice e i) = do
   pure $ e' ++ [BC.Slice i]
 assemble (Pre.DEGreaterThan e1 e2) = do
   e1' <- assemble e1
-  e2' <- assemble e2
+  e2' <- assemble (Pre.DELiteral (LInt $ toInteger e2))
   pure $ e1' ++ e2' ++ [BC.Compare BC.GreaterThan]
 assemble (Pre.DEListLength e) = do
   e' <- assemble e

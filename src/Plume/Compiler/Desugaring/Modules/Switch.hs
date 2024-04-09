@@ -65,7 +65,7 @@ unboxStatement _ = error "Incorrect statement"
 createConditionExpr :: [Post.DesugaredExpr] -> Post.DesugaredExpr
 createConditionExpr [] = Post.DELiteral (LBool True)
 createConditionExpr [x] = x
-createConditionExpr (x : xs) = Post.DEAnd x (createConditionExpr xs)
+createConditionExpr (x : xs) = x `and'` createConditionExpr xs
 
 createIfsStatement
   :: [Post.DesugaredExpr]
@@ -83,6 +83,9 @@ shouldNotHappen x =
         "println"
         [Post.DELiteral (LString ("Should not happen" <> x))]
     )
+
+and' :: Post.DesugaredExpr -> Post.DesugaredExpr -> Post.DesugaredExpr
+and' x y = Post.DEIf x [Post.DSExpr y] [Post.DSExpr (Post.DELiteral (LBool False))]
 
 createIfsExpr
   :: [Post.DesugaredExpr]
@@ -127,9 +130,9 @@ createCondition x (Pre.CPList pats slice) =
         Just _ ->
           Post.DEGreaterThan
             (Post.DEListLength x)
-            (Post.DELiteral (LInt (patLen - 1)))
+            (patLen - 1)
         Nothing ->
           Post.DEEqualsTo
             (Post.DEListLength x)
-            (Post.DELiteral (LInt patLen))
+            (Post.DELiteral (LInt (toInteger patLen)))
    in (lenCond : concat conds <> conds', mconcat maps <> maps')

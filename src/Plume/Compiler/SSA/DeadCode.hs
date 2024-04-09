@@ -55,7 +55,7 @@ instance Free DesugaredExpr where
   free (DEIndex e1 e2) = free e1 <> free e2
   free DESpecial = S.empty
   free (DESlice e _) = free e
-  free (DEGreaterThan e1 e2) = free e1 <> free e2
+  free (DEGreaterThan e1 _) = free e1
   free (DEListLength e) = free e
 
 instance Free DesugaredStatement where
@@ -208,8 +208,7 @@ removeDeadCodeExpr b (DESlice e s) =
    in DESlice <$> e' <*> pure s
 removeDeadCodeExpr b (DEGreaterThan e1 e2) =
   let e1' = removeDeadCodeExpr b e1
-      e2' = removeDeadCodeExpr b e2
-   in DEGreaterThan <$> e1' <*> e2'
+   in DEGreaterThan <$> e1' <*> pure e2
 removeDeadCodeExpr b (DEListLength e) =
   let e' = removeDeadCodeExpr b e
    in DEListLength <$> e'
