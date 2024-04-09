@@ -9,6 +9,8 @@ data UntypedExpr
   | UEList [UntypedExpr]
   | UEIndex UntypedExpr UntypedExpr
   | UEDeclaration Text UntypedExpr UntypedExpr
+  | UEMutDeclaration Text UntypedExpr UntypedExpr
+  | UEMutUpdate Text UntypedExpr UntypedExpr
   | UEConditionBranch UntypedExpr UntypedExpr UntypedExpr
   | UESwitch UntypedExpr [(UntypedPattern, UntypedExpr)]
   | UEAnd UntypedExpr UntypedExpr
@@ -32,6 +34,8 @@ data UntypedStatement
   | USReturn UntypedExpr
   | USDeclaration Text UntypedExpr
   | USConditionBranch UntypedExpr UntypedStatement UntypedStatement
+  | USMutDeclaration Text UntypedExpr
+  | USMutUpdate Text UntypedExpr
   deriving (Eq, Show, Ord)
 
 data UntypedProgram
@@ -39,4 +43,6 @@ data UntypedProgram
   | UPStatement UntypedStatement
   | UPNativeFunction Text Text Int
   | UPDeclaration Text UntypedExpr
+  | UPMutDeclaration Text UntypedExpr
+  | UPMutUpdate Text UntypedExpr
   deriving (Eq, Show, Ord)

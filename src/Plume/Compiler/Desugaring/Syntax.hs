@@ -26,6 +26,8 @@ data DesugaredStatement
   = DSExpr DesugaredExpr
   | DSReturn DesugaredExpr
   | DSDeclaration Text DesugaredExpr
+  | DSMutDeclaration Text DesugaredExpr
+  | DSMutUpdate Text DesugaredExpr
   deriving (Eq, Show, Ord)
 
 data DesugaredProgram
@@ -33,6 +35,8 @@ data DesugaredProgram
   | DPStatement DesugaredStatement
   | DPDeclaration Text DesugaredExpr
   | DPNativeFunction Text Text Int
+  | DPMutDeclaration Text DesugaredExpr
+  | DPMutUpdate Text DesugaredExpr
   deriving (Eq, Show, Ord)
 
 instance Substitutable DesugaredStatement DesugaredExpr where
@@ -41,6 +45,8 @@ instance Substitutable DesugaredStatement DesugaredExpr where
   substitute (name, expr) (DSDeclaration n e)
     | n == name = DSDeclaration n expr
     | otherwise = DSDeclaration n (substitute (name, expr) e)
+  substitute s (DSMutDeclaration n e) = DSMutDeclaration n $ substitute s e
+  substitute s (DSMutUpdate n e) = DSMutUpdate n $ substitute s e
 
 instance Substitutable DesugaredExpr DesugaredExpr where
   substitute s (DEVar x)

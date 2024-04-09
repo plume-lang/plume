@@ -159,6 +159,14 @@ closeExpression (Pre.UEIndex e1 e2) = do
   (p1, e1') <- closeExpression e1
   (p2, e2') <- closeExpression e2
   pure (p1 <> p2, Post.CEIndex e1' e2')
+closeExpression (Pre.UEMutDeclaration name e1 e2) = do
+  (p1, e1') <- closeExpression e1
+  (p2, e2') <- closeExpression e2
+  pure (p1 <> p2, Post.CEMutDeclaration name e1' e2')
+closeExpression (Pre.UEMutUpdate name e1 e2) = do
+  (p1, e1') <- closeExpression e1
+  (p2, e2') <- closeExpression e2
+  pure (p1 <> p2, Post.CEMutUpdate name e1' e2')
 
 closePattern
   :: (MonadClosure m) => Pre.UntypedPattern -> m Post.ClosedPattern
@@ -190,6 +198,12 @@ closeStatement (Pre.USConditionBranch e1 e2 e3) = do
 closeStatement (Pre.USExpr e) = do
   (stmts, e') <- closeExpression e
   pure (stmts, Post.CSExpr e')
+closeStatement (Pre.USMutDeclaration name e) = do
+  (stmts, e') <- closeExpression e
+  pure (stmts, Post.CSMutDeclaration name e')
+closeStatement (Pre.USMutUpdate name e) = do
+  (stmts, e') <- closeExpression e
+  pure (stmts, Post.CSMutUpdate name e')
 
 makeReturn :: Post.ClosedExpr -> [Post.ClosedStatement]
 makeReturn (Post.CEBlock es) = es
@@ -220,6 +234,14 @@ closeProgram (Pre.UPDeclaration n e) = do
   modifyIORef' reserved (<> S.singleton n)
   (stmts, e') <- closeExpression e
   pure $ stmts ++ [Post.CPDeclaration n e']
+closeProgram (Pre.UPMutDeclaration n e) = do
+  modifyIORef' reserved (<> S.singleton n)
+  (stmts, e') <- closeExpression e
+  pure $ stmts ++ [Post.CPMutDeclaration n e']
+closeProgram (Pre.UPMutUpdate n e) = do
+  modifyIORef' reserved (<> S.singleton n)
+  (stmts, e') <- closeExpression e
+  pure $ stmts ++ [Post.CPMutUpdate n e']
 
 runClosureConversion
   :: (MonadIO m)

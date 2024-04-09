@@ -23,38 +23,35 @@ dispatched = unsafePerformIO $ newIORef Map.empty
 
 {-# NOINLINE program #-}
 program
-  :: IORef ([Post.UntypedProgram], [Post.UntypedProgram], [Post.UntypedProgram])
-program = unsafePerformIO $ newIORef ([], [], [])
+  :: IORef [Post.UntypedProgram]
+program = unsafePerformIO $ newIORef []
 
 insertReturnStmt :: Pre.Expression -> Pre.Expression
 insertReturnStmt (Pre.EBlock [Pre.EReturn e]) = Pre.EBlock [Pre.EReturn e]
-insertReturnStmt (Pre.EBlock [e]) = Pre.EBlock [Pre.EReturn e]
+insertReturnStmt (Pre.EBlock [e]) | isNotDecl e = Pre.EBlock [Pre.EReturn e]
 insertReturnStmt (Pre.EBlock es) = Pre.EBlock es
+insertReturnStmt (Pre.EMutDeclaration n e1 e2) = Pre.EMutDeclaration n e1 (insertReturnStmt <$> e2)
+insertReturnStmt (Pre.EMutUpdate n e1 e2) = Pre.EMutUpdate n e1 (insertReturnStmt <$> e2)
+insertReturnStmt (Pre.EDeclaration n e1 e2) = Pre.EDeclaration n e1 (insertReturnStmt <$> e2)
 insertReturnStmt e = Pre.EBlock [Pre.EReturn e]
+
+isNotDecl :: Pre.Expression -> Bool
+isNotDecl (Pre.EDeclaration {}) = False
+isNotDecl (Pre.EMutDeclaration {}) = False
+isNotDecl (Pre.EMutUpdate {}) = False
+isNotDecl _ = True
 
 eraseType :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]
 eraseType (Pre.EDeclaration (Annotation name _) (Pre.EClosure args _ body) Nothing : xs) = do
   let args' = map (\(Annotation n _) -> n) args
   b' <- eraseStatement (insertReturnStmt body)
   let fun = Post.UPFunction name args' b'
-  modifyIORef'
-    program
-    ( \(natives, exts, stmts) ->
-        ( natives
-        , exts <> [fun]
-        , stmts
-        )
-    )
+  modifyIORef' program (<> [fun])
   eraseType xs
 eraseType (Pre.ENativeFunction fp n (args :->: _) : xs) = do
   modifyIORef'
     program
-    ( \(natives, exts, stmts) ->
-        ( natives <> [Post.UPNativeFunction fp n (length args)]
-        , exts
-        , stmts
-        )
-    )
+    (<> [Post.UPNativeFunction fp n (length args)])
   eraseType xs
 eraseType (Pre.ELocated e _ : xs) = eraseType (e : xs)
 eraseType (Pre.EExtensionDeclaration name _ arg (Pre.EClosure args _ b) : xs) = do
@@ -67,22 +64,11 @@ eraseType (Pre.EExtensionDeclaration name _ arg (Pre.EClosure args _ b) : xs) = 
   fun <-
     Post.UPFunction name' (arg' : map (.annotationName) args) <$> eraseStatement b'
 
-  modifyIORef'
-    program
-    ( \(natives, exts, stmts) ->
-        ( natives
-        , exts <> [fun]
-        , stmts
-        )
-    )
+  modifyIORef' program (<> [fun])
   eraseType xs
 eraseType (Pre.EType tyName ts : xs) = do
   let tys = map createFunction ts
-  modifyIORef'
-    program
-    ( \(natives, exts, stmts) ->
-        (natives, exts <> tys, stmts)
-    )
+  modifyIORef' program (<> tys)
   eraseType xs
  where
   createVariant n = "a" <> show n
@@ -122,18 +108,20 @@ eraseType (Pre.EType tyName ts : xs) = do
     Nothing -> error "Type constructor not found"
 eraseType (Pre.EDeclaration (Annotation name _) e Nothing : xs) = do
   e' <- eraseExpr e
-  modifyIORef'
-    program
-    ( \(natives, exts, stmts) ->
-        ( natives
-        , exts <> [Post.UPDeclaration name e']
-        , stmts
-        )
-    )
+  modifyIORef' program (<> [Post.UPDeclaration name e'])
+  eraseType xs
+eraseType (Pre.EMutDeclaration (Annotation name _) e Nothing : xs) = do
+  e' <- eraseExpr e
+  modifyIORef' program (<> [Post.UPMutDeclaration name e'])
+  eraseType xs
+eraseType (Pre.EMutUpdate (Annotation name _) e Nothing : xs) = do
+  e' <- eraseExpr e
+  modifyIORef' program (<> [Post.UPMutUpdate name e'])
   eraseType xs
 eraseType (x : xs) = do
-  ys <- eraseType xs
   x' <- eraseStatement x
+  modifyIORef' program (<> [Post.UPStatement x'])
+  ys <- eraseType xs
   return (Post.UPStatement x' : ys)
 eraseType [] = return []
 
@@ -141,6 +129,10 @@ eraseStatement :: Pre.TypedExpression PlumeType -> IO Post.UntypedStatement
 eraseStatement (Pre.EReturn e) =
   transformReturnE . Post.USReturn <$> eraseExpr e
 eraseStatement (Pre.EDeclaration (Annotation n _) e Nothing) = Post.USDeclaration n <$> eraseExpr e
+eraseStatement (Pre.EMutDeclaration (Annotation n _) e1 Nothing) =
+  Post.USMutDeclaration n <$> eraseExpr e1
+eraseStatement (Pre.EMutUpdate (Annotation n _) e1 Nothing) =
+  Post.USMutUpdate n <$> eraseExpr e1
 eraseStatement (Pre.EConditionBranch e1 e2 e3) = do
   e3' <- maybeM e3 eraseStatement
   case e3' of
@@ -150,6 +142,18 @@ eraseStatement (Pre.ELocated e _) = eraseStatement e
 eraseStatement e = Post.USExpr <$> eraseExpr e
 
 eraseExpr :: Pre.TypedExpression PlumeType -> IO Post.UntypedExpr
+eraseExpr (Pre.EMutDeclaration (Annotation n _) e1 e2) = do
+  e1' <- eraseExpr e1
+  e2' <- maybeM e2 eraseExpr
+  case e2' of
+    Just e2'' -> return $ Post.UEMutDeclaration n e1' e2''
+    Nothing -> error "Mut declaration without a body"
+eraseExpr (Pre.EMutUpdate (Annotation n _) e1 e2) = do
+  e1' <- eraseExpr e1
+  e2' <- maybeM e2 eraseExpr
+  case e2' of
+    Just e2'' -> return $ Post.UEMutUpdate n e1' e2''
+    Nothing -> error "Mut update without a body"
 eraseExpr (Pre.EVariable x _) = pure $ Post.UEVar x
 eraseExpr (Pre.EApplication f args) =
   Post.UEApplication <$> eraseExpr f <*> mapM eraseExpr args
@@ -214,10 +218,9 @@ erasePattern (Pre.PList ps t) =
 
 erase :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]
 erase xs = do
-  writeIORef program ([], [], [])
-  xs' <- eraseType xs
-  readIORef program >>= \case
-    (natives, exts, stmts) -> return (natives <> exts <> stmts <> xs')
+  writeIORef program []
+  void $ eraseType xs
+  readIORef program
 
 findWithKey :: (k -> Bool) -> Map k a -> Maybe (k, a)
 findWithKey f = List.find (f . fst) . Map.toList

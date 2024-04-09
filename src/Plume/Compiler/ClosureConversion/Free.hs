@@ -34,6 +34,8 @@ instance Free ClosedExpr where
   free (CEAnd e1 e2) = free e1 <> free e2
   free (CEIndex e1 e2) = free e1 <> free e2
   free CESpecial = S.empty
+  free (CEMutDeclaration x e1 e2) = (free e1 <> free e2) S.\\ S.singleton x
+  free (CEMutUpdate x e1 e2) = (free e1 <> free e2) S.\\ S.singleton x
 
 freeBody :: [ClosedStatement] -> S.Set Text
 freeBody body =
@@ -61,12 +63,16 @@ instance Free ClosedStatement where
   free (CSReturn e) = free e
   free (CSDeclaration x e) = free e S.\\ S.singleton x
   free (CSConditionBranch e1 e2 e3) = free e1 <> free e2 <> free e3
+  free (CSMutDeclaration x e) = free e S.\\ S.singleton x
+  free (CSMutUpdate x e) = free e S.\\ S.singleton x
 
 instance Free ClosedProgram where
   free (CPFunction n args e) = free e S.\\ (S.fromList args <> S.singleton n)
   free (CPStatement s) = free s
   free (CPNativeFunction {}) = S.empty
   free (CPDeclaration n e) = free e S.\\ S.singleton n
+  free (CPMutDeclaration n e) = free e S.\\ S.singleton n
+  free (CPMutUpdate n e) = free e S.\\ S.singleton n
 
 instance (Free a) => Free (Map k a) where
   free = foldMap free
@@ -103,6 +109,10 @@ instance Substitutable ClosedExpr ClosedExpr where
   substitute e (CEAnd e1 e2) = CEAnd (substitute e e1) (substitute e e2)
   substitute e (CEIndex e1 e2) = CEIndex (substitute e e1) (substitute e e2)
   substitute _ CESpecial = CESpecial
+  substitute e (CEMutDeclaration x e1 e2) =
+    CEMutDeclaration x (substitute e e1) (substitute e e2)
+  substitute e (CEMutUpdate x e1 e2) =
+    CEMutUpdate x (substitute e e1) (substitute e e2)
 
 instance Substitutable ClosedStatement ClosedExpr where
   substitute e (CSExpr e') = CSExpr (substitute e e')
@@ -114,6 +124,8 @@ instance Substitutable ClosedStatement ClosedExpr where
       (substitute e e1)
       (substitute e e2)
       (substitute e e3)
+  substitute e (CSMutDeclaration x e') = CSMutDeclaration x (substitute e e')
+  substitute e (CSMutUpdate x e') = CSMutUpdate x (substitute e e')
 
 instance Substitutable ClosedProgram ClosedExpr where
   substitute e (CPStatement s) = CPStatement (substitute e s)
@@ -123,6 +135,12 @@ instance Substitutable ClosedProgram ClosedExpr where
   substitute e (CPDeclaration name body)
     | name == fst e = CPDeclaration name body
     | otherwise = CPDeclaration name (substitute e body)
+  substitute e (CPMutDeclaration name body)
+    | name == fst e = CPMutDeclaration name body
+    | otherwise = CPMutDeclaration name (substitute e body)
+  substitute e (CPMutUpdate name body)
+    | name == fst e = CPMutUpdate name body
+    | otherwise = CPMutUpdate name (substitute e body)
 
 instance Substitutable ClosedPattern ClosedExpr where
   substitute _ p = p

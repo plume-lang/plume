@@ -50,6 +50,32 @@ desugarANF t f (Pre.CEDeclaration name expr body) = do
           <> [Post.DSDeclaration fresh body']
 
   return (Post.DEVar fresh, stmts)
+desugarANF t f (Pre.CEMutDeclaration name expr body) = do
+  (expr', stmt1) <- f expr
+  (body', stmts2) <- desugarANF t f body
+
+  fresh <- freshName
+
+  let stmts =
+        stmt1
+          <> [Post.DSMutDeclaration name expr']
+          <> stmts2
+          <> [Post.DSDeclaration fresh body']
+
+  return (Post.DEVar fresh, stmts)
+desugarANF t f (Pre.CEMutUpdate name expr body) = do
+  (expr', stmt1) <- f expr
+  (body', stmts2) <- desugarANF t f body
+
+  fresh <- freshName
+
+  let stmts =
+        stmt1
+          <> [Post.DSMutUpdate name expr']
+          <> stmts2
+          <> [Post.DSDeclaration fresh body']
+
+  return (Post.DEVar fresh, stmts)
 desugarANF (isNotTop, isReturned, _) f (Pre.CEConditionBranch e1 e2 e3) = do
   (e1', stmts1) <- f e1
   r1@(e2', stmts2) <- f e2

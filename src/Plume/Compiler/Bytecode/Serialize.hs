@@ -44,6 +44,9 @@ encodeInstruction (JumpRel i) = putWord8 20 >> encodeInteger i
 encodeInstruction (Slice i) = putWord8 21 >> encodeInteger i
 encodeInstruction ListLength = putWord8 22
 encodeInstruction Halt = putWord8 23
+encodeInstruction (UpdateGlobal i) = putWord8 24 >> encodeInteger i
+encodeInstruction (UpdateLocal i) = putWord8 25 >> encodeInteger i
+encodeInstruction MakeMutable = putWord8 26
 
 encodeText :: Text -> Put
 encodeText w = do

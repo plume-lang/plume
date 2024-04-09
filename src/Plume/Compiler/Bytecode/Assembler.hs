@@ -37,12 +37,16 @@ instance Free Pre.DesugaredStatement where
   free (Pre.DSExpr e) = free e
   free (Pre.DSReturn e) = free e
   free (Pre.DSDeclaration n e) = [n] <> free e
+  free (Pre.DSMutDeclaration n e) = [n] <> free e
+  free (Pre.DSMutUpdate n e) = [n] <> free e
 
 instance Free Pre.DesugaredProgram where
   free (Pre.DPFunction name _ _) = List.singleton name
   free (Pre.DPStatement s) = free s
   free (Pre.DPNativeFunction {}) = mempty
   free (Pre.DPDeclaration n _) = List.singleton n
+  free (Pre.DPMutDeclaration n _) = List.singleton n
+  free (Pre.DPMutUpdate n _) = List.singleton n
 
 data AssemblerState = AssemblerState
   { constants :: Map Literal Int
@@ -148,22 +152,36 @@ assemble (Pre.DEListLength e) = do
   e' <- assemble e
   pure $ e' ++ [BC.ListLength]
 
-assembleStmt :: Pre.DesugaredStatement -> IO [BC.Instruction]
-assembleStmt (Pre.DSExpr e) = assemble e
-assembleStmt (Pre.DSReturn e) = do
-  e' <- assemble e
-  pure $ e' ++ [BC.Return]
-assembleStmt (Pre.DSDeclaration n e) = do
+assembleDecl :: Bool -> Text -> Pre.DesugaredExpr -> IO [BC.Instruction]
+assembleDecl isMut n e = do
   e' <- assemble e
   AssemblerState {locals, globals} <- readIORef assemblerState
+
+  let mut = [BC.MakeMutable | isMut]
 
   case Map.lookup n locals of
     Just i -> do
       modifyIORef' assemblerState $ \s ->
         s {locals = Map.insert n i locals}
-      pure $ e' ++ [BC.StoreLocal i]
+      pure $ e' ++ mut ++ [BC.StoreLocal i]
     Nothing -> case Map.lookup n globals of
-      Just i -> pure $ e' ++ [BC.StoreGlobal i]
+      Just i -> pure $ e' ++ mut ++ [BC.StoreGlobal i]
+      Nothing -> error $ "Variable not found: " <> show n
+
+assembleStmt :: Pre.DesugaredStatement -> IO [BC.Instruction]
+assembleStmt (Pre.DSExpr e) = assemble e
+assembleStmt (Pre.DSReturn e) = do
+  e' <- assemble e
+  pure $ e' ++ [BC.Return]
+assembleStmt (Pre.DSDeclaration n e) = assembleDecl False n e
+assembleStmt (Pre.DSMutDeclaration n e) = assembleDecl True n e
+assembleStmt (Pre.DSMutUpdate n e) = do
+  e' <- assemble e
+  AssemblerState {locals, globals} <- readIORef assemblerState
+  case Map.lookup n locals of
+    Just i -> pure $ e' ++ [BC.UpdateLocal i]
+    Nothing -> case Map.lookup n globals of
+      Just i -> pure $ e' ++ [BC.UpdateGlobal i]
       Nothing -> error $ "Variable not found: " <> show n
 
 assembleProgram :: Pre.DesugaredProgram -> IO [BC.Instruction]
@@ -209,6 +227,20 @@ assembleProgram (Pre.DPDeclaration n e) = do
       let res = e' ++ [BC.StoreGlobal i]
       return res
     Nothing -> error $ "Global variable not found: " <> show n
+assembleProgram (Pre.DPMutDeclaration n e) = do
+  e' <- assemble e
+  AssemblerState {globals} <- readIORef assemblerState
+  case Map.lookup n globals of
+    Just i -> do
+      let res = e' ++ [BC.MakeMutable, BC.StoreGlobal i]
+      return res
+    Nothing -> error $ "Variable not found: " <> show n
+assembleProgram (Pre.DPMutUpdate n e) = do
+  e' <- assemble e
+  AssemblerState {globals} <- readIORef assemblerState
+  case Map.lookup n globals of
+    Just i -> pure $ e' ++ [BC.UpdateGlobal i]
+    Nothing -> error $ "Variable not found: " <> show n
 assembleProgram (Pre.DPStatement stmt) = assembleStmt stmt
 assembleProgram (Pre.DPNativeFunction fp n _) = do
   AssemblerState {nativeFunctions, constants, nativeLibraries, cwd} <-

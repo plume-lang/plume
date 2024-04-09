@@ -10,6 +10,8 @@ data ClosedExpr
   | CEIndex ClosedExpr ClosedExpr
   | CEAnd ClosedExpr ClosedExpr
   | CEDeclaration Text ClosedExpr ClosedExpr
+  | CEMutDeclaration Text ClosedExpr ClosedExpr
+  | CEMutUpdate Text ClosedExpr ClosedExpr
   | CEConditionBranch ClosedExpr ClosedExpr ClosedExpr
   | CESwitch ClosedExpr [(ClosedPattern, ClosedExpr)]
   | CEDictionary (IntMap ClosedExpr)
@@ -33,6 +35,8 @@ data ClosedStatement
   | CSReturn ClosedExpr
   | CSDeclaration Text ClosedExpr
   | CSConditionBranch ClosedExpr ClosedStatement ClosedStatement
+  | CSMutDeclaration Text ClosedExpr
+  | CSMutUpdate Text ClosedExpr
   deriving (Eq, Show, Ord)
 
 data ClosedProgram
@@ -40,4 +44,6 @@ data ClosedProgram
   | CPStatement ClosedStatement
   | CPNativeFunction Text Text Int
   | CPDeclaration Text ClosedExpr
+  | CPMutDeclaration Text ClosedExpr
+  | CPMutUpdate Text ClosedExpr
   deriving (Eq, Show, Ord)
