@@ -1,17 +1,11 @@
-err: Result<str, str> = Ok("Hello, ")
-x: Result<str, str> = err.map((s) => s.concat("world!"))
-y = x.isOk()
-println(x.show(show, show))
-println(y.show())
+mutate<A>(mut x: A, f: (A) -> A) => 
+  x = f(*x)
+  return unit
 
-x = 6.exp()
+mut x2 = 6
 
-println(x.to_string())
+println(x2.to_string())
 
-facto(n) => product(1.slice(n))
+mutate(x2, (y) => y + 1)
 
-ls: [int] = [0, 1, 2]
-println(ls.show(show))
-@println(facto(5))
-println(ls.flatMap((x) => [x, x + 1, x + 2]).show(show))
-println(ls[1..].show(show))
+println(x2.to_string())
