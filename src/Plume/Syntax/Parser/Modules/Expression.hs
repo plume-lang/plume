@@ -136,7 +136,17 @@ eConditionBranch isStatement = do
   return (EConditionBranch cond thenBr elseBr)
 
 eList :: Parser Expression
-eList = EList <$> brackets (eExpression `sepBy` comma)
+eList =
+  EList <$> do
+    _ <- symbol "["
+    ilevel <- ask
+    res <-
+      indentSepBy eExpression comma
+        <|> (eExpression `sepBy` comma)
+    _ <-
+      indentSameOrInline ilevel (symbol "]")
+        <|> indentSameOrHigher ilevel (symbol "]")
+    return res
 
 eReturn :: Parser Expression
 eReturn = do
