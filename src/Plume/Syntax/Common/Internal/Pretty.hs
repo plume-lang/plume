@@ -26,6 +26,14 @@ typeAnnotation :: (ANSIPretty t) => Annotation (Maybe t) -> Doc AnsiStyle
 typeAnnotation (Annotation name Nothing) = anItalic (pretty name)
 typeAnnotation (Annotation name (Just t)) = anItalic (pretty name) <> ":" <+> ansiPretty t
 
+ppMut :: Bool -> Doc AnsiStyle
+ppMut True = anCol Blue "mut "
+ppMut False = mempty
+
+argAnnotation :: (ANSIPretty t) => Annotation (Maybe t, Bool) -> Doc AnsiStyle
+argAnnotation (Annotation name (Nothing, m)) = ppMut m <> anItalic (pretty name)
+argAnnotation (Annotation name (Just t, m)) = ppMut m <> anItalic (pretty name) <> ":" <+> ansiPretty t
+
 prettyPat :: Pattern -> Doc AnsiStyle
 prettyPat (PVariable v) = anItalic $ pretty v
 prettyPat (PLiteral l) = prettyLit l

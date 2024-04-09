@@ -41,6 +41,16 @@ annotated = Annotation <$> identifier <*> ty
  where
   ty = optional (symbol ":" *> tType)
 
+argAnnotated :: Parser (Annotation (Maybe PlumeType, IsMutable))
+argAnnotated =
+  choice
+    [ Annotation <$> (reserved "mut" *> identifier) <*> ((,True) <$> mutTy)
+    , Annotation <$> identifier <*> ((,False) <$> ty)
+    ]
+ where
+  ty = optional (symbol ":" *> tType)
+  mutTy = optional (symbol ":" *> tType)
+
 -- Used to parse a block of expressions
 -- This takes care of indentation and newlines
 -- Block either starts with a new line and indentations or
@@ -112,7 +122,22 @@ eDeclaration = do
   ilevel <- ask
   expr <- indentOrInline
   body <- optional (indentSameOrInline ilevel $ reserved "in" *> eExpression)
-  return (EDeclaration [] var expr body)
+  return (EDeclaration [] False var expr body)
+
+eMutDeclaration :: Parser Expression
+eMutDeclaration = do
+  _ <- reserved "mut"
+  var <-
+    try $
+      Annotation
+        <$> identifier
+        <*> optional (symbol ":" *> tType)
+        <* (notFollowedBy "==" <?> "variable declaration")
+        <* symbol "="
+  ilevel <- ask
+  expr <- indentOrInline
+  body <- optional (indentSameOrInline ilevel $ reserved "in" *> eExpression)
+  return (EDeclaration [] True var expr body)
 
 stmtOrExpr :: Bool -> (Parser a -> Parser (Maybe a))
 stmtOrExpr isStatement = if isStatement then optional else (Just <$>)
@@ -174,8 +199,8 @@ eClosure = do
       [ clMonoArg
       , clPolyArg
       ]
-  clMonoArg = pure <$> (Annotation <$> identifier <*> pure Nothing)
-  clPolyArg = parens (annotated `sepBy` comma)
+  clMonoArg = pure <$> (Annotation <$> identifier <*> pure (Nothing, False))
+  clPolyArg = parens (argAnnotated `sepBy` comma)
 
 eExtension :: Parser [Expression]
 eExtension = do
@@ -197,7 +222,7 @@ eExtFunction = do
   (name, gens, args, ret) <- try $ do
     name <- try identifier <|> (reserved "operator" *> operator)
     gens <- option [] $ angles (gGeneric `sepBy` comma)
-    args <- parens (annotated `sepBy` comma)
+    args <- parens (argAnnotated `sepBy` comma)
     ret <- optional (symbol ":" *> tType)
     _ <- symbol "=>"
     return (name, gens, args, ret)
@@ -280,13 +305,19 @@ eFunctionDefinition = do
   (name, generics, arguments, ret) <- try $ do
     name <- try identifier <|> (reserved "operator" *> operator)
     generics <- option [] (angles (gGeneric `sepBy` comma))
-    arguments <- parens (annotated `sepBy` comma)
+    arguments <- parens (argAnnotated `sepBy` comma)
     ret <- optional (symbol ":" *> tType)
     _ <- symbol "=>"
     return (name, generics, arguments, ret)
   body <- indentOrInline
   return
-    (EDeclaration generics (name :@: Nothing) (EClosure arguments ret body) Nothing)
+    ( EDeclaration
+        generics
+        False
+        (name :@: Nothing)
+        (EClosure arguments ret body)
+        Nothing
+    )
 
 eCasePattern :: Parser (Pattern, Expression)
 eCasePattern = do
@@ -332,6 +363,7 @@ parseStatement =
     choice
       [ eReturn
       , eConditionBranch True
+      , try eMutDeclaration
       , eDeclaration
       , eFunctionDefinition
       , eExpression

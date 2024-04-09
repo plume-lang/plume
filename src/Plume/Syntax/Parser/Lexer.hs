@@ -144,6 +144,7 @@ reservedWords =
   , "postfix"
   , "infixl"
   , "infixr"
+  , "mut"
   ]
 
 notSpace :: Parser ()

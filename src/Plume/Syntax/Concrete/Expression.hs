@@ -40,6 +40,8 @@ data PrefixOperator
 data PostfixOperator
   = PostfixSlice
 
+type IsMutable = Bool
+
 data ConcreteExpression t
   = EVariable Text
   | ELiteral Literal
@@ -51,6 +53,7 @@ data ConcreteExpression t
   | EType (Annotation [PlumeGeneric]) [TypeConstructor t]
   | EDeclaration
       [PlumeGeneric]
+      IsMutable
       (Annotation (Maybe t))
       (ConcreteExpression t)
       (Maybe (ConcreteExpression t))
@@ -59,7 +62,7 @@ data ConcreteExpression t
       (ConcreteExpression t)
       (Maybe (ConcreteExpression t))
   | EClosure
-      [Annotation (Maybe t)]
+      [Annotation (Maybe t, IsMutable)]
       (Maybe t)
       (ConcreteExpression t)
   | EBlock [ConcreteExpression t]

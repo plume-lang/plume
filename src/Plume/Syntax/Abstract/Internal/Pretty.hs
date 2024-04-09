@@ -30,8 +30,10 @@ prettyExpr (EApplication e es) =
     <> parens (hsep . punctuate comma $ map prettyExpr es)
 prettyExpr (EVariable v) = anItalic $ pretty v
 prettyExpr (ELiteral l) = prettyLit l
-prettyExpr (EDeclaration generics a e1' e2') =
-  ansiPretty generics
+prettyExpr (EDeclaration isMut generics a e1' e2') =
+  anCol Blue "let"
+    <+> (if isMut then anCol Blue "mut" else mempty)
+    <+> ansiPretty generics
     <> typeAnnotation a
       <+> "="
       <+> prettyExpr e1'
@@ -52,8 +54,8 @@ prettyExpr (EClosure as t e) =
     <+> "=>"
     <+> prettyExpr e
  where
-  ppArgs [x :@: Nothing] Nothing = pretty x
-  ppArgs xs ret = parens (hsep . punctuate comma $ map typeAnnotation xs) <> ppRet ret
+  ppArgs [x :@: (Nothing, mt)] Nothing = ppMut mt <+> pretty x
+  ppArgs xs ret = parens (hsep . punctuate comma $ map argAnnotation xs) <> ppRet ret
 
   ppRet Nothing = ""
   ppRet (Just t') = ":" <+> prettyTy t'

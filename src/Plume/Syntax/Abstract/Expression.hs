@@ -12,12 +12,15 @@ import Plume.Syntax.Common
 import Plume.Syntax.Concrete.Expression (Position, TypeConstructor)
 import Prelude hiding (intercalate)
 
+type IsMutable = Bool
+
 data AbstractExpression t
   = EVariable Text
   | ELiteral Literal
   | EList [AbstractExpression t]
   | EApplication (AbstractExpression t) [AbstractExpression t]
   | EDeclaration
+      IsMutable
       [PlumeGeneric]
       (Annotation (Maybe t))
       (AbstractExpression t)
@@ -28,7 +31,7 @@ data AbstractExpression t
       (AbstractExpression t)
       (Maybe (AbstractExpression t))
   | EClosure
-      [Annotation (Maybe t)]
+      [Annotation (Maybe t, IsMutable)]
       (Maybe t)
       (AbstractExpression t)
   | EBlock [AbstractExpression t]
@@ -45,8 +48,12 @@ instance (Eq t) => Eq (AbstractExpression t) where
   ELiteral l1 == ELiteral l2 = l1 == l2
   EList es1 == EList es2 = es1 == es2
   EApplication e1 es1 == EApplication e2 es2 = e1 == e2 && es1 == es2
-  EDeclaration g1 a1 e1 me1 == EDeclaration g2 a2 e2 me2 =
-    g1 == g2 && a1 == a2 && e1 == e2 && me1 == me2
+  EDeclaration m1 g1 a1 e1 me1 == EDeclaration m2 g2 a2 e2 me2 =
+    m1 == m2
+      && g1 == g2
+      && a1 == a2
+      && e1 == e2
+      && me1 == me2
   EType a1 ts1 == EType a2 ts2 = a1 == a2 && ts1 == ts2
   EConditionBranch e11 e12 me1 == EConditionBranch e21 e22 me2 =
     e11 == e21 && e12 == e22 && me1 == me2

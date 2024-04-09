@@ -20,6 +20,9 @@ data PlumeGeneric
   | GExtends Text [Text]
   deriving (Eq, Show)
 
+pattern TMut :: PlumeType -> PlumeType
+pattern TMut t = TApp (TId "mut") [t]
+
 pattern TFunction, (:->:) :: [PlumeType] -> PlumeType -> PlumeType
 pattern TFunction args ret = TApp (TApp (TId "->") [ret]) args
 pattern xs :->: ret = TFunction xs ret
