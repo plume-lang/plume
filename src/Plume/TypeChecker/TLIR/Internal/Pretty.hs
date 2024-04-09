@@ -59,6 +59,28 @@ prettyExpr (EDeclaration a e1' e2') =
         )
  where
   arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
+prettyExpr (EMutDeclaration a e1' e2') =
+  anCol Blue "mut"
+    <+> arg a
+    <+> "="
+    <+> prettyExpr e1'
+    <+> ( case e2' of
+            Nothing -> ""
+            Just e2'' -> anCol Blue "\nin" <+> prettyExpr e2''
+        )
+ where
+  arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
+prettyExpr (EMutUpdate a e1' e2') =
+  anCol Blue "mut"
+    <+> arg a
+    <+> "="
+    <+> prettyExpr e1'
+    <+> ( case e2' of
+            Nothing -> ""
+            Just e2'' -> anCol Blue "\nin" <+> prettyExpr e2''
+        )
+ where
+  arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
 prettyExpr (EConditionBranch e1' e2' e3') =
   anCol Blue "if"
     <+> prettyExpr e1'
