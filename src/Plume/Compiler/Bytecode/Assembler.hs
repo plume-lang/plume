@@ -10,6 +10,7 @@ import GHC.IO
 import GHC.Records
 import Plume.Compiler.Bytecode.Syntax qualified as BC
 import Plume.Compiler.Desugaring.Syntax qualified as Pre
+import Plume.Compiler.ClosureConversion.Syntax (Update(..))
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Translation.Generics
 import System.FilePath
@@ -33,12 +34,16 @@ instance Free Pre.DesugaredExpr where
   free (Pre.DEDictionary es) = foldMap free es
   free _ = mempty
 
+instance Free Update where
+  free (UVariable x) = [x]
+  free (UProperty e _) = free e
+
 instance Free Pre.DesugaredStatement where
   free (Pre.DSExpr e) = free e
   free (Pre.DSReturn e) = free e
   free (Pre.DSDeclaration n e) = [n] <> free e
   free (Pre.DSMutDeclaration n e) = [n] <> free e
-  free (Pre.DSMutUpdate n e) = [n] <> free e
+  free (Pre.DSMutUpdate n e) = free n <> free e
 
 instance Free Pre.DesugaredProgram where
   free (Pre.DPFunction name _ _) = List.singleton name
@@ -46,7 +51,7 @@ instance Free Pre.DesugaredProgram where
   free (Pre.DPNativeFunction {}) = mempty
   free (Pre.DPDeclaration n _) = List.singleton n
   free (Pre.DPMutDeclaration n _) = List.singleton n
-  free (Pre.DPMutUpdate n _) = List.singleton n
+  free (Pre.DPMutUpdate n _) = free n
 
 data AssemblerState = AssemblerState
   { constants :: Map Literal Int
@@ -180,12 +185,12 @@ assembleStmt (Pre.DSDeclaration n e) = assembleDecl False n e
 assembleStmt (Pre.DSMutDeclaration n e) = assembleDecl True n e
 assembleStmt (Pre.DSMutUpdate n e) = do
   e' <- assemble e
-  AssemblerState {locals, globals} <- readIORef assemblerState
-  case Map.lookup n locals of
-    Just i -> pure $ e' ++ [BC.UpdateLocal i]
-    Nothing -> case Map.lookup n globals of
-      Just i -> pure $ e' ++ [BC.UpdateGlobal i]
-      Nothing -> error $ "Variable not found: " <> show n
+  up <- assembleUpdate n
+  pure $ e' ++ up ++ [BC.Update]
+
+getUpdateVariable :: Update -> Text
+getUpdateVariable (UVariable n) = n
+getUpdateVariable (UProperty e _) = getUpdateVariable e
 
 assembleProgram :: Pre.DesugaredProgram -> IO [BC.Instruction]
 assembleProgram (Pre.DPFunction n args stmts) = do
@@ -240,10 +245,8 @@ assembleProgram (Pre.DPMutDeclaration n e) = do
     Nothing -> error $ "Variable not found: " <> show n
 assembleProgram (Pre.DPMutUpdate n e) = do
   e' <- assemble e
-  AssemblerState {globals} <- readIORef assemblerState
-  case Map.lookup n globals of
-    Just i -> pure $ e' ++ [BC.UpdateGlobal i]
-    Nothing -> error $ "Variable not found: " <> show n
+  up <- assembleUpdate n
+  pure $ e' ++ up ++ [BC.Update]
 assembleProgram (Pre.DPStatement stmt) = assembleStmt stmt
 assembleProgram (Pre.DPNativeFunction fp n _) = do
   AssemblerState {nativeFunctions, constants, nativeLibraries, cwd} <-
@@ -283,6 +286,18 @@ getNativeFunctions = mapMaybe getNativeFunction
  where
   getNativeFunction (Pre.DPNativeFunction _ n _) = Just n
   getNativeFunction _ = Nothing
+
+assembleUpdate :: Update -> IO [BC.Instruction]
+assembleUpdate (UVariable n) = do
+  AssemblerState {locals, globals} <- readIORef assemblerState
+  case Map.lookup n locals of
+    Just i -> pure [BC.LoadLocal i]
+    Nothing -> case Map.lookup n globals of
+      Just i -> pure [BC.LoadGlobal i]
+      Nothing -> error $ "Variable not found: " <> show n
+assembleUpdate (UProperty e p) = do
+  e' <- assembleUpdate e
+  pure $ e' ++ [BC.ListGet p]
 
 runAssembler :: [Pre.DesugaredProgram] -> IO ([BC.Instruction], AssemblerState)
 runAssembler xs = do

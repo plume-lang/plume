@@ -6,8 +6,7 @@ data Instruction
   | LoadConstant Int
   | LoadGlobal Int
   | StoreGlobal Int
-  | UpdateGlobal Int
-  | UpdateLocal Int
+  | Update
   | Return
   | Compare Comparator
   | And

@@ -1,6 +1,7 @@
 module Plume.Compiler.Desugaring.Syntax where
 
 import Plume.Compiler.ClosureConversion.Free
+import Plume.Compiler.ClosureConversion.Syntax (Update(..))
 import Plume.Syntax.Common.Literal
 
 data DesugaredExpr
@@ -28,7 +29,7 @@ data DesugaredStatement
   | DSReturn DesugaredExpr
   | DSDeclaration Text DesugaredExpr
   | DSMutDeclaration Text DesugaredExpr
-  | DSMutUpdate Text DesugaredExpr
+  | DSMutUpdate Update DesugaredExpr
   deriving (Eq, Show, Ord)
 
 data DesugaredProgram
@@ -37,7 +38,7 @@ data DesugaredProgram
   | DPDeclaration Text DesugaredExpr
   | DPNativeFunction Text Text Int
   | DPMutDeclaration Text DesugaredExpr
-  | DPMutUpdate Text DesugaredExpr
+  | DPMutUpdate Update DesugaredExpr
   deriving (Eq, Show, Ord)
 
 instance Substitutable DesugaredStatement DesugaredExpr where

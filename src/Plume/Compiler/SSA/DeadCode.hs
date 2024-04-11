@@ -64,7 +64,7 @@ instance Free DesugaredStatement where
   free (DSReturn e) = free e
   free (DSDeclaration n e) = free e S.\\ S.singleton n
   free (DSMutDeclaration n e) = free e S.\\ S.singleton n
-  free (DSMutUpdate n e) = free e S.\\ S.singleton n
+  free (DSMutUpdate n e) = free e S.\\ free n
 
 type BoundVariables = Set Text
 type FreeVariables = Set Text
@@ -90,8 +90,8 @@ freeStmtList xs = go xs (S.empty, S.empty)
     let freeE = S.delete n $ free e
      in go rest (bimap (S.union freeE) (S.insert n) s)
   go (DSMutUpdate n e : rest) s =
-    let freeE = S.delete n $ free e
-     in go rest (bimap (S.union freeE) (S.insert n) s)
+    let freeE = free e S.\\ free n
+     in go rest (bimap (S.union freeE) (S.union (free n)) s)
   go [] s = s
 
 freeProgList :: [DesugaredProgram] -> FreeVariables
@@ -117,8 +117,8 @@ freeProgList xs = fst $ go xs (S.empty, S.empty)
     let freeE = free e S.\\ S.singleton n
      in go rest (bimap (S.union freeE) (S.insert n) s)
   go (DPMutUpdate n e : rest) s =
-    let freeE = free e S.\\ S.singleton n
-     in go rest (bimap (S.union freeE) (S.insert n) s)
+    let freeE = free e S.\\ free n
+     in go rest (bimap (S.union freeE) (<> free n) s)
   go [] s = s
 
 instance Free DesugaredProgram where
@@ -127,7 +127,7 @@ instance Free DesugaredProgram where
   free (DPNativeFunction {}) = S.empty
   free (DPDeclaration n e) = free e S.\\ S.singleton n
   free (DPMutDeclaration n e) = free e S.\\ S.singleton n
-  free (DPMutUpdate n e) = free e S.\\ S.singleton n
+  free (DPMutUpdate n e) = free e S.\\ free n
 
 removeDeadCode
   :: BoundVariables
@@ -171,7 +171,8 @@ removeDeadCode s (DPMutDeclaration n e : rest) =
         else rest'
 removeDeadCode s (DPMutUpdate n e : rest) =
   let e' = maybeToList $ removeDeadCodeExpr s e
-      rest' = removeDeadCode (S.insert n s) rest
+      n' = free n
+      rest' = removeDeadCode (S.union n' s) rest
    in (DPMutUpdate n <$> e') <> rest'
 removeDeadCode _ [] = []
 
@@ -200,7 +201,7 @@ removeDeadCodeStmt s (DSMutDeclaration n e : rest) =
         else rest'
 removeDeadCodeStmt s (DSMutUpdate n e : rest) =
   let e' = maybeToList $ removeDeadCodeExpr s e
-      rest' = removeDeadCodeStmt (S.insert n s) rest
+      rest' = removeDeadCodeStmt (S.union (free n) s) rest
    in (DSMutUpdate n <$> e') <> rest'
 removeDeadCodeStmt _ [] = []
 
