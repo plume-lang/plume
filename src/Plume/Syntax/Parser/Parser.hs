@@ -216,6 +216,7 @@ sFunction :: P.Parser CST.Expression
 sFunction = do
   void $ L.reserved "fn"
   name <- L.identifier
+  generics <- P.option [] $ L.angles $ Typ.parseGeneric `P.sepBy` L.comma
   args <- L.parens $ mutArg `P.sepBy` L.comma
   retTy <- P.optional $ L.symbol ":" *> Typ.tType
   body <- L.symbol "=>" *> parseExpression <|> eBlock
@@ -224,7 +225,7 @@ sFunction = do
 
   return $
     CST.EDeclaration
-      []
+      generics
       False
       (name Cmm.:@: Nothing)
       cl
