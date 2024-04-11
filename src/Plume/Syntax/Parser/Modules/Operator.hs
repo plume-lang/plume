@@ -1,4 +1,5 @@
 {-# LANGUAGE PatternSynonyms #-}
+
 module Plume.Syntax.Parser.Modules.Operator where
 
 import Control.Monad.Combinators.Expr
@@ -35,7 +36,6 @@ operators =
       , binary "or" (EBinary Or)
       ]
     , [prefix "not" (EPrefix Not)]
-    , [prefix "*" EUnMut]
     ,
       [ binary "==" (EBinary Equals)
       , binary "!=" (EBinary NotEquals)
@@ -53,6 +53,7 @@ operators =
       , binary "/" (EBinary Division)
       ]
     , [binary "%" (EBinary Mod)]
+    , [prefix "*" EUnMut]
     ]
 
 sortCustomOperators :: [CustomOperator] -> [[Operator Parser Expression]]

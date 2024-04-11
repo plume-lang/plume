@@ -2,8 +2,8 @@ module Plume.Syntax.Parser.Modules.Type where
 
 import Control.Monad.Parser
 import Plume.Syntax.Common.Type
-import Plume.Syntax.Parser.Lexer
 import Plume.Syntax.Concrete
+import Plume.Syntax.Parser.Lexer
 import Text.Megaparsec
 
 -- Primitive types parsing function
@@ -23,7 +23,8 @@ tPrimitive =
 -- and ret is the function type return type
 tFunction :: Parser PlumeType
 tFunction = do
-  args <- try $ parens (tType `sepBy` comma) <* symbol "->"
+  void $ reserved "fn"
+  args <- parens (tType `sepBy` comma) <* symbol ":"
   TFunction args <$> tType
 
 -- (t1, t2, ..., tn) where t1, t2, ..., tn are the tuple type elements. There are tuple
@@ -62,14 +63,16 @@ tCon = do
 tId :: Parser PlumeType
 tId = TId <$> identifier
 
+tMut :: Parser PlumeType
+tMut = TMut <$> (reserved "mut" *> tType)
+
 -- Main type parsing function
 tType :: Parser PlumeType
 tType =
   choice
-    [ -- Try may be used here because function type starts with the same
-      -- syntax as tuple
-      try tFunction
+    [ tFunction
     , tTuple
+    , tMut
     , tPrimitive
     , tList
     , -- Try may be used here because type application starts with an identifier

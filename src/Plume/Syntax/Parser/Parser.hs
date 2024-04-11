@@ -2,18 +2,16 @@ module Plume.Syntax.Parser.Parser where
 
 import Control.Monad.Combinators.Expr qualified as P
 import Control.Monad.Parser qualified as P
-import Text.Megaparsec qualified as P
-import Text.Megaparsec.Char qualified as P
-
 import Plume.Syntax.Common qualified as Cmm
 import Plume.Syntax.Concrete qualified as CST
 import Plume.Syntax.Parser.Lexer qualified as L
-
 import Plume.Syntax.Parser.Modules.Literal qualified as Lit
 import Plume.Syntax.Parser.Modules.Operator qualified as Opr
 import Plume.Syntax.Parser.Modules.Pattern qualified as Pat
 import Plume.Syntax.Parser.Modules.Slice qualified as Slc
 import Plume.Syntax.Parser.Modules.Type qualified as Typ
+import Text.Megaparsec qualified as P
+import Text.Megaparsec.Char qualified as P
 
 type Argument = Cmm.Annotation (Maybe Cmm.PlumeType, CST.IsMutable)
 
@@ -25,9 +23,9 @@ functionCallOperator = do
   arguments <- L.parens (parseExpression `P.sepBy` L.comma)
 
   -- Optional syntaxic sugar for callback argument
-  lambdaArg <- optional $ do
-    _ <- L.symbol "=>"
-    CST.EClosure [] Nothing <$> eBlock
+  lambdaArg <-
+    optional $
+      CST.EClosure [] Nothing <$> L.braces (CST.EBlock <$> P.many parseStatement)
 
   let newArgs = arguments ++ maybeToList lambdaArg
 
@@ -135,9 +133,14 @@ eClosure = do
   void $ L.reserved "fn"
   args <- L.parens $ mutArg `P.sepBy` L.comma
   retTy <- P.optional $ L.symbol ":" *> Typ.tType
-  void $ L.symbol "=>"
+  body <-
+    CST.EBlock
+      <$> L.braces (P.many parseStatement)
+        <|> ( L.symbol "=>"
+                *> parseExpression
+            )
 
-  CST.EClosure args retTy <$> eBlock
+  return $ CST.EClosure args retTy body
 
 eTuple :: P.Parser CST.Expression
 eTuple = buildTuple <$> L.parens (parseExpression `P.sepBy1` L.comma)
@@ -152,11 +155,11 @@ parseTerm =
     [ eLiteral
     , eIf
     , eSwitch
-    , eVariable
     , eList
     , eMacroExpr
     , eClosure
     , eTuple
+    , eVariable
     , CST.EBlock <$> L.braces (P.many parseStatement)
     , L.parens parseExpression
     ]
@@ -172,6 +175,10 @@ parseExpression = eLocated $ do
       Opr.makeUnaryOp $
         P.choice
           [ functionCallOperator
+          , -- Mutable property access, just a shortcut for mutability
+            do
+              f <- P.string "->" *> L.identifierHelper False
+              return $ CST.EProperty f . CST.EUnMut
           , Slc.transformSlice <$> L.brackets (Slc.parseSlice parseTerm)
           , -- Record selection e.x where e may be a record and x a label to
             -- select from the record
@@ -261,7 +268,7 @@ eExtFunction = do
 tRequire :: P.Parser [CST.Expression]
 tRequire = do
   void $ L.reserved "require"
-  (:[]) . CST.ERequire <$> Lit.stringLiteral
+  (: []) . CST.ERequire <$> Lit.stringLiteral
 
 tNative :: P.Parser [CST.Expression]
 tNative = do
