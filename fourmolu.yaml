@@ -1,8 +1,6 @@
 # Number of spaces per indentation step
 indentation: 2
 
-haddock-style: single-line
-
 # Max line length for automatic line breaking
 column-limit: 80
 
@@ -25,7 +23,7 @@ record-brace-space: true
 newlines-between-decls: 1
 
 # How to print Haddock comments (choices: single-line, multi-line, or multi-line-compact)
-haddock-style: multi-line
+haddock-style: single-line
 
 # How to print module docstring
 haddock-style-module: null
@@ -49,9 +47,8 @@ unicode: never
 respectful: true
 
 # Fixity information for operators
-fixities: 
+fixities:
   - infix 1 `with`
 
 # Module reexports Fourmolu should know about
 reexports: []
-
