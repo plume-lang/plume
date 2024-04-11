@@ -6,8 +6,21 @@ fn counter(n: int) {
   }
 }
 
+fn update<A>(mut x: A, f: fn(A): A) {
+  x = f(*x)
+  return unit
+}
+
 c = counter(2)
 println(c().show())
 println(c().show())
 println(c().show())
 println(c().show())
+
+mut x = 0
+
+println(x->show())
+
+update(x, fn(_) => 3)
+
+println(x->show())
