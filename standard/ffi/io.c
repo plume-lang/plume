@@ -19,6 +19,11 @@ bool file_exists(const char* filename) {
 
 void print_helper(Value v) {
   switch (v.type) {
+    case VALUE_MUTABLE: {
+        printf("mut ");
+        print_helper(*v.mutable_value);
+        break;
+    }
     case VALUE_INT:
       printf("%lld", v.int_value);
       break;
