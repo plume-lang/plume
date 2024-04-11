@@ -24,7 +24,7 @@ parseLiteral f =
 -- encapsulated into their CST correspondance
 
 charLiteral :: Parser Char
-charLiteral = sameLine $ lexeme $ between (char '\'') (char '\'') $ do
+charLiteral = between (char '\'') (char '\'') $ do
   c <- L.charLiteral
   guard (c /= '\'')
   return c
@@ -45,7 +45,7 @@ stringLiteralInterpolated f = lexeme $ do
   str <- char '"' *> manyTill interpolation (char '"')
   return $ buildString str
  where
-  parseInterpolation = char '{' *> f <* sc <* char '}'
+  parseInterpolation = char '{' *> f <* char '}'
   parseCharChunk = do
     str <-
       T.pack

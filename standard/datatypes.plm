@@ -1,12 +1,13 @@
-type unit = unit
+type unit { unit }
 
-require "datatypes/number"
+require "datatypes/bool"
 require "datatypes/string"
+require "datatypes/number"
 require "datatypes/tuple"
 require "datatypes/result"
 require "datatypes/option"
-require "datatypes/bool"
 require "datatypes/list"
 
-extend (c: unit) with
-  show(): str => "()"
+extend (c: unit) {
+  fn show(): str => "()"
+}

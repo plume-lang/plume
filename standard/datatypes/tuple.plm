@@ -1,11 +1,15 @@
-type tuple<A, B> = tuple(A, B)
+type tuple<A, B> { tuple(A, B) }
 
-extend<A, B> (c: tuple<A, B>) with
-  show(showA: (A) -> str, showB: (B) -> str): str => switch c 
+extend<A, B> (c: tuple<A, B>) {
+  fn show(showA: (A) -> str, showB: (B) -> str): str => switch c {
     case tuple(x, y) => "(" + showA(x) + ", " + showB(y) + ")"
+  }
 
-  fst(): A => switch c
+  fn fst(): A => switch c {
     case tuple(x, y) => x
+  }
   
-  snd(): B => switch c
+  fn snd(): B => switch c {
     case tuple(x, y) => y
+  }
+}

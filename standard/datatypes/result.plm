@@ -1,34 +1,42 @@
-type Result<A, B> =
-  Error(A)
+type Result<A, B> {
+  Error(A),
   Ok(B)
+}
 
-extend<A, B> (this: Result<A, B>) with
-  map<C>(f: (B) -> C): Result<A, C> =>
-    switch this
+extend<A, B> (this: Result<A, B>) {
+  fn map<C>(f: (B) -> C): Result<A, C> =>
+    switch this {
       case Error(a) => Error(a)
       case Ok(b) => Ok(f(b))
+    }
 
-  show(showError: (A) -> str, showOk: (B) -> str): str =>
-    switch this
+  fn show(showError: (A) -> str, showOk: (B) -> str): str =>
+    switch this {
       case Error(a) => "Error({a.showError()})"
       case Ok(b) => "Ok({b.showOk()})"
+    }
   
-  flatMap<C>(f: (B) -> Result<A, C>): Result<A, C> =>
-    switch this
+  fn flatMap<C>(f: (B) -> Result<A, C>): Result<A, C> =>
+    switch this {
       case Error(a) => Error(a)
       case Ok(b) => f(b)
+    }
 
-  getOrElse(f: (A) -> B): B =>
-    switch this
+  fn getOrElse(f: (A) -> B): B =>
+    switch this {
       case Error(a) => f(a)
       case Ok(b) => b
+    }
   
-  isError(): bool =>
-    switch this
+  fn isError(): bool =>
+    switch this {
       case Error(?) => true
       case Ok(?) => false
+    }
   
-  isOk(): bool =>
-    switch this
+  fn isOk(): bool =>
+    switch this {
       case Error(?) => false
       case Ok(?) => true
+    }
+}

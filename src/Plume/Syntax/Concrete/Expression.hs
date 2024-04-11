@@ -32,13 +32,16 @@ data BinaryOperator
   | And
   | Or
   | BinarySlice
+  deriving (Show)
 
 data PrefixOperator
   = Not
   | PrefixSlice
+  deriving (Show)
 
 data PostfixOperator
   = PostfixSlice
+  deriving (Show)
 
 type IsMutable = Bool
 
@@ -82,6 +85,7 @@ data ConcreteExpression t
   | EGenericProperty [PlumeGeneric] Text [t] t
   | ETypeExtension [PlumeGeneric] (Annotation t) [ExtensionMember t]
   | ENativeFunction Text Text [Text] t
+  deriving (Show)
 
 data TypeConstructor t
   = TConstructor Text [t]
@@ -93,6 +97,7 @@ data ExtensionMember t
       [PlumeGeneric]
       (Annotation (Maybe t))
       (ConcreteExpression t)
+  deriving (Show)
 
 pattern (:>:) :: ConcreteExpression t -> Position -> ConcreteExpression t
 pattern e :>: p = ELocated e p
