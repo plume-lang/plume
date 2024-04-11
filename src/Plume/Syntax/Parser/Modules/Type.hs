@@ -3,6 +3,7 @@ module Plume.Syntax.Parser.Modules.Type where
 import Control.Monad.Parser
 import Plume.Syntax.Common.Type
 import Plume.Syntax.Parser.Lexer
+import Plume.Syntax.Concrete
 import Text.Megaparsec
 
 -- Primitive types parsing function
@@ -75,4 +76,14 @@ tType =
       -- just like type identifier
       try tCon
     , tId
+    ]
+
+parseGeneric :: Parser PlumeGeneric
+parseGeneric = GVar <$> identifier
+
+typeConstructor :: Parser (TypeConstructor PlumeType)
+typeConstructor =
+  choice
+    [ try $ TConstructor <$> identifier <*> parens (tType `sepBy` comma)
+    , TVariable <$> identifier
     ]

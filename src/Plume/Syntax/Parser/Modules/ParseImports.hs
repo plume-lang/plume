@@ -2,14 +2,15 @@ module Plume.Syntax.Parser.Modules.ParseImports where
 
 import Control.Monad.Parser
 import Plume.Syntax.Concrete.Expression (Position)
-import Plume.Syntax.Parser.Lexer
+import Plume.Syntax.Parser.Lexer hiding (symbol)
 import Plume.Syntax.Parser.Modules.Literal
 import Text.Megaparsec hiding (many)
+import Text.Megaparsec.Char.Lexer
 
 eRequire :: Parser TempAST
-eRequire = do
+eRequire = nonIndented scn $ do
   p1 <- getSourcePos
-  void $ symbol "require"
+  void $ reserved "require"
   path <- stringLiteral
   p2 <- getSourcePos
   pure $ Import path (p1, p2)
@@ -23,7 +24,7 @@ parseImports =
   scn
     *> many
       ( choice
-          [ eRequire
+          [ try eRequire
           , Other <$ anySingle
           ]
       )
