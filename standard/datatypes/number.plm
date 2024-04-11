@@ -24,56 +24,59 @@ infix 3 ^
 
 // Defining math operators
 
-extend (c: int) with
-  operator * (d: int) => mul_int(c, d)
-  operator / (d: int) => div_int(c, d)
-  operator % (d: int) => mod_int(c, d)
-  operator - (d: int) => sub_int(c, d)
-  operator + (d: int) => add_int(c, d)
-  operator ^ (d: int) => switch d
+extend (c: int) {
+  fn (*) (d: int) => mul_int(c, d)
+  fn (/) (d: int) => div_int(c, d)
+  fn (%) (d: int) => mod_int(c, d)
+  fn (-) (d: int) => sub_int(c, d)
+  fn (+) (d: int) => add_int(c, d)
+  fn (^) (d: int) => switch d {
     case 0 => 1
-    case ? => 
-      return c * (c ^ (d - 1))
-  operator == (d: int) => eq_int(c, d)
-  operator < (d: int) => lt_int(c, d)
-  operator > (d: int) => lt_int(d, c)
-  operator <= (d: int) => not (lt_int(d, c))
-  operator >= (d: int) => not (lt_int(c, d))
+    case ? => c * (c ^ (d - 1))
+  }
+  fn (==) (d: int) => eq_int(c, d)
+  fn (<) (d: int) => lt_int(c, d)
+  fn (>) (d: int) => lt_int(d, c)
+  fn (<=) (d: int) => not (lt_int(d, c))
+  fn (>=) (d: int) => not (lt_int(c, d))
   
-  to_float(): float => int_to_float(c)
-  
-extend (c: int) with
-  show() => to_string(c)
+  fn to_float(): float => int_to_float(c)
+  fn show() => to_string(c)
+}
+
 
 // Defining math functions
 
 postfix 3 !
 
-extend (c: int) with
-  operator !(): int =>
-    switch c
+extend (c: int) {
+  fn (!) (): int =>
+    switch c {
       case 0 => 1
       case ? => c * (c - 1)!
+    }
 
-  negate(): int => 0 - c
+  fn negate(): int => 0 - c
+}
 
-extend (c: float) with
-  operator * (d: float) => mul_float(c, d)
-  operator / (d: float) => div_float(c, d)
-  operator % (d: float) => mod_float(c, d)
-  operator - (d: float) => sub_float(c, d)
-  operator + (d: float) => add_float(c, d)
-  operator ^ (d: float) => pow_float(c, d)
-  operator == (d: float) => eq_float(c, d)
-  operator < (d: float) => lt_float(c, d)
-  operator > (d: float) => lt_float(d, c)
-  operator <= (d: float) => not (lt_float(d, c))
-  operator >= (d: float) => not (lt_float(c, d))
+extend (c: float) {
+  fn (*) (d: float) => mul_float(c, d)
+  fn (/) (d: float) => div_float(c, d)
+  fn (%) (d: float) => mod_float(c, d)
+  fn (-) (d: float) => sub_float(c, d)
+  fn (+) (d: float) => add_float(c, d)
+  fn (^) (d: float) => pow_float(c, d)
+  fn (==) (d: float) => eq_float(c, d)
+  fn (<) (d: float) => lt_float(c, d)
+  fn (>) (d: float) => lt_float(d, c)
+  fn (<=) (d: float) => not (lt_float(d, c))
+  fn (>=) (d: float) => not (lt_float(c, d))
 
-  to_int(): int => float_to_int(c)
+  fn to_int(): int => float_to_int(c)
 
-  show() => to_string(c)
+  fn show() => to_string(c)
+}
 
-@e = 2.718282
-expf(x: float): float => @e ^ x
-exp(x: int): float => expf(x.to_float())
+macro e = 2.718282
+fn expf(x: float): float => @e ^ x
+fn exp(x: int): float => expf(x.to_float())

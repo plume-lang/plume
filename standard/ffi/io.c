@@ -3,12 +3,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <value.h>
+#include <stdbool.h>
 
 #include "cons.h"
-
-typedef int bool;
-#define true 1
-#define false 0
 
 bool file_exists(const char* filename) {
   FILE* fp = fopen(filename, "r");
