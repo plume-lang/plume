@@ -12,6 +12,10 @@ bundleProg (DPNativeFunction fp name arity) =
   Just $ DPNativeFunction fp name arity
 bundleProg (DPDeclaration n e) =
   Just $ DPDeclaration n e
+bundleProg (DPMutDeclaration n e) =
+  Just $ DPMutDeclaration n e
+bundleProg (DPMutUpdate n e) =
+  Just $ DPMutUpdate n e
 
 bundle :: [DesugaredProgram] -> [DesugaredProgram]
 bundle [] = []

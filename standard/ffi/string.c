@@ -38,6 +38,15 @@ Value mul_str(int arg_n, Module* mod, Value* args) {
 Value to_string(int arg_n, Module* mod, Value* args) {
   if (arg_n != 1) THROW("To_string expects 1 argument");
   switch (args[0].type) {
+    case VALUE_MUTABLE: {
+      Value v = *args[0].mutable_value;
+      char* str = to_string(1, mod, &v).string_value;
+      size_t sz = strlen(str) + 5;
+      char* new_str = malloc(sz * sizeof(char));
+      strcpy(new_str, "mut ");
+      strcpy(new_str + 4, str);
+      return MAKE_STRING(new_str);
+    }
     case VALUE_INT: {
       size_t sz = snprintf(NULL, 0, "%lld", args[0].int_value);
       char* new_str = malloc((sz + 1) * sizeof(char));

@@ -41,6 +41,11 @@ synthesize (Pre.EVariable name) = do
             else throw $ UnboundVariable name
 synthesize (Pre.ELiteral lit) =
   pure $ (: []) . Post.ELiteral <$> typeOfLiteral lit
+synthesize (Pre.EUnMut e) = do
+  tv <- fresh
+  (ty, e') <- extractFromArray $ synthesize e
+  ty `unifiesTo` TMut tv
+  pure (tv, [Post.EUnMut e'])
 synthesize (Pre.EBlock exprs) = local id $ do
   (tys, exprs') <-
     mapAndUnzipM

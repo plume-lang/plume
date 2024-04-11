@@ -4,16 +4,16 @@ native "std:native" get_args(): [str]
 native "std:native" does_file_exist(path: str): bool
 native "std:native" execute_command(path: str): int
 
-@print(x) =>
-  print(x.show())
+macro print(x) => print(x.show())
 
-@println(x) =>
+macro println(x) {
   @print(x)
   print("\n")
+}
 
-@print_with(fmt, x) =>
-  print(x.show(fmt))
+macro print_with(fmt, x) => print(x.show(fmt))
 
-@println_with(fmt, x) =>
+macro println_with(fmt, x) {
   @print_with(fmt, x)
   print("\n")
+}

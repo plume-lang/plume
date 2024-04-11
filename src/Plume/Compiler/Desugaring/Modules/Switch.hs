@@ -4,6 +4,7 @@ module Plume.Compiler.Desugaring.Modules.Switch where
 
 import Data.Map qualified as M
 import Data.Set qualified as S
+import GHC.IO hiding (liftIO)
 import Plume.Compiler.ClosureConversion.Free
 import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Compiler.Desugaring.Monad
@@ -21,13 +22,21 @@ type IsToplevel = Bool
 type IsReturned = Bool
 type IsExpression = Bool
 
+{-# NOINLINE switchCounter #-}
+switchCounter :: IORef Int
+switchCounter = unsafePerformIO $ newIORef 0
+
 desugarSwitch :: (IsToplevel, IsReturned, IsExpression) -> DesugarSwitch
 desugarSwitch (_, shouldReturn, isExpr) (fExpr, _) (Pre.CESwitch x cases) = do
   (x', stmts) <- fExpr x
   let freedPat = foldMap (free . fst) cases
-  let (decl, declVar) = case x' of
-        Post.DEVar n | n `S.notMember` freedPat -> ([], x')
-        _ -> (createLets (M.singleton "$switch" x'), Post.DEVar "$switch")
+  (decl, declVar) <- case x' of
+    Post.DEVar n | n `S.notMember` freedPat -> return ([], x')
+    _ -> do
+      i <- readIORef switchCounter
+      let switchName = "$switch" <> show i
+      modifyIORef' switchCounter (+ 1)
+      return (createLets (M.singleton switchName x'), Post.DEVar switchName)
   let (conds, maps) = unzip $ map (createCondition declVar . fst) cases
 
   let bodies = map snd cases

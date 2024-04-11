@@ -1,8 +1,10 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 module Plume.Syntax.Parser.Modules.Operator where
 
 import Control.Monad.Combinators.Expr
 import Control.Monad.Parser
-import Data.Foldable
+import Data.Foldable hiding (elem)
 import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer
 
@@ -51,4 +53,30 @@ operators =
       , binary "/" (EBinary Division)
       ]
     , [binary "%" (EBinary Mod)]
+    , [prefix "*" EUnMut]
     ]
+
+sortCustomOperators :: [CustomOperator] -> [[Operator Parser Expression]]
+sortCustomOperators ops = do
+  let ops' = sortBy (\x y -> compare x.precedence y.precedence) ops
+  map ((: []) . parseOperator) ops'
+ where
+  parseOperator :: CustomOperator -> Operator Parser Expression
+  parseOperator (CustomOperator name _ CPrefix) =
+    prefix name (CustomPrefix name)
+  parseOperator (CustomOperator name _ CPostfix) =
+    postfix name (CustomPostfix name)
+  parseOperator (CustomOperator name _ ty)
+    | ty `elem` [CInfixN, CInfixL, CInfixR] = case ty of
+        CInfixN -> binary name (CustomInfix name)
+        CInfixL -> InfixL (CustomInfix name <$ symbol name)
+        CInfixR -> InfixR (CustomInfix name <$ symbol name)
+    | otherwise =
+        error "Invalid operator type"
+
+pattern CustomInfix :: Text -> Expression -> Expression -> Expression
+pattern CustomInfix name e1 e2 = EApplication (EVariable name) [e1, e2]
+
+pattern CustomPrefix, CustomPostfix :: Text -> Expression -> Expression
+pattern CustomPrefix name e = EApplication (EVariable name) [e]
+pattern CustomPostfix name e = EApplication (EVariable name) [e]

@@ -127,6 +127,9 @@ closeExpression (Pre.UEDeclaration name e1 e2) = do
   (p1, e1') <- closeExpression e1
   (p2, e2') <- closeExpression e2
   pure (p1 <> p2, Post.CEDeclaration name e1' e2')
+closeExpression (Pre.UEUnMut e) = do
+  (stmts, e') <- closeExpression e
+  pure (stmts, Post.CEUnMut e')
 closeExpression (Pre.UEConditionBranch e1 e2 e3) = do
   (p1, e1') <- closeExpression e1
   (p2, e2') <- closeExpression e2
@@ -159,6 +162,14 @@ closeExpression (Pre.UEIndex e1 e2) = do
   (p1, e1') <- closeExpression e1
   (p2, e2') <- closeExpression e2
   pure (p1 <> p2, Post.CEIndex e1' e2')
+closeExpression (Pre.UEMutDeclaration name e1 e2) = do
+  (p1, e1') <- closeExpression e1
+  (p2, e2') <- closeExpression e2
+  pure (p1 <> p2, Post.CEMutDeclaration name e1' e2')
+closeExpression (Pre.UEMutUpdate name e1 e2) = do
+  (p1, e1') <- closeExpression e1
+  (p2, e2') <- closeExpression e2
+  pure (p1 <> p2, Post.CEMutUpdate (Post.UVariable name) e1' e2')
 
 closePattern
   :: (MonadClosure m) => Pre.UntypedPattern -> m Post.ClosedPattern
@@ -190,6 +201,12 @@ closeStatement (Pre.USConditionBranch e1 e2 e3) = do
 closeStatement (Pre.USExpr e) = do
   (stmts, e') <- closeExpression e
   pure (stmts, Post.CSExpr e')
+closeStatement (Pre.USMutDeclaration name e) = do
+  (stmts, e') <- closeExpression e
+  pure (stmts, Post.CSMutDeclaration name e')
+closeStatement (Pre.USMutUpdate name e) = do
+  (stmts, e') <- closeExpression e
+  pure (stmts, Post.CSMutUpdate (Post.UVariable name) e')
 
 makeReturn :: Post.ClosedExpr -> [Post.ClosedStatement]
 makeReturn (Post.CEBlock es) = es
@@ -217,9 +234,17 @@ closeProgram (Pre.UPStatement s) = do
   (stmts, s') <- closeStatement s
   pure $ stmts ++ [Post.CPStatement s']
 closeProgram (Pre.UPDeclaration n e) = do
-  modifyIORef' reserved (<> S.singleton n)
+  modifyIORef' globalVars (<> S.singleton n)
   (stmts, e') <- closeExpression e
   pure $ stmts ++ [Post.CPDeclaration n e']
+closeProgram (Pre.UPMutDeclaration n e) = do
+  modifyIORef' globalVars (<> S.singleton n)
+  (stmts, e') <- closeExpression e
+  pure $ stmts ++ [Post.CPMutDeclaration n e']
+closeProgram (Pre.UPMutUpdate n e) = do
+  modifyIORef' globalVars (<> S.singleton n)
+  (stmts, e') <- closeExpression e
+  pure $ stmts ++ [Post.CPMutUpdate (Post.UVariable n) e']
 
 runClosureConversion
   :: (MonadIO m)

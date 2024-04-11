@@ -25,4 +25,4 @@ parse
   -> FileContent
   -> IO (Either ParsingError a)
 parse p filePath fileContent = do
-  runReaderT (runParserT p filePath fileContent) 0
+  runReaderT (runParserT p filePath fileContent) 1

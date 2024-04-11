@@ -7,7 +7,7 @@ import Plume.TypeChecker.TLIR qualified as Post
 
 synthApp :: Infer -> Infer
 synthApp infer (Pre.EApplication f xs) = local id $ do
-  f' <- parseLocated f
+  let f' = parseLocated f
   exts <- gets extensions
   (t, f'') <- extractFromArray $ infer f
   (ts, xs') <- mapAndUnzipM (extractFromArray . infer) xs
@@ -15,11 +15,10 @@ synthApp infer (Pre.EApplication f xs) = local id $ do
   t `unifiesTo` ts :->: ret
 
   case f' of
-    Pre.EVariable name | doesExtensionExist name exts -> do
+    Just (Pre.EVariable name) | doesExtensionExist name exts -> do
       case ts of
         [] -> throw $ CompilerError "Empty list of types"
-        (x : _) -> do
-          doesExtend x name (ts :->: ret)
+        (x : _) -> doesExtend x name (ts :->: ret)
     _ -> return ()
 
   pure (ret, [Post.EApplication f'' xs'])
@@ -38,7 +37,7 @@ isExtension (Pre.ELocated expr _) = isExtension expr
 isExtension (Pre.EVariable name) = doesExtensionExistM name
 isExtension _ = pure False
 
-parseLocated :: Pre.Expression -> Checker Pre.Expression
-parseLocated (Pre.ELocated expr p) = withPosition p $ parseLocated expr
-parseLocated e@(Pre.EVariable _) = pure e
-parseLocated _ = throw $ CompilerError "Only variables are supported"
+parseLocated :: Pre.Expression -> Maybe Pre.Expression
+parseLocated (Pre.ELocated expr _) = parseLocated expr
+parseLocated e@(Pre.EVariable _) = Just e
+parseLocated _ = Nothing

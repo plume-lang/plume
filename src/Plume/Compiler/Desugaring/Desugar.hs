@@ -42,6 +42,8 @@ desugarExpr isTop = \case
     (x', stmts) <- desugarExpr isTop x
     return (Post.DEEqualsTo (Post.DETypeOf x') (Post.DELiteral (LString t)), stmts)
   d@(Pre.CEDeclaration {}) -> desugarANF isTop (desugarExpr isTop) d
+  d@(Pre.CEMutDeclaration {}) -> desugarANF isTop (desugarExpr isTop) d
+  d@(Pre.CEMutUpdate {}) -> desugarANF isTop (desugarExpr isTop) d
   s@Pre.CESwitch {} -> desugarSwitch isTop (desugarExpr isTop, desugarStatement isTop) s
   Pre.CEBlock xs -> do
     res <- concat <$> mapM (desugarStatement (fst3 isTop, False, False)) xs
@@ -54,6 +56,9 @@ desugarExpr isTop = \case
     (x', stmts1) <- desugarExpr isTop x
     (y', stmts2) <- desugarExpr isTop y
     return (Post.DEIndex x' y', stmts1 ++ stmts2)
+  Pre.CEUnMut x -> do
+    (x', stmts) <- desugarExpr isTop x
+    return (Post.DEUnMut x', stmts)
 
 desugarStatement
   :: (IsToplevel, IsReturned, IsExpression)
@@ -76,6 +81,12 @@ desugarStatement isTop = \case
     zs <- desugarStatement isTop z
     return
       [(Just . Post.DSExpr $ Post.DEIf x' (createBlock ys) (createBlock zs), stmts1)]
+  Pre.CSMutDeclaration n e -> do
+    (e', stmts) <- desugarExpr (False, False, True) e
+    return [(Just $ Post.DSMutDeclaration n e', stmts)]
+  Pre.CSMutUpdate n e -> do
+    (e', stmts) <- desugarExpr (False, False, True) e
+    return [(Just $ Post.DSMutUpdate n e', stmts)]
 
 fst3 :: (a, b, c) -> a
 fst3 (x, _, _) = x
@@ -100,6 +111,12 @@ desugarProgram = \case
   Pre.CPDeclaration n e -> do
     (e', stmts) <- desugarExpr (False, False, True) e
     return (createBlockProg stmts ++ [Post.DPDeclaration n e'])
+  Pre.CPMutDeclaration n e -> do
+    (e', stmts) <- desugarExpr (False, False, True) e
+    return (createBlockProg stmts ++ [Post.DPMutDeclaration n e'])
+  Pre.CPMutUpdate n e -> do
+    (e', stmts) <- desugarExpr (False, False, True) e
+    return (createBlockProg stmts ++ [Post.DPMutUpdate n e'])
 
 desugar :: [Pre.ClosedProgram] -> IO [Post.DesugaredProgram]
 desugar = concatMapM desugarProgram

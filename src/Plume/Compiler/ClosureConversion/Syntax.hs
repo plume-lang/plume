@@ -10,6 +10,8 @@ data ClosedExpr
   | CEIndex ClosedExpr ClosedExpr
   | CEAnd ClosedExpr ClosedExpr
   | CEDeclaration Text ClosedExpr ClosedExpr
+  | CEMutDeclaration Text ClosedExpr ClosedExpr
+  | CEMutUpdate Update ClosedExpr ClosedExpr
   | CEConditionBranch ClosedExpr ClosedExpr ClosedExpr
   | CESwitch ClosedExpr [(ClosedPattern, ClosedExpr)]
   | CEDictionary (IntMap ClosedExpr)
@@ -17,6 +19,12 @@ data ClosedExpr
   | CEProperty ClosedExpr Int
   | CEEqualsType ClosedExpr Text
   | CESpecial
+  | CEUnMut ClosedExpr
+  deriving (Eq, Show, Ord)
+
+data Update
+  = UVariable Text
+  | UProperty Update Int
   deriving (Eq, Show, Ord)
 
 data ClosedPattern
@@ -33,6 +41,8 @@ data ClosedStatement
   | CSReturn ClosedExpr
   | CSDeclaration Text ClosedExpr
   | CSConditionBranch ClosedExpr ClosedStatement ClosedStatement
+  | CSMutDeclaration Text ClosedExpr
+  | CSMutUpdate Update ClosedExpr
   deriving (Eq, Show, Ord)
 
 data ClosedProgram
@@ -40,4 +50,6 @@ data ClosedProgram
   | CPStatement ClosedStatement
   | CPNativeFunction Text Text Int
   | CPDeclaration Text ClosedExpr
+  | CPMutDeclaration Text ClosedExpr
+  | CPMutUpdate Update ClosedExpr
   deriving (Eq, Show, Ord)

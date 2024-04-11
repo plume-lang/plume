@@ -37,6 +37,10 @@ instance Text `ConvertsTo` TyVar where
         insertEnv @"genericsEnv" v ty
         pure ty
 
+instance (Maybe Pre.PlumeType, Bool) `ConvertsTo` Post.PlumeType where
+  convert (x, True) = TMut <$> convert x
+  convert (x, False) = convert x
+
 instance Pre.PlumeGeneric `ConvertsTo` Post.TyVar where
   convert (Pre.GVar v) = do
     searchEnv @"datatypeEnv" v >>= \case

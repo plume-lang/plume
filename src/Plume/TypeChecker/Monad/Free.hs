@@ -57,6 +57,8 @@ instance (Free t) => Free (TypedExpression t) where
   apply s (EAnd e1 e2) = EAnd (apply s e1) (apply s e2)
   apply s (EIndex e1 e2) = EIndex (apply s e1) (apply s e2)
   apply s (EDeclaration a e1 e2) = EDeclaration (apply s a) (apply s e1) (apply s e2)
+  apply s (EMutDeclaration a e1 e2) = EMutDeclaration (apply s a) (apply s e1) (apply s e2)
+  apply s (EMutUpdate a e1 e2) = EMutUpdate (apply s a) (apply s e1) (apply s e2)
   apply _ (ELiteral l) = ELiteral l
   apply s (EExtVariable n t t') = EExtVariable n (apply s t) (apply s t')
   apply s (EList xs) = EList (apply s xs)
@@ -66,6 +68,7 @@ instance (Free t) => Free (TypedExpression t) where
   apply s (EReturn e) = EReturn (apply s e)
   apply s (ENativeFunction fp n t) = ENativeFunction fp n (apply s t)
   apply s (EExtensionDeclaration n t arg body) = EExtensionDeclaration n (apply s t) (apply s arg) (apply s body)
+  apply s (EUnMut e) = EUnMut (apply s e)
 
 instance (Free t) => Free (TypedPattern t) where
   free _ = mempty

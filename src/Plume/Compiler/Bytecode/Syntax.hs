@@ -6,6 +6,7 @@ data Instruction
   | LoadConstant Int
   | LoadGlobal Int
   | StoreGlobal Int
+  | Update
   | Return
   | Compare Comparator
   | And
@@ -20,6 +21,8 @@ data Instruction
   | ConstructorName
   | Phi Int Int
   | MakeLambda Int Int
+  | MakeMutable
+  | UnMut
   | GetIndex
   | Special
   | Slice Int

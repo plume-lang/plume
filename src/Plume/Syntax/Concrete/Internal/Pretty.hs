@@ -68,14 +68,18 @@ prettyExpr _ (EApplication e es) =
     <> parens (hsep . punctuate comma $ map (prettyExpr 0) es)
 prettyExpr _ (EVariable v) = anItalic $ pretty v
 prettyExpr _ (ELiteral l) = ansiPretty l
-prettyExpr _ (EDeclaration generics a e1' e2') =
-  ansiPretty generics
-    <> typeAnnotation a
-      <+> "="
-      <+> prettyExpr 0 e1'
-      <+> case e2' of
-        Nothing -> ""
-        Just e2'' -> anCol Blue "\nin" <+> prettyExpr 0 e2''
+prettyExpr _ (EDeclaration generics isMut a e1' e2') =
+  if isMut
+    then anCol Blue "mut"
+    else
+      mempty
+        <+> ansiPretty generics
+        <> typeAnnotation a
+          <+> "="
+          <+> prettyExpr 0 e1'
+          <+> case e2' of
+            Nothing -> ""
+            Just e2'' -> anCol Blue "\nin" <+> prettyExpr 0 e2''
 prettyExpr _ (EConditionBranch e1' e2' e3') =
   anCol Blue "if"
     <+> prettyExpr 0 e1'
@@ -89,13 +93,14 @@ prettyExpr _ (EClosure as t e) =
     <+> "=>\n"
     <+> indent 2 (prettyExpr 0 e)
  where
-  ppArgs [x :@: Nothing] Nothing = pretty x
-  ppArgs xs ret = parens (hsep . punctuate comma $ map typeAnnotation xs) <> ppRet ret
+  ppArgs [x :@: (Nothing, mt)] Nothing = ppMut mt <+> pretty x
+  ppArgs xs ret = parens (hsep . punctuate comma $ map argAnnotation xs) <> ppRet ret
 
   ppRet Nothing = ""
   ppRet (Just t') = ":" <+> prettyTy t'
+prettyExpr _ (EUnMut e) = anBold "*" <> prettyExpr 0 e
 prettyExpr _ (EBlock es) =
-  line <> indent 4 (vsep (map (prettyExpr 0) es))
+  anCol Blue "block" <> line <> indent 4 (vsep (map (prettyExpr 0) es))
 prettyExpr _ (EListIndex e1' e2') = prettyExpr 0 e1' <> brackets (prettyExpr 0 e2')
 prettyExpr _ (ERequire l) = anCol Blue "require" <+> anCol Green (dquotes $ pretty l)
 prettyExpr _ (ELocated e _) = prettyExpr 0 e

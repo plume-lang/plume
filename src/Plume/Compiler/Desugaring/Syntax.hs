@@ -1,6 +1,7 @@
 module Plume.Compiler.Desugaring.Syntax where
 
 import Plume.Compiler.ClosureConversion.Free
+import Plume.Compiler.ClosureConversion.Syntax (Update(..))
 import Plume.Syntax.Common.Literal
 
 data DesugaredExpr
@@ -20,12 +21,15 @@ data DesugaredExpr
   | DESlice DesugaredExpr Int
   | DEGreaterThan DesugaredExpr Int
   | DEListLength DesugaredExpr
+  | DEUnMut DesugaredExpr
   deriving (Eq, Show, Ord)
 
 data DesugaredStatement
   = DSExpr DesugaredExpr
   | DSReturn DesugaredExpr
   | DSDeclaration Text DesugaredExpr
+  | DSMutDeclaration Text DesugaredExpr
+  | DSMutUpdate Update DesugaredExpr
   deriving (Eq, Show, Ord)
 
 data DesugaredProgram
@@ -33,6 +37,8 @@ data DesugaredProgram
   | DPStatement DesugaredStatement
   | DPDeclaration Text DesugaredExpr
   | DPNativeFunction Text Text Int
+  | DPMutDeclaration Text DesugaredExpr
+  | DPMutUpdate Update DesugaredExpr
   deriving (Eq, Show, Ord)
 
 instance Substitutable DesugaredStatement DesugaredExpr where
@@ -41,6 +47,8 @@ instance Substitutable DesugaredStatement DesugaredExpr where
   substitute (name, expr) (DSDeclaration n e)
     | n == name = DSDeclaration n expr
     | otherwise = DSDeclaration n (substitute (name, expr) e)
+  substitute s (DSMutDeclaration n e) = DSMutDeclaration n $ substitute s e
+  substitute s (DSMutUpdate n e) = DSMutUpdate n $ substitute s e
 
 instance Substitutable DesugaredExpr DesugaredExpr where
   substitute s (DEVar x)
@@ -66,6 +74,7 @@ instance Substitutable DesugaredExpr DesugaredExpr where
   substitute s (DEGreaterThan e1 e2) =
     DEGreaterThan (substitute s e1) e2
   substitute s (DEListLength e) = DEListLength (substitute s e)
+  substitute s (DEUnMut e) = DEUnMut (substitute s e)
 
 doesContainReturn :: DesugaredStatement -> Bool
 doesContainReturn (DSReturn _) = True

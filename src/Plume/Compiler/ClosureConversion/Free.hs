@@ -34,6 +34,13 @@ instance Free ClosedExpr where
   free (CEAnd e1 e2) = free e1 <> free e2
   free (CEIndex e1 e2) = free e1 <> free e2
   free CESpecial = S.empty
+  free (CEMutDeclaration x e1 e2) = (free e1 <> free e2) S.\\ S.singleton x
+  free (CEMutUpdate x e1 e2) = ((free e1 <> free e2) S.\\ free x) <> free x
+  free (CEUnMut e) = free e
+
+instance Free Update where
+  free (UVariable x) = S.singleton x
+  free (UProperty u _) = free u
 
 freeBody :: [ClosedStatement] -> S.Set Text
 freeBody body =
@@ -61,12 +68,16 @@ instance Free ClosedStatement where
   free (CSReturn e) = free e
   free (CSDeclaration x e) = free e S.\\ S.singleton x
   free (CSConditionBranch e1 e2 e3) = free e1 <> free e2 <> free e3
+  free (CSMutDeclaration x e) = free e S.\\ S.singleton x
+  free (CSMutUpdate x e) = (free e S.\\ free x) <> free x
 
 instance Free ClosedProgram where
   free (CPFunction n args e) = free e S.\\ (S.fromList args <> S.singleton n)
   free (CPStatement s) = free s
   free (CPNativeFunction {}) = S.empty
   free (CPDeclaration n e) = free e S.\\ S.singleton n
+  free (CPMutDeclaration n e) = free e S.\\ S.singleton n
+  free (CPMutUpdate n e) = (free e S.\\ free n) <> free n
 
 instance (Free a) => Free (Map k a) where
   free = foldMap free
@@ -103,6 +114,18 @@ instance Substitutable ClosedExpr ClosedExpr where
   substitute e (CEAnd e1 e2) = CEAnd (substitute e e1) (substitute e e2)
   substitute e (CEIndex e1 e2) = CEIndex (substitute e e1) (substitute e e2)
   substitute _ CESpecial = CESpecial
+  substitute e (CEMutDeclaration x e1 e2) =
+    CEMutDeclaration x (substitute e e1) (substitute e e2)
+  substitute e@(n, r) (CEMutUpdate (UVariable x) e1 e2)
+    | x == n = CEMutUpdate (convertToUpdate r) (substitute e e1) (substitute e e2)
+    | otherwise = CEMutUpdate (UVariable x) (substitute e e1) (substitute e e2)
+  substitute e (CEMutUpdate x e1 e2) = CEMutUpdate x (substitute e e1) (substitute e e2)
+  substitute e (CEUnMut e') = CEUnMut (substitute e e')
+
+convertToUpdate :: ClosedExpr -> Update
+convertToUpdate (CEVar x) = UVariable x
+convertToUpdate (CEProperty e f) = UProperty (convertToUpdate e) f
+convertToUpdate _ = error "Invalid update"
 
 instance Substitutable ClosedStatement ClosedExpr where
   substitute e (CSExpr e') = CSExpr (substitute e e')
@@ -114,6 +137,11 @@ instance Substitutable ClosedStatement ClosedExpr where
       (substitute e e1)
       (substitute e e2)
       (substitute e e3)
+  substitute e (CSMutDeclaration x e') = CSMutDeclaration x (substitute e e')
+  substitute e@(n, r) (CSMutUpdate (UVariable name) e')
+    | name == n = CSMutUpdate (convertToUpdate r) (substitute e e')
+    | otherwise = CSMutUpdate (UVariable name) (substitute e e')
+  substitute e (CSMutUpdate x e') = CSMutUpdate x (substitute e e')
 
 instance Substitutable ClosedProgram ClosedExpr where
   substitute e (CPStatement s) = CPStatement (substitute e s)
@@ -123,6 +151,13 @@ instance Substitutable ClosedProgram ClosedExpr where
   substitute e (CPDeclaration name body)
     | name == fst e = CPDeclaration name body
     | otherwise = CPDeclaration name (substitute e body)
+  substitute e (CPMutDeclaration name body)
+    | name == fst e = CPMutDeclaration name body
+    | otherwise = CPMutDeclaration name (substitute e body)
+  substitute e@(n, r) (CPMutUpdate (UVariable name) body)
+    | name == n = CPMutUpdate (convertToUpdate r) body
+    | otherwise = CPMutUpdate (UVariable name) (substitute e body)
+  substitute e (CPMutUpdate x body) = CPMutUpdate x (substitute e body)
 
 instance Substitutable ClosedPattern ClosedExpr where
   substitute _ p = p

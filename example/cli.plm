@@ -1,17 +1,13 @@
-err: Result<str, str> = Ok("Hello, ")
-x: Result<str, str> = err.map((s) => s.concat("world!"))
-y = x.isOk()
-println(x.show(show, show))
-println(y.show())
+fn counter(n: int) {
+  mut i = n
+  return fn(): int {
+    i = *i + 1
+    return *i
+  }
+}
 
-x = 6.exp()
-
-println(x.to_string())
-
-facto(n) => product(1.slice(n))
-
-ls: [int] = [0, 1, 2]
-println(ls.show(show))
-@println(facto(5))
-println(ls.flatMap((x) => [x, x + 1, x + 2]).show(show))
-println(ls[1..].show(show))
+c = counter(2)
+println(c().show())
+println(c().show())
+println(c().show())
+println(c().show())

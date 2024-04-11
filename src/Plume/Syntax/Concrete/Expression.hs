@@ -32,13 +32,18 @@ data BinaryOperator
   | And
   | Or
   | BinarySlice
+  deriving (Show)
 
 data PrefixOperator
   = Not
   | PrefixSlice
+  deriving (Show)
 
 data PostfixOperator
   = PostfixSlice
+  deriving (Show)
+
+type IsMutable = Bool
 
 data ConcreteExpression t
   = EVariable Text
@@ -51,6 +56,7 @@ data ConcreteExpression t
   | EType (Annotation [PlumeGeneric]) [TypeConstructor t]
   | EDeclaration
       [PlumeGeneric]
+      IsMutable
       (Annotation (Maybe t))
       (ConcreteExpression t)
       (Maybe (ConcreteExpression t))
@@ -59,9 +65,10 @@ data ConcreteExpression t
       (ConcreteExpression t)
       (Maybe (ConcreteExpression t))
   | EClosure
-      [Annotation (Maybe t)]
+      [Annotation (Maybe t, IsMutable)]
       (Maybe t)
       (ConcreteExpression t)
+  | EUnMut (ConcreteExpression t)
   | EBlock [ConcreteExpression t]
   | EProperty Text (ConcreteExpression t)
   | EListIndex (ConcreteExpression t) (ConcreteExpression t)
@@ -78,6 +85,7 @@ data ConcreteExpression t
   | EGenericProperty [PlumeGeneric] Text [t] t
   | ETypeExtension [PlumeGeneric] (Annotation t) [ExtensionMember t]
   | ENativeFunction Text Text [Text] t
+  deriving (Show)
 
 data TypeConstructor t
   = TConstructor Text [t]
@@ -89,6 +97,7 @@ data ExtensionMember t
       [PlumeGeneric]
       (Annotation (Maybe t))
       (ConcreteExpression t)
+  deriving (Show)
 
 pattern (:>:) :: ConcreteExpression t -> Position -> ConcreteExpression t
 pattern e :>: p = ELocated e p

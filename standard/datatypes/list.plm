@@ -1,53 +1,65 @@
 require "string"
 require "number"
 
-native "std:native" with
+native "std:native" {
   list_append<A>(x: [A], y: A): [A]
   list_prepend<A>(x: [A], y: A): [A]
   list_concat<A>(x: [A], y: [A]): [A]
   ffi_get_index<A>(x: [A], i: int): Option<A>
   ffi_slice_list<A>(x: [A], start: int, end: int): [A]
+}
 
-extend<A> (c: [A]) with
-  append(d: A) => list_append(c, d)
-  prepend(d: A) => list_prepend(c, d)
-  concat(d: [A]) => list_concat(c, d)
-  len(): int => 
-    switch c
+extend<A> (c: [A]) {
+  fn append(d: A) => list_append(c, d)
+  fn prepend(d: A) => list_prepend(c, d)
+  fn concat(d: [A]) => list_concat(c, d)
+  fn len(): int =>
+    switch c {
       case [] => 0
       case [?, ..xs] => 1 + xs.len()
+    }
 
-  map<B>(f: (A) -> B): [B] =>
-    switch c
+  fn map<B>(f: fn(A): B): [B] =>
+    switch c {
       case [] => []
       case [x, ..xs] => xs.map(f).prepend(f(x))
-  
-  flatMap<B>(f: (A) -> [B]): [B] =>
-    switch c
+    }
+
+  fn flatMap<B>(f: fn(A): [B]): [B] =>
+    switch c {
       case [] => []
-      case [x_, ..xs_] => 
+      case [x_, ..xs_] {
         x1 = f(x_)
         x2 = xs_.flatMap(f)
         return x1.concat(x2)
+      }
+    }
 
-  show(showHelper: (A) -> str): str => "[{c.map(showHelper).join(", ")}]"
+  fn show(showHelper: fn(A): str): str => "[{c.map(showHelper).join(", ")}]"
 
-  get_index(i: int): Option<A> => ffi_get_index(c, i)
+  fn get_index(i: int): Option<A> => ffi_get_index(c, i)
 
-  slice(start: int, end: int): [A] => ffi_slice_list(c, start, end)
+  fn slice(start: int, end: int): [A] => ffi_slice_list(c, start, end)
+}
 
-extend (c: [int]) with
-  sum(): int =>
-    switch c
+extend (c: [int]) {
+  fn sum(): int =>
+    switch c {
       case [] => 0
       case [x, ..xs] => x + xs.sum()
+    }
 
-  product(): int =>
-    switch c
+  fn product(): int =>
+    switch c {
       case [] => 1
       case [x, ..xs] => x * xs.product()
+    }
+}
 
-extend (c: int) with
-  slice(to: int): [int] => switch to
-    case 0 => []
-    case ? => [c].concat((c + 1).slice(to - 1))
+extend (c: int) {
+  fn slice(to: int): [int] =>
+    switch to {
+      case 0 => []
+      case ? => [c].concat((c + 1).slice(to - 1))
+    }
+}
