@@ -40,3 +40,5 @@ build
 *.class
 
 _*
+
+compile_commands.json
