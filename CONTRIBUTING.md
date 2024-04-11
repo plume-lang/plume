@@ -22,6 +22,8 @@ All types of contributions are encouraged and valued. See the [Table of Contents
   - [Your First Code Contribution](#your-first-code-contribution)
   - [Improving The Documentation](#improving-the-documentation)
 - [Style guides](#styleguides)
+  - [Code Style](#code-style)
+  - [Comments Style](#comments-style)
   - [Commit Messages](#commit-messages)
 - [Join The Project Team](#join-the-project-team)
 
