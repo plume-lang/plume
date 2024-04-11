@@ -1,3 +1,13 @@
-println("Hello world")
+fn counter(n: int) {
+  mut i = n
+  return fn(): int {
+    i = *i + 1
+    return *i
+  }
+}
 
-require "closure.plm"
+c = counter(2)
+println(c().show())
+println(c().show())
+println(c().show())
+println(c().show())

@@ -1,14 +1,14 @@
 type tuple<A, B> { tuple(A, B) }
 
 extend<A, B> (c: tuple<A, B>) {
-  fn show(showA: (A) -> str, showB: (B) -> str): str => switch c {
+  fn show(showA: fn(A): str, showB: fn(B): str): str => switch c {
     case tuple(x, y) => "(" + showA(x) + ", " + showB(y) + ")"
   }
 
   fn fst(): A => switch c {
     case tuple(x, y) => x
   }
-  
+
   fn snd(): B => switch c {
     case tuple(x, y) => y
   }

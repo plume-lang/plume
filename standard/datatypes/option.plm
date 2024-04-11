@@ -4,25 +4,25 @@ type Option<A> {
 }
 
 extend<A> (this: Option<A>) {
-  fn map<B>(f: (A) -> B): Option<B> =>
+  fn map<B>(f: fn(A): B): Option<B> =>
     switch this {
       case None => None
       case Some(a) => Some(f(a))
     }
-    
-  fn show(showSome: (A) -> str): str =>
+
+  fn show(showSome: fn(A): str): str =>
     switch this {
       case None => "None"
       case Some(a) => "Some({a.showSome()})"
     }
 
-  fn flatMap<B>(f: (A) -> Option<B>): Option<B> =>
+  fn flatMap<B>(f: fn(A): Option<B>): Option<B> =>
     switch this {
       case None => None
       case Some(a) => f(a)
     }
 
-  fn getOrElse(f: () -> A): A =>
+  fn getOrElse(f: fn(): A): A =>
     switch this {
       case None => f()
       case Some(a) => a

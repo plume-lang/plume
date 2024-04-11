@@ -4,36 +4,36 @@ type Result<A, B> {
 }
 
 extend<A, B> (this: Result<A, B>) {
-  fn map<C>(f: (B) -> C): Result<A, C> =>
+  fn map<C>(f: fn(B): C): Result<A, C> =>
     switch this {
       case Error(a) => Error(a)
       case Ok(b) => Ok(f(b))
     }
 
-  fn show(showError: (A) -> str, showOk: (B) -> str): str =>
+  fn show(showError: fn(A): str, showOk: fn(B): str): str =>
     switch this {
       case Error(a) => "Error({a.showError()})"
       case Ok(b) => "Ok({b.showOk()})"
     }
-  
-  fn flatMap<C>(f: (B) -> Result<A, C>): Result<A, C> =>
+
+  fn flatMap<C>(f: fn(B): Result<A, C>): Result<A, C> =>
     switch this {
       case Error(a) => Error(a)
       case Ok(b) => f(b)
     }
 
-  fn getOrElse(f: (A) -> B): B =>
+  fn getOrElse(f: fn(A): B): B =>
     switch this {
       case Error(a) => f(a)
       case Ok(b) => b
     }
-  
+
   fn isError(): bool =>
     switch this {
       case Error(?) => true
       case Ok(?) => false
     }
-  
+
   fn isOk(): bool =>
     switch this {
       case Error(?) => false
