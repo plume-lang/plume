@@ -27,12 +27,7 @@ program
 program = unsafePerformIO $ newIORef []
 
 insertReturnStmt :: Pre.Expression -> Pre.Expression
-insertReturnStmt (Pre.EBlock [Pre.EReturn e]) = Pre.EBlock [Pre.EReturn e]
-insertReturnStmt (Pre.EBlock [e]) | isNotDecl e = Pre.EBlock [Pre.EReturn e]
 insertReturnStmt (Pre.EBlock es) = Pre.EBlock es
-insertReturnStmt (Pre.EMutDeclaration n e1 e2) = Pre.EMutDeclaration n e1 (insertReturnStmt <$> e2)
-insertReturnStmt (Pre.EMutUpdate n e1 e2) = Pre.EMutUpdate n e1 (insertReturnStmt <$> e2)
-insertReturnStmt (Pre.EDeclaration n e1 e2) = Pre.EDeclaration n e1 (insertReturnStmt <$> e2)
 insertReturnStmt e = Pre.EBlock [Pre.EReturn e]
 
 isNotDecl :: Pre.Expression -> Bool
@@ -44,7 +39,8 @@ isNotDecl _ = True
 eraseType :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]
 eraseType (Pre.EDeclaration (Annotation name _) (Pre.EClosure args _ body) Nothing : xs) = do
   let args' = map (\(Annotation n _) -> n) args
-  b' <- eraseStatement (insertReturnStmt body)
+  let b = insertReturnStmt body
+  b' <- eraseStatement b
   let fun = Post.UPFunction name args' b'
   modifyIORef' program (<> [fun])
   eraseType xs
@@ -176,7 +172,8 @@ eraseExpr (Pre.ESwitch e cases) = do
   return $ Post.UESwitch e' cases'
 eraseExpr (Pre.EBlock es) = Post.UEBlock <$> mapM eraseStatement es
 eraseExpr (Pre.EClosure args _ body) = do
-  b <- eraseExpr body
+  let b' = insertReturnStmt body
+  b <- eraseExpr b'
   return $
     Post.UEClosure
       (map (\(Annotation n _) -> n) args)
