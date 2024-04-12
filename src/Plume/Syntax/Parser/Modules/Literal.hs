@@ -10,10 +10,10 @@ import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 
 parseLiteral :: Parser Expression -> Parser Expression
-parseLiteral f =
+parseLiteral _ =
   choice
     [ ELiteral <$> parseChar
-    , stringLiteralInterpolated f
+    , ELiteral <$> parseString
     , ELiteral <$> try parseFloat
     , ELiteral <$> parseBool
     , ELiteral <$> parseInteger
@@ -47,11 +47,8 @@ stringLiteralInterpolated f = lexeme $ do
  where
   parseInterpolation = char '{' *> f <* char '}'
   parseCharChunk = do
-    str <-
-      T.pack
-        <$> some
-          (notFollowedBy (void parseInterpolation <|> void (char '"')) >> L.charLiteral)
-    return $ ELiteral (LString str)
+    str <- manyTill L.charLiteral (lookAhead (char '{' <|> char '"'))
+    return $ ELiteral (LString (T.pack str))
 
   interpolation = parseInterpolation <|> parseCharChunk
 

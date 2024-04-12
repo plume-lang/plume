@@ -2,6 +2,7 @@ module Plume.Syntax.Parser.Parser where
 
 import Control.Monad.Combinators.Expr qualified as P
 import Control.Monad.Parser qualified as P
+import Data.SortedList qualified as SL
 import Plume.Syntax.Common qualified as Cmm
 import Plume.Syntax.Concrete qualified as CST
 import Plume.Syntax.Parser.Lexer qualified as L
@@ -22,14 +23,7 @@ functionCallOperator :: P.Parser (CST.Expression -> CST.Expression)
 functionCallOperator = do
   arguments <- L.parens (parseExpression `P.sepBy` L.comma)
 
-  -- Optional syntaxic sugar for callback argument
-  lambdaArg <-
-    optional $
-      CST.EClosure [] Nothing <$> L.braces (CST.EBlock <$> P.many parseStatement)
-
-  let newArgs = arguments ++ maybeToList lambdaArg
-
-  return $ flip CST.EApplication newArgs
+  return $ flip CST.EApplication arguments
 
 -- | Parses an expression with its position
 eLocated :: P.Parser CST.Expression -> P.Parser CST.Expression
@@ -113,7 +107,7 @@ eList =
 eMacroExpr :: P.Parser CST.Expression
 eMacroExpr =
   P.choice
-    [ P.try parseMacroCall
+    [ parseMacroCall
     , parseMacroVar
     ]
  where
@@ -124,8 +118,9 @@ eMacroExpr =
 
   parseMacroCall :: P.Parser CST.Expression
   parseMacroCall = do
-    name <- P.char '@' *> L.identifier
-    args <- L.parens $ parseExpression `P.sepBy` L.comma
+    name <- P.try $ P.char '@' *> L.identifier <* L.symbol "("
+    args <- parseExpression `P.sepBy` L.comma
+    void $ L.symbol ")"
     return $ CST.EMacroApplication name args
 
 eClosure :: P.Parser CST.Expression
@@ -166,9 +161,8 @@ parseTerm =
 
 parseExpression :: P.Parser CST.Expression
 parseExpression = eLocated $ do
-  customOps <- readIORef L.customOperators
-  let customs = Opr.sortCustomOperators customOps
-  P.makeExprParser parseTerm ([postfixOperators] : customs ++ Opr.operators)
+  customOps <- readIORef L.operatorsCombinators
+  P.makeExprParser parseTerm ([postfixOperators] : customOps ++ Opr.operators)
  where
   postfixOperators =
     P.Postfix $
@@ -177,7 +171,7 @@ parseExpression = eLocated $ do
           [ functionCallOperator
           , -- Mutable property access, just a shortcut for mutability
             do
-              f <- P.string "->" *> L.identifierHelper False
+              f <- P.string "->" *> L.nonLexedID
               return $ CST.EProperty f . CST.EUnMut
           , Slc.transformSlice <$> L.brackets (Slc.parseSlice parseTerm)
           , -- Record selection e.x where e may be a record and x a label to
@@ -274,33 +268,21 @@ tRequire = do
 tNative :: P.Parser [CST.Expression]
 tNative = do
   void $ L.reserved "native"
-  path <- Lit.stringLiteral <* P.notFollowedBy (L.reserved "with")
-  name <- L.identifier
-  gens <- P.option [] $ L.angles $ L.identifier `P.sepBy` L.comma
-  args <- L.parens $ typeAnnot' `P.sepBy` L.comma
-  retTy <- P.option Cmm.TUnit $ L.symbol ":" *> Typ.tType
-
-  let clTy = args Cmm.:->: retTy
-
-  return [CST.ENativeFunction path name gens clTy]
-
-tNativeGroup :: P.Parser [CST.Expression]
-tNativeGroup = do
-  void $ L.reserved "native"
   path <- Lit.stringLiteral
+  P.choice [nativeGroup path, nativeOne path]
+  where
+    nativeGroup p = L.braces (P.many (parseNative p))
+    nativeOne p = (: []) <$> parseNative p
 
-  L.braces . P.many $ parseNative path
- where
-  parseNative :: Text -> P.Parser CST.Expression
-  parseNative p = do
-    name <- L.identifier
-    gens <- P.option [] $ L.angles $ L.identifier `P.sepBy` L.comma
-    args <- L.parens $ typeAnnot' `P.sepBy` L.comma
-    retTy <- P.option Cmm.TUnit $ L.symbol ":" *> Typ.tType
+    parseNative p = do
+      name <- L.identifier
+      gens <- P.option [] $ L.angles $ L.identifier `P.sepBy` L.comma
+      args <- L.parens $ typeAnnot' `P.sepBy` L.comma
+      retTy <- P.option Cmm.TUnit $ L.symbol ":" *> Typ.tType
 
-    let clTy = args Cmm.:->: retTy
+      let clTy = args Cmm.:->: retTy
 
-    return $ CST.ENativeFunction p name gens clTy
+      return $ CST.ENativeFunction p name gens clTy
 
 tCustomOperator :: P.Parser [CST.Expression]
 tCustomOperator = do
@@ -314,8 +296,11 @@ tCustomOperator = do
       ]
   prec <- P.option 0 $ fromInteger <$> Lit.integer
   name <- some L.operator
-  let op = map (\n -> L.CustomOperator n prec opTy) name
-  modifyIORef' L.customOperators (op <>)
+  let op = SL.toSortedList $ map (\n -> L.CustomOperator n prec opTy) name
+  op' <- readIORef L.customOperators
+  writeIORef L.customOperators $ SL.union op op'
+  let newOps = Opr.sortCustomOperators (op `SL.union` op')
+  writeIORef L.operatorsCombinators newOps
   mempty
 
 tExtension :: P.Parser [CST.Expression]
@@ -337,30 +322,29 @@ tType = do
 tMacro :: P.Parser [CST.Expression]
 tMacro = do
   void $ L.reserved "macro"
-  name <- L.identifier <* L.symbol "="
-  body <- eBlock
-  return [CST.EMacro name body]
-
-tMacroFunction :: P.Parser [CST.Expression]
-tMacroFunction = do
-  void $ L.reserved "macro"
   name <- L.identifier
-  args <- L.parens $ L.identifier `P.sepBy` L.comma
-  body <- L.symbol "=>" *> parseExpression <|> eBlock
-  return [CST.EMacroFunction name args body]
+  (args, body, isFun) <- P.choice [macroFun, macroVar]
+  return
+    [if isFun then CST.EMacroFunction name args body else CST.EMacro name body]
+ where
+  macroFun = do
+    args <- L.parens $ L.identifier `P.sepBy` L.comma
+    body <- L.symbol "=>" *> parseExpression <|> eBlock
+    return (args, body, True)
+  macroVar = do
+    body <- L.symbol "=" *> parseExpression
+    return ([], body, False)
 
 parseToplevel :: P.Parser [CST.Expression]
 parseToplevel =
   eLocatedMany $
     P.choice
-      [ P.try tNative
-      , tNativeGroup
+      [ tNative
       , tRequire
       , tType
       , tCustomOperator
       , tExtension
-      , P.try tMacro
-      , tMacroFunction
+      , tMacro
       , pure <$> parseStatement
       ]
 

@@ -2,9 +2,13 @@
 
 module Plume.Syntax.Parser.Lexer where
 
+import Control.Monad.Combinators.Expr
 import Control.Monad.Parser
 import Data.Char
-import Data.Text (pack)
+import Data.Set qualified as Set
+import Data.SortedList qualified as SL
+import Data.Text qualified as Text
+import Plume.Syntax.Concrete
 import System.IO.Unsafe
 import Text.Megaparsec hiding (many, some)
 import Text.Megaparsec.Char
@@ -17,7 +21,7 @@ data OperatorType
   | CInfixN
   | CPrefix
   | CPostfix
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data CustomOperator
   = CustomOperator
@@ -25,7 +29,19 @@ data CustomOperator
   , precedence :: Int
   , opType :: OperatorType
   }
-  deriving (Show, Eq)
+  deriving (Show)
+
+instance Eq CustomOperator where
+  x == y = customOperator x == customOperator y && opType x == opType y
+
+instance Ord CustomOperator where
+  compare CustomOperator {precedence = p1, opType = t1, customOperator = o1} CustomOperator {precedence = p2, opType = t2, customOperator = o2} 
+    | p1 == p2 = compare (t1, o1) (t2, o2)
+    | otherwise = compare p1 p2
+
+{-# NOINLINE operatorsCombinators #-}
+operatorsCombinators :: IORef [[Operator Parser Expression]]
+operatorsCombinators = unsafePerformIO $ newIORef []
 
 lineComment :: Parser ()
 lineComment = L.skipLineComment "//"
@@ -39,54 +55,43 @@ scn = L.space space1 lineComment multilineComment
 isReal :: (Num a, RealFrac a) => a -> Bool
 isReal x = (ceiling x :: Integer) == floor x
 
-reservedWords :: [Text]
+reservedWords :: Set Text
 reservedWords =
-  [ "in"
-  , "if"
-  , "then"
-  , "else"
-  , "true"
-  , "false"
-  , "require"
-  , "switch"
-  , "fn"
-  , "case"
-  , "return"
-  , "extend"
-  , "native"
-  , "with"
-  , "extends"
-  , "operator"
-  , "type"
-  , -- Primitive types
-    "int"
-  , "str"
-  , "char"
-  , "float"
-  , "bool"
-  , "infix"
-  , "prefix"
-  , "postfix"
-  , "infixl"
-  , "infixr"
-  , "mut"
-  ]
+  Set.fromList
+    [ "in"
+    , "if"
+    , "then"
+    , "else"
+    , "true"
+    , "false"
+    , "require"
+    , "switch"
+    , "fn"
+    , "case"
+    , "return"
+    , "extend"
+    , "native"
+    , "with"
+    , "extends"
+    , "operator"
+    , "type"
+    , -- Primitive types
+      "int"
+    , "str"
+    , "char"
+    , "float"
+    , "bool"
+    , "infix"
+    , "prefix"
+    , "postfix"
+    , "infixl"
+    , "infixr"
+    , "mut"
+    ]
 
--- Tab width for the indent sensitive parser
--- Defaulting to Nothing, meaning that the tab width is not set
--- It is set on first space or tab consumption
-tabWidthRef :: IORef (Maybe Int)
-{-# NOINLINE tabWidthRef #-}
-tabWidthRef = unsafePerformIO $ newIORef Nothing
-
--- Tab utility to tell the parser whether to use tabs or spaces
-isTabIndent :: IORef (Maybe Bool)
-{-# NOINLINE isTabIndent #-}
-isTabIndent = unsafePerformIO $ newIORef Nothing
-
-customOperators :: IORef [CustomOperator]
+customOperators :: IORef (SL.SortedList CustomOperator)
 {-# NOINLINE customOperators #-}
-customOperators = unsafePerformIO $ newIORef []
+customOperators = unsafePerformIO $ newIORef mempty
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme scn
@@ -94,45 +99,43 @@ lexeme = L.lexeme scn
 symbol :: Text -> Parser Text
 symbol = lexeme . L.symbol scn
 
-validOperators :: [Char]
+validOperators :: Set Char
 validOperators =
-  [ '!'
-  , '#'
-  , '$'
-  , '%'
-  , '&'
-  , '*'
-  , '+'
-  , '.'
-  , '/'
-  , '<'
-  , '='
-  , '>'
-  , '?'
-  , '@'
-  , '^'
-  , '|'
-  , '-'
-  , '~'
-  ]
+  Set.fromList
+    [ '!'
+    , '#'
+    , '$'
+    , '%'
+    , '&'
+    , '*'
+    , '+'
+    , '.'
+    , '/'
+    , '<'
+    , '='
+    , '>'
+    , '?'
+    , '@'
+    , '^'
+    , '|'
+    , '-'
+    , '~'
+    ]
 
-reservedOperators :: [Text]
+reservedOperators :: Set Text
 reservedOperators =
-  [ "->"
-  , ":"
-  , "."
-  , ".."
-  , "=>"
-  ]
+  Set.fromList
+    [ "->"
+    , ":"
+    , "."
+    , ".."
+    , "=>"
+    ]
 
 operator :: Parser Text
 operator = do
-  op <-
-    pack
-      <$> lexeme
-        ( (:) <$> oneOf validOperators <*> many (oneOf validOperators)
-        )
-  guard (op `notElem` reservedOperators)
+  op <- lexeme $ takeWhile1P Nothing (`Set.member` validOperators)
+  guard (op `Set.notMember` reservedOperators)
   return op
 
 reserved :: Text -> Parser Text
@@ -156,26 +159,30 @@ comma = symbol ","
 colon :: Parser Text
 colon = symbol ":"
 
-identifierHelper :: Bool -> Parser Text
-identifierHelper isLexed = do
-  let lex = if isLexed then lexeme else id
-  r <-
-    lex
-      ( pack
-          <$> ( (:)
-                  <$> (letterChar <|> oneOf ("_" :: String))
-                  <*> many (alphaNumChar <|> oneOf ("_" :: String))
-              )
-      )
+isIdentChar :: Char -> Bool
+isIdentChar c = isAlphaNum c || c == '_'
 
+isIdentCharStart :: Text -> Bool
+isIdentCharStart cs = isAlpha (Text.head cs) || Text.head cs == '_'
+
+nonLexedID :: Parser Text
+nonLexedID = do
+  r <- takeWhile1P Nothing isIdentChar
   -- Guarding parsed result and failing when reserved word is parsed
   -- (such as reserved keyword)
-  if r `elem` reservedWords
+  if r `Set.member` reservedWords
     then fail $ "The identifier " ++ show r ++ " is a reserved word"
     else return r
 
 identifier :: Parser Text
-identifier = identifierHelper True
+identifier = lexeme $ do
+  cs <- takeWhile1P Nothing isIdentChar
+  if cs `Set.member` reservedWords
+    then fail $ "The identifier " ++ show cs ++ " is a reserved word"
+    else
+      if isIdentCharStart cs
+        then return cs
+        else fail $ "The identifier " ++ show cs ++ " is not valid"
 
 field :: Parser Text
-field = identifierHelper False <|> operator
+field = nonLexedID <|> operator

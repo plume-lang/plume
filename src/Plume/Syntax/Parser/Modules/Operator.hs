@@ -3,6 +3,7 @@
 module Plume.Syntax.Parser.Modules.Operator where
 
 import Control.Monad.Combinators.Expr
+import Data.SortedList qualified as SL
 import Control.Monad.Parser
 import Data.Foldable hiding (elem)
 import Plume.Syntax.Concrete
@@ -56,10 +57,8 @@ operators =
     , [prefix "*" EUnMut]
     ]
 
-sortCustomOperators :: [CustomOperator] -> [[Operator Parser Expression]]
-sortCustomOperators ops = do
-  let ops' = sortBy (\x y -> compare x.precedence y.precedence) ops
-  map ((: []) . parseOperator) ops'
+sortCustomOperators :: SL.SortedList CustomOperator -> [[Operator Parser Expression]]
+sortCustomOperators ops = map ((: []) . parseOperator) (SL.fromSortedList ops)
  where
   parseOperator :: CustomOperator -> Operator Parser Expression
   parseOperator (CustomOperator name _ CPrefix) =

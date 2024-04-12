@@ -5,10 +5,9 @@ import Plume.Syntax.Concrete.Expression (Position)
 import Plume.Syntax.Parser.Lexer hiding (symbol)
 import Plume.Syntax.Parser.Modules.Literal
 import Text.Megaparsec hiding (many)
-import Text.Megaparsec.Char.Lexer
 
 eRequire :: Parser TempAST
-eRequire = nonIndented scn $ do
+eRequire = lexeme $ do
   p1 <- getSourcePos
   void $ reserved "require"
   path <- stringLiteral
