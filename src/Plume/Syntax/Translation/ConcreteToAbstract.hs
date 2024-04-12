@@ -5,6 +5,7 @@ module Plume.Syntax.Translation.ConcreteToAbstract where
 import Control.Monad.Exception
 import Data.List qualified as L
 import Data.Text qualified as T
+import Data.SortedList qualified as SL
 import Plume.Syntax.Abstract qualified as AST
 import Plume.Syntax.Common qualified as Common
 import Plume.Syntax.Concrete qualified as CST
@@ -216,7 +217,7 @@ runConcreteToAbstract std dir paths fp = do
               liftIO (parsePlumeFile fp content ops) >>= \case
                 Left err -> throwError' $ ParserError err
                 Right (cst, ops') -> do
-                  modifyIORef' operators (ops' ++)
+                  modifyIORef' operators (`SL.union` ops')
                   sequenceMapM concreteToAbstract cst >>= \case
                     Left err -> throwError' err
                     Right ast -> bireturn $ exprs <> flat ast

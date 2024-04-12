@@ -4,6 +4,7 @@ module Plume.Syntax.Translation.Generics where
 
 import Control.Monad.Exception
 import Control.Monad.IO
+import Data.SortedList qualified as SL
 import Control.Monad.Parser
 import GHC.IO
 import Plume.Syntax.Concrete.Expression (Position)
@@ -18,8 +19,8 @@ positionRef :: IORef (Maybe Position)
 positionRef = unsafePerformIO $ newIORef Nothing
 
 {-# NOINLINE operators #-}
-operators :: IORef [CustomOperator]
-operators = unsafePerformIO $ newIORef []
+operators :: IORef (SL.SortedList CustomOperator)
+operators = unsafePerformIO $ newIORef mempty
 
 -- A spreadable type is a type that can handle either a single value or a
 -- spread of values. It is used to specify the translator that we need to
