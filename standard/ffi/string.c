@@ -13,7 +13,7 @@ Value add_str(int arg_n, Module* mod, Value* args) {
              args[1].type);
 
   char* new_str =
-      malloc(strlen(args[0].string_value) + strlen(args[1].string_value));
+      malloc(strlen(args[0].string_value) + strlen(args[1].string_value) + 1);
   strcpy(new_str, args[0].string_value);
   strcat(new_str, args[1].string_value);
 
