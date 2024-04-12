@@ -139,7 +139,7 @@ operator = do
   return op
 
 reserved :: Text -> Parser Text
-reserved keyword = lexeme (string keyword <* notFollowedBy alphaNumChar)
+reserved keyword = try $ lexeme (string keyword <* notFollowedBy alphaNumChar)
 
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
