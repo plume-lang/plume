@@ -258,6 +258,7 @@ getLocalConstraints m = do
         , nextTyVar = s.nextTyVar
         , extensions = s.extensions
         , positions = s.positions
+        , returnType = s.returnType
         }
     )
   let sCons = s.constraints
