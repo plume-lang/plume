@@ -13,7 +13,7 @@ extend (c: str) {
   fn (*) (d: int) => mul_str(c, d)
   fn (==) (d: str) => eq_string(c, d)
   fn concat(d: str) => c + d
-  fn show() => "\"{c}\""
+  fn show() => "\"" + c + "\""
   fn len() => string_length(c)
 
   fn get_index(i: int): Option<char> => get_index_str(c, i)
@@ -30,7 +30,7 @@ extend (c: [str]) {
 }
 
 extend (c: char) {
-  fn show() => "'{char_to_string(c)}'"
+  fn show() => "'" + char_to_string(c) + "'"
   fn to_str(): str => char_to_string(c)
   fn (==) (d: char) => eq_char(c, d)
 }

@@ -2,5 +2,5 @@ require "std:io"
 require "std:datatypes"
 
 extend<A> (c: mut A) {
-    fn show(showHelper: fn(A): str): str => "mut {c->showHelper()}"
+    fn show(showHelper: fn(A): str): str => "mut " + c->showHelper()
 }

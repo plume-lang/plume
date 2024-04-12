@@ -35,7 +35,8 @@ extend<A> (c: [A]) {
       }
     }
 
-  fn show(showHelper: fn(A): str): str => "[{c.map(showHelper).join(", ")}]"
+  fn show(showHelper: fn(A): str): str =>
+    "[" + c.map(showHelper).join(", ") + "]"
 
   fn get_index(i: int): Option<A> => ffi_get_index(c, i)
 
