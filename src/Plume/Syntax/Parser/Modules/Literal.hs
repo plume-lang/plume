@@ -24,7 +24,7 @@ parseLiteral _ =
 -- encapsulated into their CST correspondance
 
 charLiteral :: Parser Char
-charLiteral = between (char '\'') (char '\'') $ do
+charLiteral = lexeme $ between (char '\'') (char '\'') $ do
   c <- L.charLiteral
   guard (c /= '\'')
   return c

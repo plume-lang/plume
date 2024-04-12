@@ -349,4 +349,4 @@ parseToplevel =
       ]
 
 parseProgram :: P.Parser [CST.Expression]
-parseProgram = concat <$> P.sepEndBy parseToplevel L.scn
+parseProgram = L.scn *> (concat <$> P.sepEndBy parseToplevel L.scn)

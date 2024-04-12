@@ -33,4 +33,5 @@ extend (c: char) {
   fn show() => "'" + char_to_string(c) + "'"
   fn to_str(): str => char_to_string(c)
   fn (==) (d: char) => eq_char(c, d)
+  fn (!=) (d: char) => not (c == d)
 }

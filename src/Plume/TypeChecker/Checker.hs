@@ -17,6 +17,16 @@ import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.TLIR qualified as Post
 
+doesContainReturn :: [Post.Expression] -> Bool
+doesContainReturn = any $ \case
+  Post.EReturn {} -> True
+  Post.EBlock xs -> doesContainReturn xs
+  _ -> False
+
+withoutLocated :: Post.Expression -> Post.Expression
+withoutLocated (Post.ELocated expr _) = withoutLocated expr
+withoutLocated e = e
+
 synthesize :: Pre.Expression -> Checker (PlumeType, [Post.Expression])
 -- Some basic and primitive expressions
 synthesize (Pre.ELocated expr pos) = withPosition pos $ synthesize expr
@@ -51,12 +61,13 @@ synthesize (Pre.EBlock exprs) = local id $ do
     mapAndUnzipM
       (localPosition . extractFromArray . synthesize)
       exprs
-  case viaNonEmpty last tys of
-    Nothing -> pure (TUnit, [Post.EBlock []])
-    Just retInfered -> do
-      returnTy <- gets returnType
-      forM_ returnTy $ unifiesTo retInfered
-      pure (retInfered, [Post.EBlock exprs'])
+
+  retTy <- gets returnType
+  case tys of
+    [x] -> do
+      forM_ retTy $ unifiesTo x
+      pure (x, [Post.EBlock exprs'])
+    _ -> return (fromMaybe TUnit retTy, [Post.EBlock exprs'])
 synthesize (Pre.EReturn expr) = do
   (ty, expr') <- extractFromArray $ synthesize expr
   returnTy <- gets returnType
