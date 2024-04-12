@@ -128,7 +128,9 @@ library
         directory,
         text,
         binary,
-        template-haskell
+        template-haskell,
+        MissingH,
+        sorted-list
 
     mixins:
         base hiding (Prelude),
