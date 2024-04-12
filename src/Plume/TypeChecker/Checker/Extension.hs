@@ -62,7 +62,7 @@ synthExtMember
     insertEnvWith @"typeEnv" Map.union schemes
     ((retTy, body'), finalExt, s3) <- case convertedGenerics of
       [] -> do
-        r@(retTy, _) <- extractFromArray (infer body)
+        r@(retTy, _) <- local (\s -> s {returnType = Just convertedRet}) $ extractFromArray (infer body)
         retTy `unifiesTo` convertedRet
 
         let closureTy = (extTy : map (.annotationValue) convertedArgs) :->: retTy
@@ -74,7 +74,7 @@ synthExtMember
 
         pure (r, newExt, mempty)
       _ -> do
-        (r@(retTy, _), cs) <- getLocalConstraints $ extractFromArray $ infer body
+        (r@(retTy, _), cs) <- local (\s -> s {returnType = Just convertedRet}) . getLocalConstraints $ extractFromArray $ infer body
         let closureTy = (extTy : map (.annotationValue) convertedArgs) :->: retTy
 
         c1 <- createConstraint (convertedTy :~: closureTy)

@@ -13,7 +13,7 @@ parsePattern =
     , parseTuple
     , parseList
     , parseLiteral
-    , try parseConstructor
+    , parseConstructor
     , parseVariable
     ]
 
@@ -43,7 +43,7 @@ parseLiteral =
 parseList :: Parser Pattern
 parseList =
   brackets $ do
-    items <- (try parseSlice <|> parsePattern) `sepBy` comma
+    items <- (parseSlice <|> parsePattern) `sepBy` comma
     let (items', slice) = case reverse items of
           [] -> ([], Nothing)
           (p@(PSlice _) : rest) -> (reverse rest, Just p)
@@ -55,8 +55,9 @@ parseSlice = PSlice <$> (symbol ".." *> identifier)
 
 parseConstructor :: Parser Pattern
 parseConstructor = do
-  name <- identifier
-  args <- parens (parsePattern `sepBy` comma)
+  name <- try $ identifier <* symbol "("
+  args <- parsePattern `sepBy` comma
+  _ <- symbol ")"
   return $ PConstructor name args
 
 parseWildcard :: Parser Pattern

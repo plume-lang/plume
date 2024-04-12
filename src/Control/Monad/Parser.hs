@@ -9,20 +9,17 @@ module Control.Monad.Parser (
 import Control.Monad.IO as IO
 import Text.Megaparsec hiding (parse)
 
-type Parser = ParsecT Void Text (ReaderT Int IO)
+type Parser = ParsecT Void Text IO
 
 type FileContent = Text
 
 type ParsingError = ParseErrorBundle FileContent Void
 
-instance Semigroup Int where (<>) = (+)
-
-instance Monoid Int where mempty = 0
-
+{-# INLINE parse #-}
 parse
   :: Parser a
   -> FilePath
   -> FileContent
   -> IO (Either ParsingError a)
 parse p filePath fileContent = do
-  runReaderT (runParserT p filePath fileContent) 1
+  runParserT p filePath fileContent

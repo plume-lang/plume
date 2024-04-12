@@ -4,19 +4,20 @@ import Control.Monad.Parser
 import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer
 import Plume.Syntax.Parser.Parser
+import Data.SortedList qualified as SL
 
 parseTestPlume
   :: FileContent
-  -> IO (Either ParsingError (Program, [CustomOperator]))
+  -> IO (Either ParsingError (Program, SL.SortedList CustomOperator))
 parseTestPlume fc = parsePlumeFile mempty fc mempty
 
 parsePlumeFile
   :: FilePath
   -> FileContent
-  -> [CustomOperator]
-  -> IO (Either ParsingError (Program, [CustomOperator]))
+  -> SL.SortedList CustomOperator
+  -> IO (Either ParsingError (Program, SL.SortedList CustomOperator))
 parsePlumeFile fp fc ops' = do
-  modifyIORef' customOperators (ops' ++)
+  modifyIORef' customOperators (ops' `SL.union`)
   res <- parse parseProgram fp fc
   ops <- readIORef customOperators
   pure $ (,ops) <$> res

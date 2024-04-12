@@ -3,8 +3,8 @@
 module Plume.Syntax.Translation.ConcreteToAbstract where
 
 import Control.Monad.Exception
-import Data.List qualified as L
 import Data.Text qualified as T
+import Data.SortedList qualified as SL
 import Plume.Syntax.Abstract qualified as AST
 import Plume.Syntax.Common qualified as Common
 import Plume.Syntax.Concrete qualified as CST
@@ -127,7 +127,8 @@ concreteToAbstract (CST.ESwitch e ps) = do
         (\(p, body) -> (p,) . fmap interpretSpreadable <$> concreteToAbstract body)
         ps
   transRet $ AST.ESwitch <$> e' <*> ps'
-concreteToAbstract (CST.EProperty {}) = do
+concreteToAbstract z@(CST.EProperty {}) = do
+  print z
   pos <- readIORef positionRef
   throwError $ case pos of
     Just p -> CompilerError $ "Unexpected property at " <> show p
@@ -206,7 +207,7 @@ runConcreteToAbstract std dir paths fp = do
                     CST.ERequire i
             )
             paths
-        case L.nub . flat <$> imports' of
+        case flat <$> imports' of
           Left err -> throwError' err
           Right exprs -> do
             newCWD <- liftIO getCurrentDirectory
@@ -216,7 +217,7 @@ runConcreteToAbstract std dir paths fp = do
               liftIO (parsePlumeFile fp content ops) >>= \case
                 Left err -> throwError' $ ParserError err
                 Right (cst, ops') -> do
-                  modifyIORef' operators (ops' ++)
+                  modifyIORef' operators (`SL.union` ops')
                   sequenceMapM concreteToAbstract cst >>= \case
                     Left err -> throwError' err
                     Right ast -> bireturn $ exprs <> flat ast

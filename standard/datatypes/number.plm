@@ -21,6 +21,7 @@ require "string"
 require "bool"
 
 infix 3 ^
+infixr 2 !=
 
 // Defining math operators
 
@@ -35,6 +36,7 @@ extend (c: int) {
     case ? => c * (c ^ (d - 1))
   }
   fn (==) (d: int) => eq_int(c, d)
+  fn (!=) (d: int) => not (eq_int(c, d))
   fn (<) (d: int) => lt_int(c, d)
   fn (>) (d: int) => lt_int(d, c)
   fn (<=) (d: int) => not (lt_int(d, c))

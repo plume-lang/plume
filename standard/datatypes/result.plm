@@ -12,8 +12,8 @@ extend<A, B> (this: Result<A, B>) {
 
   fn show(showError: fn(A): str, showOk: fn(B): str): str =>
     switch this {
-      case Error(a) => "Error({a.showError()})"
-      case Ok(b) => "Ok({b.showOk()})"
+      case Error(a) => "Error(" + showError(a) + ")"
+      case Ok(b) => "Ok(" + showOk(b) + ")"
     }
 
   fn flatMap<C>(f: fn(B): Result<A, C>): Result<A, C> =>

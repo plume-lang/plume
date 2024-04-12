@@ -13,7 +13,7 @@ extend<A> (this: Option<A>) {
   fn show(showSome: fn(A): str): str =>
     switch this {
       case None => "None"
-      case Some(a) => "Some({a.showSome()})"
+      case Some(a) => "Some(" + showSome(a) + ")"
     }
 
   fn flatMap<B>(f: fn(A): Option<B>): Option<B> =>

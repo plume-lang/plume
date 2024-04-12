@@ -105,6 +105,7 @@ insertWith
 insertWith f value = do
   modify $ \s -> setField @l s (f value (getField @l s))
 
+{-# INLINE pushConstraint #-}
 pushConstraint
   :: forall l a
    . (HasField l Constraints [a])
@@ -222,12 +223,13 @@ extractFromArray ls = do
         CompilerError $
           "Expected a single element, received: " <> show (length r)
 
+{-# INLINE updateSubst #-}
 updateSubst :: Substitution -> Checker ()
 updateSubst s2 = do
-  s1 <- getSubst
   modify $ \st ->
-    st {constraints = st.constraints {substitution = s2 <> s1}}
+    st {constraints = st.constraints {substitution = s2 <> st.constraints.substitution}}
 
+{-# INLINE getSubst #-}
 getSubst :: Checker Substitution
 getSubst = gets (substitution . constraints)
 
@@ -256,6 +258,7 @@ getLocalConstraints m = do
         , nextTyVar = s.nextTyVar
         , extensions = s.extensions
         , positions = s.positions
+        , returnType = s.returnType
         }
     )
   let sCons = s.constraints
