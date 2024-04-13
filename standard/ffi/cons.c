@@ -35,3 +35,27 @@ Value MAKE_CHAR(char c) {
 
   return v;
 }
+
+Value make_ok(Value v) {
+  ValueList l;
+  l.length = 4;
+  l.values = malloc(sizeof(Value) * 4);
+  l.values[0] = MAKE_SPECIAL();
+  l.values[1] = MAKE_STRING("Result");
+  l.values[2] = MAKE_STRING("Ok");
+  l.values[3] = v;
+
+  return MAKE_LIST(l);
+}
+
+Value make_err(Value v) {
+  ValueList l;
+  l.length = 4;
+  l.values = malloc(sizeof(Value) * 4);
+  l.values[0] = MAKE_SPECIAL();
+  l.values[1] = MAKE_STRING("Result");
+  l.values[2] = MAKE_STRING("Error");
+  l.values[3] = v;
+
+  return MAKE_LIST(l);
+}
