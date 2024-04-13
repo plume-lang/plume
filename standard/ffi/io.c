@@ -105,3 +105,15 @@ Value ffi_get_index(int arg_n, Module* mod, Value* args) {
 
   return make_some(l.values[idx]);
 }
+
+Value input(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 1) THROW("Input expects 1 argument");
+  ASSERT(args[0].type == VALUE_STRING, "Input expects a string argument");
+
+  
+  char* buffer = malloc(1024);
+  printf("%s", args[0].string_value);
+  scanf("%s", buffer);
+
+  return MAKE_STRING(buffer);
+}
