@@ -1,6 +1,8 @@
 add_rules("mode.debug", "mode.release", "mode.profile")
+add_requires("libcurl")
 
 target("plume-natives")
+  add_packages("libcurl")
   add_files("ffi/**.c")
   add_includedirs("../runtime/include")
   add_files("ffi/ffi.export.txt")

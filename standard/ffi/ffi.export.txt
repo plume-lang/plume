@@ -38,3 +38,6 @@ println
 get_args
 does_file_exist
 execute_command
+input
+
+ffi_fetch
