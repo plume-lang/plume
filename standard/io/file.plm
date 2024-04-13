@@ -1,0 +1,8 @@
+require "std:datatypes/option"
+
+native "std:native" {
+  read_file(path: str): Option<str>
+  write_file(path: str, content: str): bool
+  append_file(path: str, content: str): bool
+  does_file_exist(path: str): bool
+}
