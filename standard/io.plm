@@ -3,6 +3,7 @@ native "std:native" println(x: str): int
 native "std:native" get_args(): [str]
 native "std:native" does_file_exist(path: str): bool
 native "std:native" execute_command(path: str): int
+native "std:native" input(pre: str): str
 
 macro print(x) => print(x.show())
 
@@ -17,3 +18,6 @@ macro println_with(fmt, x) {
   @print_with(fmt, x)
   print("\n")
 }
+
+native "std:native" ffi_fetch(url: str): Result<str, str>
+fn fetch(url: str): Result<str, str> => ffi_fetch(url)
