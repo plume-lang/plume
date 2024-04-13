@@ -15,6 +15,17 @@ Value make_some(Value v) {
   return MAKE_LIST(l);
 }
 
+Value make_unit() {
+  ValueList l;
+  l.length = 3;
+  l.values = malloc(sizeof(Value) * 3);
+  l.values[0] = MAKE_SPECIAL();
+  l.values[1] = MAKE_STRING("unit");
+  l.values[2] = MAKE_STRING("unit");
+
+  return MAKE_LIST(l);
+}
+
 Value make_none() {
   ValueList l;
   l.length = 3;
