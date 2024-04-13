@@ -1,5 +1,5 @@
-require "string"
 require "number"
+require "tuple"
 
 native "std:native" {
   list_append<A>(x: [A], y: A): [A]
@@ -10,57 +10,109 @@ native "std:native" {
 }
 
 extend<A> (c: [A]) {
-  fn append(d: A) => list_append(c, d)
-  fn prepend(d: A) => list_prepend(c, d)
-  fn concat(d: [A]) => list_concat(c, d)
-  fn len(): int =>
-    switch c {
-      case [] => 0
-      case [?, ..xs] => 1 + xs.len()
-    }
-
-  fn map<B>(f: fn(A): B): [B] =>
-    switch c {
-      case [] => []
-      case [x, ..xs] => xs.map(f).prepend(f(x))
-    }
-
-  fn flatMap<B>(f: fn(A): [B]): [B] =>
-    switch c {
-      case [] => []
-      case [x_, ..xs_] {
-        x1 = f(x_)
-        x2 = xs_.flatMap(f)
-        return x1.concat(x2)
-      }
-    }
-
-  fn show(showHelper: fn(A): str): str =>
-    "[" + c.map(showHelper).join(", ") + "]"
-
   fn get_index(i: int): Option<A> => ffi_get_index(c, i)
-
   fn slice(start: int, end: int): [A] => ffi_slice_list(c, start, end)
-}
 
-extend (c: [int]) {
-  fn sum(): int =>
-    switch c {
-      case [] => 0
-      case [x, ..xs] => x + xs.sum()
-    }
+  fn len(): int => switch c {
+    case [] => 0
+    case [?, ..xs] => 1 + len(xs)
+  }
 
-  fn product(): int =>
-    switch c {
-      case [] => 1
-      case [x, ..xs] => x * xs.product()
-    }
-}
+  fn (+) (other: [A]): [A] => list_concat(c, other)
+  fn concat(other: [A]): [A] => c + other
 
-extend (c: int) {
-  fn slice(to: int): [int] =>
-    switch to {
-      case 0 => []
-      case ? => [c].concat((c + 1).slice(to - 1))
+  fn head(): Option<A> => c.get_index(0)
+  fn tail(): [A] => c.slice(1, len(c))
+  fn last(): Option<A> => c.get_index(len(c) - 1)
+  fn init(): [A] => c.slice(0, len(c) - 1)
+
+  fn destruct(): (Option<A>, [A]) => (c.head(), c.tail())
+  fn destruct_last(): ([A], Option<A>) => (c.init(), c.last())
+  fn destruct_head(): (Option<A>, [A]) => c.destruct()
+
+  fn singleton(x: A): [A] => [x]
+  fn null(): bool => len(c) == 0
+
+  fn map<B>(f: fn(A): B): [B] => switch c {
+    case [] => []
+    case [x, ..xs] => [f(x)] + xs.map(f)
+  }
+  fn reverse(): [A] => switch c {
+    case [] => []
+    case [x, ..xs] => xs.reverse() + [x]
+  }
+  fn intersperse(x: A): [A] => switch c {
+    case [] => []
+    case [y] => [y]
+    case [y, ..ys] => [y, x].list_concat(ys.intersperse(x))
+  }
+  
+  fn reduce<B>(f: fn(B, A): B, init: B): B => switch c {
+    case [] => init
+    case [x, ..xs] => xs.reduce(f, f(init, x))
+  }
+
+  fn concat_map<B>(f: fn(A): [B]): [B] => switch c {
+    case [] => []
+    case [x, ..xs] => f(x) + xs.concat_map(f)
+  }
+
+  fn any(f: fn(A): bool): bool => switch c {
+    case [] => false
+    case [x, ..xs] => f(x) or xs.any(f)
+  }
+  fn all(f: fn(A): bool): bool => switch c {
+    case [] => true
+    case [x, ..xs] => f(x) and xs.all(f)
+  }
+
+  fn take(n: int): [A] => switch n {
+    case 0 => []
+    case ? => switch c {
+      case [] => []
+      case [x, ..xs] => [x] + xs.take(n - 1)
     }
+  }
+  fn drop(n: int): [A] => switch n {
+    case 0 => c
+    case ? => switch c {
+      case [] => []
+      case [x, ..xs] => xs.drop(n - 1)
+    }
+  }
+  fn take_while(f: fn(A): bool): [A] => switch c {
+    case [] => []
+    case [x, ..xs] => switch f(x) {
+      case true => [x] + xs.take_while(f)
+      case false => []
+    }
+  }
+  fn drop_while(f: fn(A): bool): [A] => switch c {
+    case [] => []
+    case [x, ..xs] => switch f(x) {
+      case true => xs.drop_while(f)
+      case false => c
+    }
+  }
+  fn split_at(n: int): ([A], [A]) => (c.take(n), c.drop(n))
+  
+  fn filter(f: fn(A): bool): [A] => switch c {
+    case [] => []
+    case [x, ..xs] => switch f(x) {
+      case true => [x] + xs.filter(f)
+      case false => xs.filter(f)
+    }
+  }
+  
+  fn zip<B>(other: [B]): [(A, B)] => switch (c, other) {
+    case ([], []) => []
+    case ([x, ..xs], [y, ..ys]) => [(x, y)] + xs.zip(ys)
+  }
+  fn zip_with<B, C>(other: [B], f: fn(A, B): C): [C] => switch (c, other) {
+    case ([], []) => []
+    case ([x, ..xs], [y, ..ys]) => [f(x, y)] + xs.zip_with(ys, f)
+  }
+
+  fn show(showH: fn(A): str): str =>
+    "[" + c.map(showH).reduce(fn (x, y) => x + ", " + y, "") + "]"
 }

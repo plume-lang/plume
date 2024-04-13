@@ -1,13 +1,18 @@
-type unit { unit }
-
 require "datatypes/bool"
-require "datatypes/string"
-require "datatypes/number"
-require "datatypes/tuple"
-require "datatypes/result"
-require "datatypes/option"
 require "datatypes/list"
+require "datatypes/option"
+require "datatypes/string"
+require "datatypes/tuple"
+require "datatypes/number"
+require "datatypes/char"
+
+type unit { unit }
 
 extend (c: unit) {
   fn show(): str => "()"
+}
+
+extend<A> (c: mut A) {
+  fn show(showWith: fn(A): str): str =>
+    "mut " + c->showWith()
 }

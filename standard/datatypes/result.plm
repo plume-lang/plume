@@ -16,25 +16,31 @@ extend<A, B> (this: Result<A, B>) {
       case Ok(b) => "Ok(" + showOk(b) + ")"
     }
 
-  fn flatMap<C>(f: fn(B): Result<A, C>): Result<A, C> =>
+  fn flat_map<C>(f: fn(B): Result<A, C>): Result<A, C> =>
     switch this {
       case Error(a) => Error(a)
       case Ok(b) => f(b)
     }
 
-  fn getOrElse(f: fn(A): B): B =>
+  fn or(def: B): B =>
+    switch this {
+      case Error(?) => def
+      case Ok(b) => b
+    }
+
+  fn get_or_else(f: fn(A): B): B =>
     switch this {
       case Error(a) => f(a)
       case Ok(b) => b
     }
 
-  fn isError(): bool =>
+  fn is_error(): bool =>
     switch this {
       case Error(?) => true
       case Ok(?) => false
     }
 
-  fn isOk(): bool =>
+  fn is_ok(): bool =>
     switch this {
       case Error(?) => false
       case Ok(?) => true

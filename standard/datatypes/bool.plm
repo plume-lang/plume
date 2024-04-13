@@ -1,9 +1,6 @@
 extend (c: bool) {
-  fn show() => if (c) "true" else "false"
+  fn and(d: bool): bool => if c { d } else { false }
+  fn or(d: bool): bool => if c { true } else { d }
 
-  fn not() => if (c) false else true
-
-  fn and(d: bool) => if (c) d else false
-
-  fn or(d: bool) => if (c) true else d
+  fn not(): bool => if c { false } else { true }
 }

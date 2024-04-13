@@ -1,42 +1,93 @@
-type Option<A> {
-  None,
-  Some(A)
+require "string"
+
+type Option<T> {
+  Some(T),
+  None
 }
 
-extend<A> (this: Option<A>) {
-  fn map<B>(f: fn(A): B): Option<B> =>
-    switch this {
-      case None => None
-      case Some(a) => Some(f(a))
-    }
+fn when<A>(cond: bool, a: fn(): A): Option<A> =>
+  if cond {
+    Some(a())
+  } else {
+    None
+  }
 
-  fn show(showSome: fn(A): str): str =>
-    switch this {
+fn unless<A>(cond: bool, a: fn(): A): Option<A> =>
+  if cond {
+    None
+  } else {
+    Some(a())
+  }
+
+type Control<A> { 
+  Return(A),
+  Break,
+  Continue
+}
+
+fn while<A>(cond: fn(): bool, body: fn(): Control<A>): Option<A> =>
+  if cond() {
+    switch body() {
+      case Return(x) => Some(x)
+      case Break => None
+      case Continue => while(cond, body)
+    }
+  } else {
+    None
+  }
+
+
+extend<A> (c: Option<A>) {
+  fn show(showH: fn(A): str): str => 
+    switch c {
+      case Some(a) => "Some(" + a.showH() + ")"
       case None => "None"
-      case Some(a) => "Some(" + showSome(a) + ")"
     }
 
-  fn flatMap<B>(f: fn(A): Option<B>): Option<B> =>
-    switch this {
-      case None => None
+  fn maybe<B>(default: B, f: fn(A): B): B => 
+    switch c {
       case Some(a) => f(a)
+      case None => default
     }
 
-  fn getOrElse(f: fn(): A): A =>
-    switch this {
-      case None => f()
-      case Some(a) => a
-    }
-
-  fn isNone(): bool =>
-    switch this {
-      case None => true
-      case Some(?) => false
-    }
-
-  fn isSome(): bool =>
-    switch this {
-      case None => false
+  fn is_some(): bool => 
+    switch c {
       case Some(?) => true
+      case None => false
+    }
+  fn is_none(): bool => 
+    switch c {
+      case Some(?) => false
+      case None => true
+    }
+  
+  fn or(default: A): A => 
+    switch c {
+      case Some(a) => a
+      case None => default
+    }
+  
+  fn to_list(): [A] =>
+    switch c {
+      case Some(a) => [a]
+      case None => []
+    }
+  
+  fn map<B>(f: fn(A): B): Option<B> => 
+    switch c {
+      case Some(a) => Some(f(a))
+      case None => None
+    }
+  
+  fn and_then<B>(f: fn(A): Option<B>): Option<B> =>
+    switch c {
+      case Some(a) => f(a)
+      case None => None
+    }
+
+  fn get_or_else(f: fn(): A): A =>
+    switch c {
+      case Some(a) => a
+      case None => f()
     }
 }

@@ -1,29 +1,32 @@
-native "std:native" add_int(x: int, y: int): int
-native "std:native" sub_int(x: int, y: int): int
-native "std:native" mul_int(x: int, y: int): int
-native "std:native" div_int(x: int, y: int): int
-native "std:native" mod_int(x: int, y: int): int
-native "std:native" float_to_int(x: float): int
-native "std:native" int_to_float(x: int): float
-native "std:native" eq_int(x: int, y: int): bool
-native "std:native" lt_int(x: int, y: int): bool
+native "std:native" {
+  add_int(x: int, y: int): int
+  sub_int(x: int, y: int): int
+  mul_int(x: int, y: int): int
+  div_int(x: int, y: int): int
+  mod_int(x: int, y: int): int
+  float_to_int(x: float): int
+  int_to_float(x: int): float
+  eq_int(x: int, y: int): bool
+  lt_int(x: int, y: int): bool
+}
 
-native "std:native" add_float(x: float, y: float): float
-native "std:native" sub_float(x: float, y: float): float
-native "std:native" mul_float(x: float, y: float): float
-native "std:native" div_float(x: float, y: float): float
-native "std:native" mod_float(x: float, y: float): float
-native "std:native" pow_float(x: float, y: float): float
-native "std:native" eq_float(x: float, y: float): bool
-native "std:native" lt_float(x: float, y: float): bool
+// Native float functions
+native "std:native" {
+  add_float(x: float, y: float): float
+  sub_float(x: float, y: float): float
+  mul_float(x: float, y: float): float
+  div_float(x: float, y: float): float
+  mod_float(x: float, y: float): float
+  pow_float(x: float, y: float): float
+  eq_float(x: float, y: float): bool
+  lt_float(x: float, y: float): bool
+}
 
 require "string"
 require "bool"
 
 infix 3 ^
 infixr 2 !=
-
-// Defining math operators
 
 extend (c: int) {
   fn (*) (d: int) => mul_int(c, d)
@@ -35,6 +38,8 @@ extend (c: int) {
     case 0 => 1
     case ? => c * (c ^ (d - 1))
   }
+  fn negate(): int => 0 - c
+
   fn (==) (d: int) => eq_int(c, d)
   fn (!=) (d: int) => not (eq_int(c, d))
   fn (<) (d: int) => lt_int(c, d)
@@ -49,18 +54,6 @@ extend (c: int) {
 
 // Defining math functions
 
-postfix 3 !
-
-extend (c: int) {
-  fn (!) (): int =>
-    switch c {
-      case 0 => 1
-      case ? => c * (c - 1)!
-    }
-
-  fn negate(): int => 0 - c
-}
-
 extend (c: float) {
   fn (*) (d: float) => mul_float(c, d)
   fn (/) (d: float) => div_float(c, d)
@@ -68,14 +61,16 @@ extend (c: float) {
   fn (-) (d: float) => sub_float(c, d)
   fn (+) (d: float) => add_float(c, d)
   fn (^) (d: float) => pow_float(c, d)
+  fn negate(): float => 0.0 - c
+
   fn (==) (d: float) => eq_float(c, d)
+  fn (!=) (d: float) => not eq_float(c, d)
   fn (<) (d: float) => lt_float(c, d)
   fn (>) (d: float) => lt_float(d, c)
   fn (<=) (d: float) => not (lt_float(d, c))
   fn (>=) (d: float) => not (lt_float(c, d))
 
   fn to_int(): int => float_to_int(c)
-
   fn show() => to_string(c)
 }
 
