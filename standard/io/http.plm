@@ -1,0 +1,5 @@
+require "std:datatypes/result"
+
+native "std:native" ffi_fetch(url: str): Result<str, str>
+
+fn fetch(url: str): Result<str, str> => ffi_fetch(url)

@@ -1,0 +1,17 @@
+require "string"
+
+native "std:native" {
+  char_to_string(x: char): str
+  eq_char(x: char, y: char): bool
+}
+
+extend (c: char) {
+  fn show() => "'" + char_to_string(c) + "'"
+  fn to_str(): str => char_to_string(c)
+  fn (==) (d: char) => eq_char(c, d)
+  fn (!=) (d: char) => not (c == d)
+}
+
+extend (c: [char]) {
+  fn to_str(): str => c.map(char_to_string).join("")
+}

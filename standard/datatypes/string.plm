@@ -1,18 +1,21 @@
-native "std:native" add_str(x: str, y: str): str
-native "std:native" mul_str(x: str, y: int): str
-native "std:native" to_string<A>(x: A): str
-native "std:native" string_length(x: str): int
-native "std:native" eq_string(x: str, y: str): bool
-native "std:native" get_index_str(x: str, i: int): Option<char>
-native "std:native" char_to_string(x: char): str
-native "std:native" eq_char(x: char, y: char): bool
-native "std:native" str_slice(x: str, start: int, end: int): str
+require "bool"
+
+native "std:native" {
+  add_str(x: str, y: str): str
+  mul_str(x: str, y: int): str
+  to_string<A>(x: A): str
+  string_length(x: str): int
+  eq_string(x: str, y: str): bool
+  get_index_str(x: str, i: int): Option<char>
+  str_slice(x: str, start: int, end: int): str
+}
 
 extend (c: str) {
   fn (+) (d: str) => add_str(c, d)
   fn (*) (d: int) => mul_str(c, d)
-  fn (==) (d: str) => eq_string(c, d)
   fn concat(d: str) => c + d
+  fn (==) (d: str) => eq_string(c, d)
+
   fn show() => "\"" + c + "\""
   fn len() => string_length(c)
 
@@ -21,17 +24,12 @@ extend (c: str) {
 }
   
 extend (c: [str]) {
+  // Inserting a `sep`arator between each element of the list
+  // and concatenating the result into a single string.
   fn join(sep: str) =>
     switch c {
       case [] => ""
       case [x] => x
       case [x, ..xs] => x + sep + xs.join(sep)
     }
-}
-
-extend (c: char) {
-  fn show() => "'" + char_to_string(c) + "'"
-  fn to_str(): str => char_to_string(c)
-  fn (==) (d: char) => eq_char(c, d)
-  fn (!=) (d: char) => not (c == d)
 }

@@ -1,0 +1,16 @@
+native "std:native" print(x: str): int
+native "std:native" println(x: str): int
+
+macro print(x) => print(x.show())
+
+macro println(x) {
+  @print(x)
+  print("\n")
+}
+
+macro print_with(fmt, x) => print(x.show(fmt))
+
+macro println_with(fmt, x) {
+  @print_with(fmt, x)
+  print("\n")
+}

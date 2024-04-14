@@ -1,0 +1,3 @@
+native "std:native" get_args(): [str]
+native "std:native" execute_command(path: str): int
+native "std:native" input(pre: str): str
