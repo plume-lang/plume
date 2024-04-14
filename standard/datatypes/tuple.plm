@@ -6,21 +6,22 @@ extend<A, B> (c: tuple<A, B>) {
       case tuple(x, y) => "(" + showA(x) + ", " + showB(y) + ")"
     }
 
+  // Some primitive operations over tuples
   fn fst(): A => 
     switch c {
       case tuple(x, y) => x
     }
-
   fn snd(): B => 
     switch c {
       case tuple(x, y) => y
     }
-
   fn swap(): tuple<B, A> => 
     switch c {
       case tuple(x, y) => tuple(y, x)
     }
 
+  // Some bifunctor and functor mappings functions
+  // Used to map over the elements of the tuple
   fn map<C, D>(f: fn(A): C, g: fn(B): D): tuple<C, D> => 
     switch c {
       case tuple(x, y) => tuple(f(x), g(y))

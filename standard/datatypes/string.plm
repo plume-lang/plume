@@ -24,6 +24,8 @@ extend (c: str) {
 }
   
 extend (c: [str]) {
+  // Inserting a `sep`arator between each element of the list
+  // and concatenating the result into a single string.
   fn join(sep: str) =>
     switch c {
       case [] => ""
