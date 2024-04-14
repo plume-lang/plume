@@ -9,8 +9,8 @@ import Text.Megaparsec hiding (many, some)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 
-parseLiteral :: Parser Expression -> Parser Expression
-parseLiteral _ =
+parseLiteral :: Parser Expression
+parseLiteral =
   choice
     [ ELiteral <$> parseChar
     , ELiteral <$> parseString
@@ -24,10 +24,7 @@ parseLiteral _ =
 -- encapsulated into their CST correspondance
 
 charLiteral :: Parser Char
-charLiteral = lexeme $ between (char '\'') (char '\'') $ do
-  c <- L.charLiteral
-  guard (c /= '\'')
-  return c
+charLiteral = lexeme $ between (char '\'') (char '\'') L.charLiteral
 
 stringLiteral :: Parser Text
 stringLiteral =
@@ -53,10 +50,10 @@ stringLiteralInterpolated f = lexeme $ do
   interpolation = parseInterpolation <|> parseCharChunk
 
 integer :: Parser Integer
-integer = lexeme L.decimal
+integer = lexeme (L.signed mempty L.decimal)
 
 float :: Parser Double
-float = lexeme L.float
+float = lexeme (L.signed mempty L.float)
 
 -- Actual literal parsing functions
 

@@ -1,4 +1,4 @@
-module Plume.Syntax.Parser.Modules.Pattern (parsePattern) where
+module Plume.Syntax.Parser.Modules.Pattern where
 
 import Control.Monad.Parser
 import Plume.Syntax.Common.Pattern
@@ -40,14 +40,20 @@ parseLiteral =
       , parseInteger
       ]
 
+isSlice :: Pattern -> Bool
+isSlice (PSlice _) = True
+isSlice _ = False
+
 parseList :: Parser Pattern
 parseList =
   brackets $ do
     items <- (parseSlice <|> parsePattern) `sepBy` comma
-    let (items', slice) = case reverse items of
-          [] -> ([], Nothing)
-          (p@(PSlice _) : rest) -> (reverse rest, Just p)
-          _ -> (items, Nothing)
+    (items', slice) <- case reverse items of
+      [] -> return ([], Nothing)
+      (p@(PSlice _) : rest)
+        | not (any isSlice rest) -> return (reverse rest, Just p)
+      _ | not (any isSlice items) -> return (items, Nothing)
+        | otherwise -> fail "invalid slice position"
     return $ PList items' slice
 
 parseSlice :: Parser Pattern

@@ -32,16 +32,16 @@ data BinaryOperator
   | And
   | Or
   | BinarySlice
-  deriving (Show)
+  deriving (Show, Eq)
 
 data PrefixOperator
   = Not
   | PrefixSlice
-  deriving (Show)
+  deriving (Show, Eq)
 
 data PostfixOperator
   = PostfixSlice
-  deriving (Show)
+  deriving (Show, Eq)
 
 type IsMutable = Bool
 
@@ -90,7 +90,7 @@ data ConcreteExpression t
 data TypeConstructor t
   = TConstructor Text [t]
   | TVariable Text
-  deriving (Eq, Show)
+  deriving (Show)
 
 data ExtensionMember t
   = ExtDeclaration
@@ -101,3 +101,44 @@ data ExtensionMember t
 
 pattern (:>:) :: ConcreteExpression t -> Position -> ConcreteExpression t
 pattern e :>: p = ELocated e p
+
+instance Eq t => Eq (ConcreteExpression t) where
+  EVariable x == EVariable y = x == y
+  ELiteral x == ELiteral y = x == y
+  EList xs == EList ys = xs == ys
+  EApplication f xs == EApplication g ys = f == g && xs == ys
+  EBinary op x y == EBinary op' x' y' = op == op' && x == x' && y == y'
+  EPrefix op x == EPrefix op' x' = op == op' && x == x'
+  EPostfix op x == EPostfix op' x' = op == op' && x == x'
+  EType _ xs == EType _ ys = xs == ys
+  EDeclaration _ m t x y == EDeclaration _ m' t' x' y' =
+    m == m' && t == t' && x == x' && y == y'
+  EConditionBranch x y z == EConditionBranch x' y' z' = x == x' && y == y' && z == z'
+  EClosure xs t x == EClosure xs' t' x' = xs == xs' && t == t' && x == x'
+  EUnMut x == EUnMut y = x == y
+  EBlock xs == EBlock ys = xs == ys
+  EProperty x y == EProperty x' y' = x == x' && y == y'
+  EListIndex x y == EListIndex x' y' = x == x' && y == y'
+  ERequire x == ERequire y = x == y
+  EMacro x y == EMacro x' y' = x == x' && y == y'
+  EMacroFunction x xs y == EMacroFunction x' xs' y' = x == x' && xs == xs' && y == y'
+  EMacroVariable x == EMacroVariable y = x == y
+  EMacroApplication x xs == EMacroApplication x' xs' = x == x' && xs == xs'
+  ESwitch x xs == ESwitch x' xs' = x == x' && xs == xs'
+  EReturn x == EReturn y = x == y
+  EGenericProperty xs x ys y == EGenericProperty xs' x' ys' y' =
+    xs == xs' && x == x' && ys == ys' && y == y'
+  ETypeExtension xs x ys == ETypeExtension xs' x' ys' = xs == xs' && x == x' && ys == ys'
+  ENativeFunction x y xs z == ENativeFunction x' y' xs' z' = x == x' && y == y' && xs == xs' && z == z'
+  ELocated x _ == ELocated y _ = x == y
+  ELocated x _ == y = x == y
+  x == ELocated y _ = x == y
+  _ == _ = False
+
+instance Eq t => Eq (TypeConstructor t) where
+  TConstructor x xs == TConstructor y ys = x == y && xs == ys
+  TVariable x == TVariable y = x == y
+  _ == _ = False
+
+instance Eq t => Eq (ExtensionMember t) where
+  ExtDeclaration xs x y == ExtDeclaration xs' x' y' = xs == xs' && x == x' && y == y'

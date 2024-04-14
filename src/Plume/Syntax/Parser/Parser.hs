@@ -75,7 +75,7 @@ eVariable :: P.Parser CST.Expression
 eVariable = CST.EVariable <$> L.identifier
 
 eLiteral :: P.Parser CST.Expression
-eLiteral = Lit.parseLiteral parseExpression
+eLiteral = Lit.parseLiteral
 
 eIf :: P.Parser CST.Expression
 eIf = do
