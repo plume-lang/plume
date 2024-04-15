@@ -9,49 +9,59 @@ import Text.Megaparsec hiding (many, some)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 
+-- | Parse a literal
+-- | A literal is a value that is directly represented in the source code
+-- |
+-- | example: 42, "Hello, World!", true
+-- |
+-- | Try is used to parse floats in order to backtrack if the float parser fails
+-- | and try the integer parser instead.
 parseLiteral :: Parser Expression
 parseLiteral =
-  choice
-    [ ELiteral <$> parseChar
-    , ELiteral <$> parseString
-    , ELiteral <$> try parseFloat
-    , ELiteral <$> parseBool
-    , ELiteral <$> parseInteger
-    ]
+  ELiteral
+    <$> choice
+      [ parseChar
+      , parseString
+      , try parseFloat
+      , parseBool
+      , parseInteger
+      ]
 
--- Parser utility functions
--- Used to parse for instance string sequences which will be later
--- encapsulated into their CST correspondance
-
+-- | Parse a character literal
+-- | A character literal is a single character enclosed in single quotes
+-- | Example: 'a'
+-- | note: The character can be escaped
+-- |       Example: '\n' is a newline character
+-- |       The character can also be unescaped single quote character
 charLiteral :: Parser Char
 charLiteral = lexeme $ between (char '\'') (char '\'') L.charLiteral
 
+-- | Parse a string literal
+-- | A string literal is a sequence of characters enclosed in double quotes
+-- | Example: "Hello, World!"
+-- | note: The string can contain escaped characters
+-- |       Example: "Hello\nWorld" is a string with a newline character
+-- |       However, unlike character literals, the string can contain unescaped
+-- |       double quote characters.
 stringLiteral :: Parser Text
 stringLiteral =
   lexeme $
     T.pack
       <$> (char '"' *> manyTill L.charLiteral (char '"'))
 
-buildString :: [Expression] -> Expression
-buildString [x] = x
-buildString (x : xs) = EBinary Plus x (buildString xs)
-buildString [] = ELiteral (LString "")
-
-stringLiteralInterpolated :: Parser Expression -> Parser Expression
-stringLiteralInterpolated f = lexeme $ do
-  str <- char '"' *> manyTill interpolation (char '"')
-  return $ buildString str
- where
-  parseInterpolation = char '{' *> f <* char '}'
-  parseCharChunk = do
-    str <- manyTill L.charLiteral (lookAhead (char '{' <|> char '"'))
-    return $ ELiteral (LString (T.pack str))
-
-  interpolation = parseInterpolation <|> parseCharChunk
-
+-- | Parse an integer literal
+-- | Using `signed` combinator to parse signed integers
+-- |
+-- | example: 42, -42
+-- |
+-- | The sign must be directly in front of the number as there is no whitespace
+-- | accepted between the sign and the number.
 integer :: Parser Integer
 integer = lexeme (L.signed mempty L.decimal)
 
+-- | Parse a floating point number
+-- | Same as integer, we use the `signed` combinator to parse signed
+-- | floating point numbers.
 float :: Parser Double
 float = lexeme (L.signed mempty L.float)
 
@@ -71,9 +81,7 @@ parseFloat = LFloat <$> float
 
 parseBool :: Parser Literal
 parseBool =
-  ( reserved "true"
-      $> LBool True
-  )
-    <|> ( reserved "false"
-            $> LBool False
-        )
+  choice
+    [ LBool True <$ symbol "true"
+    , LBool False <$ symbol "false"
+    ]

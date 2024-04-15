@@ -6,9 +6,10 @@ import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer
 import Text.Megaparsec
 
--- Primitive types parsing function
--- Primitive types are just types that are not using other types
--- to build themselves. They're final types as they can't be destructured.
+-- | Parse a primitive type
+-- | A primitive type is a type that is built-in to the language
+-- |
+-- | example: int, bool, str, char, float
 tPrimitive :: Parser PlumeType
 tPrimitive =
   choice
@@ -19,19 +20,25 @@ tPrimitive =
     , symbol "float" $> TFloat
     ]
 
--- (t1, t2, ..., tn) -> ret where t1, t2, ..., tn are the function type arguments types
--- and ret is the function type return type
+-- | Parse a function type
+-- | A function type is a type that represents a function
+-- | 
+-- | SYNTAX:
+-- |  - fn (t1, t2, ..., tn): return
+-- | where t1, t2, ..., tn are the argument types and return is the return type
 tFunction :: Parser PlumeType
 tFunction = do
   void $ reserved "fn"
   args <- parens (tType `sepBy` comma) <* symbol ":"
   TFunction args <$> tType
 
--- (t1, t2, ..., tn) where t1, t2, ..., tn are the tuple type elements. There are tuple
--- special cases depending on the quantity of types specified for the tuple:
--- - Tuples with 0 argument are just unit, void types (as Haskell does)
--- - Tuples with 1 argument are just parenthesized types
--- - Tuples with n elements are real tuples
+-- | Parse a tuple type
+-- | A tuple type is a type that represents a tuple
+-- | 
+-- | SYNTAX:
+-- |  - (t1, t2, ..., tn) <=> tuple of t1, t2, ..., tn
+-- |  - () <=> unit type
+-- |  - (t) <=> t
 tTuple :: Parser PlumeType
 tTuple = do
   tys <- parens (tType `sepBy` comma)
@@ -45,28 +52,44 @@ tTuple = do
   buildTuple [x] = x
   buildTuple (x : xs) = TTuple [x, buildTuple xs]
 
--- [t] where t is a concrete type. It represents list where the list's elements
--- are of t's type
+-- | Parse a list type
+-- | A list type is a type that represents a list
+-- |
+-- | SYNTAX: [t] with t being the type of the list
 tList :: Parser PlumeType
 tList =
   TList <$> brackets tType
 
--- x<t1, t2, ..., tn> where x is an identifier (resp. datatype name) and t1, t2, ... tn
--- are the datatype arguments. This is used to represent type applications over user-defined
--- datatypes (such as ADTs, or even GADTs...)
+-- | Parse a type constructor
+-- | A type constructor is a type that is defined by the user and that is
+-- | parameterized by other types
+-- | 
+-- | SYNTAX: C<t1, t2, ..., tn> where C is the type 
+-- |         constructor and t1, t2, ..., tn
 tCon :: Parser PlumeType
 tCon = do
   c <- identifier
   tys <- angles (tType `sepBy1` comma)
   return (TCon c tys)
 
+-- | Parse a type identifier
+-- | A type identifier is just an identifier that can either represent a type
+-- | or a type variable
 tId :: Parser PlumeType
 tId = TId <$> identifier
 
+-- | Parse a mutable type
+-- | A mutable type is a type that represents a mutable reference to 
+-- | another type
+-- |
+-- | SYNTAX: mut t where t is the type of the mutable reference
 tMut :: Parser PlumeType
 tMut = TMut <$> (reserved "mut" *> tType)
 
--- Main type parsing function
+-- | Parse a type
+-- | A type is a type that can be used in the language
+-- | A type can be a primitive type, a function type, a tuple type, a list type,
+-- | a type constructor, a type identifier or a mutable type
 tType :: Parser PlumeType
 tType =
   choice
@@ -81,9 +104,17 @@ tType =
     , tId
     ]
 
+-- | Parse a generic type
+-- | A generic type is a type that is parameterized by a type variable
+-- | Currently, only type variables are supported as generic types
+-- | But in the future, this may be extended to support other type constraints
+-- | such as type extension constraints
 parseGeneric :: Parser PlumeGeneric
 parseGeneric = GVar <$> identifier
 
+-- | Parse a type constructor
+-- | A type constructor is a sort of function that takes types as arguments
+-- | and returns the type that is constructed by the type constructor
 typeConstructor :: Parser (TypeConstructor PlumeType)
 typeConstructor =
   choice

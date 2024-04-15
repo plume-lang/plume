@@ -9,7 +9,7 @@ import Data.Foldable hiding (elem)
 import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer
 
--- Useful shortcut functions for defining operators
+-- OPERATOR SHORTHANDS
 
 binary
   :: Text -> (Expression -> Expression -> Expression) -> Operator Parser Expression
@@ -21,9 +21,15 @@ prefix
 prefix name f = Prefix (f <$ symbol name)
 postfix name f = Postfix (f <$ symbol name)
 
--- makeUnaryOp is a function that mainly takes a parser that returns a function
--- (such as postfix function previously defined) and returns the same function
--- but with the chaining capacity
+-- | Make a unary operator sequence
+-- | A unary operator sequence is a sequence of unary operators
+-- | that are applied to an expression.
+-- |
+-- | example: not not a <=> not (not a)
+-- |
+-- | The sequence is applied from right to left.
+-- | This is because the postfix and prefix operators are applied *
+-- | from right to left.
 makeUnaryOp :: (Alternative f) => f (a -> a) -> f (a -> a)
 makeUnaryOp s = foldr1 (.) . reverse <$> some s
 
@@ -57,6 +63,9 @@ operators =
     , [prefix "*" EUnMut]
     ]
 
+-- | Sort custom operators
+-- | Custom operators are sorted and then parsed into a list of operator
+-- | that can be used by the expression parser.
 sortCustomOperators :: SL.SortedList CustomOperator -> [[Operator Parser Expression]]
 sortCustomOperators ops = map ((: []) . parseOperator) (SL.fromSortedList ops)
  where
