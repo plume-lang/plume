@@ -2,11 +2,6 @@
 
 module Plume.Syntax.Abstract.Expression where
 
--- Abstract expression is the first intermediate representation of the program
--- that is generated after parsing the concrete syntax and converting it. It
--- removes some concrete syntax details and makes the program more abstract
--- in order to make it easier to manipulate and transform.
-
 import Data.Text hiding (map)
 import Plume.Syntax.Common
 import Plume.Syntax.Concrete.Expression (Position, TypeConstructor)
@@ -14,6 +9,10 @@ import Prelude hiding (intercalate)
 
 type IsMutable = Bool
 
+-- | An abstract expression is an expression that is used to represent
+-- | a program. It is a more abstract representation of a program than
+-- | a concrete syntax tree. It is used to represent the program with
+-- | easier constructs to manipulate.
 data AbstractExpression t
   = EVariable Text
   | ELiteral Literal
@@ -44,6 +43,8 @@ data AbstractExpression t
   | EGenericProperty [PlumeGeneric] Text [t] t
   deriving (Show)
 
+-- ABSTRACT EXPRESSION INSTANCES
+
 instance (Eq t) => Eq (AbstractExpression t) where
   EVariable n1 == EVariable n2 = n1 == n2
   ELiteral l1 == ELiteral l2 = l1 == l2
@@ -71,6 +72,8 @@ instance (Eq t) => Eq (AbstractExpression t) where
     gs1 == gs2 && n1 == n2 && ts1 == ts2 && t1 == t2
   _ == _ = False
 
+-- | An extension member is a member that is used to extend a type.
+-- | It is currently only a declaration that may be a function.
 data ExtensionMember t
   = ExtDeclaration
       [PlumeGeneric]
@@ -78,5 +81,7 @@ data ExtensionMember t
       (AbstractExpression t)
   deriving (Eq, Show)
 
+-- | Shorthand for a located expression
+-- | x :>: p is equivalent to ELocated x p
 pattern (:>:) :: AbstractExpression t -> Position -> AbstractExpression t
 pattern e :>: p = ELocated e p

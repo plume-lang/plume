@@ -15,8 +15,14 @@ import Plume.Syntax.Common.Type
 import Text.Megaparsec.Pos
 import Prelude hiding (intercalate)
 
+-- | A position is a tuple of two source positions.
+-- | The first position is the start position and the second position 
+-- | is the end position.
 type Position = (SourcePos, SourcePos)
 
+-- | A binary operator is an operator that takes two operands.
+-- | The operands are placed on the left and right side of the operator.
+-- | These operators are used to perform arithmetic and logical operations.
 data BinaryOperator
   = Plus
   | Minus
@@ -34,17 +40,26 @@ data BinaryOperator
   | BinarySlice
   deriving (Show, Eq)
 
+-- | A prefix operator is an operator that takes one operand.
+-- | The operand is placed on the right side of the operator.
 data PrefixOperator
   = Not
   | PrefixSlice
   deriving (Show, Eq)
 
+-- | A postfix operator is an operator that takes one operand.
+-- | The operand is placed on the left side of the operator.
 data PostfixOperator
   = PostfixSlice
   deriving (Show, Eq)
 
 type IsMutable = Bool
 
+-- | A concrete expression is an expression that is used to represent
+-- | a program. It is a more concrete representation of a program than
+-- | an abstract syntax tree. It is used to represent the program in a
+-- | way that is easier to understand for the user and especially more
+-- | natural.
 data ConcreteExpression t
   = EVariable Text
   | ELiteral Literal
@@ -87,11 +102,18 @@ data ConcreteExpression t
   | ENativeFunction Text Text [Text] t
   deriving (Show)
 
+-- | A type constructor is a type that is used to construct a type.
+-- | It may be either a type-constructor function or a type-constructor 
+-- | variable.
+-- | For instance `unit` is a type-constructor variable whereas 
+-- | `Ok` is a type-constructor function.
 data TypeConstructor t
   = TConstructor Text [t]
   | TVariable Text
   deriving (Show)
 
+-- | An extension member is a member that is used to extend a type.
+-- | It is currently only a declaration that may be a function.
 data ExtensionMember t
   = ExtDeclaration
       [PlumeGeneric]
@@ -99,8 +121,12 @@ data ExtensionMember t
       (ConcreteExpression t)
   deriving (Show)
 
+-- | Shorthand for a located expression
+-- | x :>: p is equivalent to ELocated x p
 pattern (:>:) :: ConcreteExpression t -> Position -> ConcreteExpression t
 pattern e :>: p = ELocated e p
+
+-- CONCRETE EXPRESSION INSTANCES
 
 instance Eq t => Eq (ConcreteExpression t) where
   EVariable x == EVariable y = x == y
