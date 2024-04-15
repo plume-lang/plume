@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Plume.Syntax.Translation.ConcreteToAbstract.MacroResolver where
 
 import Control.Monad.Exception
@@ -8,17 +9,23 @@ import Plume.Syntax.Concrete qualified as CST
 import Plume.Syntax.Translation.Generics
 import Plume.Syntax.Translation.Substitution
 
+-- | Macro body can be a single expression, a spread of expressions
+-- | but it can't be empty
 type MacroBody = Spreadable [AST.Expression] AST.Expression
 
+-- | Macro state stores all the macros defined in the program
 data MacroState = MacroState
   { macroVariables :: Map Text AST.Expression
   , macroFunctions :: Map Text ([Text], MacroBody)
   }
 
+-- | Macro state reference that is used to store the macros
 {-# NOINLINE macroState #-}
 macroState :: IORef MacroState
 macroState = unsafePerformIO $ newIORef $ MacroState mempty mempty
 
+-- | Convert all macro expressions (macro variables and macro applications)
+-- | with their corresponding values
 convertMacro :: Translator Error CST.Expression AST.Expression
 convertMacro f (CST.EMacro name expr) =
   shouldBeAlone <$> f expr `with` \body -> do
@@ -30,6 +37,9 @@ convertMacro f (CST.EMacroFunction name args expr) =
     modifyIORef' macroState $ \st ->
       st {macroFunctions = Map.insert name (args, body) $ macroFunctions st}
     return $ Right Empty
+
+-- | Macro variable is just replaced by its macro corresponding
+-- | value
 convertMacro _ (CST.EMacroVariable name) = do
   st <- readIORef macroState
   case Map.lookup name $ macroVariables st of
@@ -39,24 +49,16 @@ convertMacro _ (CST.EMacroVariable name) = do
       case pos of
         Just p -> throwError $ MacroNotFound name p
         Nothing -> throwError NoPositionSaved
+
+-- | Macro application is replaced by its corresponding macro body
+-- | with the arguments substituted.
 convertMacro f (CST.EMacroApplication name args) = do
   args' <- fmap flat . sequence <$> mapM f args
   liftIO (lookupMacro name) `with` \(argsNames, body) -> do
     if length args == length argsNames
       then do
         let correspondance = zip argsNames <$> args'
-        case body of
-          Spread es ->
-            return $
-              (Spread <$>) . substituteManyBlock
-                <$> correspondance
-                <*> pure es
-          Single e ->
-            return $
-              (Single <$>) . substituteMany
-                <$> correspondance
-                <*> pure e
-          Empty -> return $ Right Empty
+        return $ substituteSpread <$> correspondance <*> pure body
       else do
         pos <- readIORef positionRef
         throwError $ case pos of
@@ -64,6 +66,15 @@ convertMacro f (CST.EMacroApplication name args) = do
           Nothing -> NoPositionSaved
 convertMacro _ _ = error "Impossible happened"
 
+-- | Substitute a spreadable expression with a list of expressions
+substituteSpread :: [(Text, AST.Expression)] -> MacroBody -> MacroBody
+substituteSpread correspondance = \case
+  Spread es -> Spread $ substituteManyBlock correspondance es
+  Single e -> Single $ substituteMany correspondance e
+  Empty -> Empty
+
+-- | Lookup a macro by its name, similar to the `lookup` function
+-- | but for macros
 lookupMacro :: Text -> IO (Either Error ([Text], MacroBody))
 lookupMacro name = do
   st <- readIORef macroState
