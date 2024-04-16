@@ -40,14 +40,11 @@ system(f"cp {executable} bin/{executable_out}")
 runtime_executable = f"plume-vm{ext}"
 runtime_executable_out = f"plume{ext}"
 
-def build_xmake(project: str):
-  system(f'cd {project}')
-  system('xmake f --root -y')
-  system('xmake --root')
-  system('cd ..')
-
-build_xmake('runtime')
+system(f'xmake f --root -P runtime -y')
+system(f'xmake b --root -P runtime')
 system(f"cp runtime/bin/{runtime_executable} bin/{runtime_executable_out}")
-build_xmake('standard')
+
+system(f'xmake f --root -P standard -y')
+system(f'xmake b --root -P standard')
 
 print('Build ran successfully')
