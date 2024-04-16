@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: true
-
+        
       - uses: xmake-io/github-action-setup-xmake@v1
         with:
           xmake-version: latest
@@ -35,6 +35,9 @@ jobs:
         run: |
           python3 --version
           xmake --version --root
+
+      - name: Update xmake repository
+        run: xmake repo --update
     
       - name: Set up GHC ${{ matrix.ghc-version }}
         uses: haskell-actions/setup@v2
