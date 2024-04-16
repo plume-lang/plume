@@ -7,22 +7,37 @@ import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR.Internal.Pretty ()
 import Text.Megaparsec
 
+-- | Type errors that can be thrown by the type checker
+-- | These errors are used to provide a more concise and readable error message
+-- | without the pain of manually writing and formatting the error message.
+-- |
+-- | UnificationFail: The unification of two types failed, meaning that the two 
+-- |                 types are not "equivalent".
+-- | InfiniteType: A type that unifies with an other type containing the type
+-- |              itself: t ~ t -> t (what should t be?)
+-- | UnificationMismatch: The number of arguments given to a function does not
+-- |                     match the number of arguments expected.
+-- | NoExtensionFound: No extension was found for a specific type.
+-- | MultipleExtensionsFound: Multiple extensions were found for a specific type.
+-- | EmptyMatch: The match expression is empty.
+-- | UnboundTypeVariable: A type variable is unbound.
+-- | UnboundVariable: A variable is unbound.
+-- | DuplicateNative: A native function is already defined.
+-- | CompilerError: An internal compiler error that should not happen.
 data TypeError
-  = -- Unification related errors
-    UnificationFail PlumeType PlumeType
+  = UnificationFail PlumeType PlumeType
   | InfiniteType TyVar PlumeType
   | UnificationMismatch [PlumeType] [PlumeType]
-  | -- Extensions related errors
-    NoExtensionFound Text PlumeType
+  | NoExtensionFound Text PlumeType
   | MultipleExtensionsFound Text [PlumeType] PlumeType
-  | -- Expression related errors
-    EmptyMatch
+  | EmptyMatch
   | UnboundTypeVariable Int
   | UnboundVariable Text
   | DuplicateNative Text PlumeScheme
-  | -- Internal errors
-    CompilerError Text
-  deriving (Eq, Show)
+  | CompilerError Text
+  deriving (Eq, Show, Ord)
+
+-- THROWABLE INSTANCES FOR TYPE ERROR
 
 instance Throwable PlumeType
 

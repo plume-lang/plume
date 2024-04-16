@@ -50,17 +50,22 @@ synthExtMember
     convertedArgs :: [Annotation PlumeType] <- convert args
     convertedRet :: PlumeType <- convert ret
 
+    -- Building a pre-function type with the converted arguments and return type
+    -- and then building the first extension template, used to allow recursive
+    -- extension calls
     let preFun = (extTy : map (.annotationValue) convertedArgs) :->: convertedRet
     let sch = Forall convertedGenerics preFun
-
     let ext = MkExtension name extTy sch
     modifyIORef' checkState $ \s ->
       s {extensions = removeDuplicates $ Set.insert ext s.extensions}
 
+    -- Creating a new environment with the arguments as type schemes
     let argSchemes = createEnvFromAnnotations convertedArgs
     let schemes = Map.insert extVar (Forall [] extTy) argSchemes
     insertEnvWith @"typeEnv" Map.union schemes
+
     ((retTy, body'), finalExt, s3) <- case convertedGenerics of
+      -- If there are no generics, we can just infer the expression
       [] -> do
         r@(retTy, _) <- local (\s -> s {returnType = Just convertedRet}) $ extractFromArray (infer body)
         retTy `unifiesTo` convertedRet
@@ -73,6 +78,10 @@ synthExtMember
         let newExt = MkExtension name extTy newScheme
 
         pure (r, newExt, mempty)
+
+      -- Otherwise, that's kind of the same trick used for variable
+      -- declarations: we need to locally solve the generated constraints
+      -- from the body in order to get rid of the unbound type generics.
       _ -> do
         (r@(retTy, _), cs) <- local (\s -> s {returnType = Just convertedRet}) . getLocalConstraints $ extractFromArray $ infer body
         let closureTy = (extTy : map (.annotationValue) convertedArgs) :->: retTy
@@ -102,9 +111,11 @@ synthExtMember
 
         return (r, finalExt, s3)
 
+    -- Inserting new extension in the environment and deleting the old one
     modifyIORef' checkState $ \s ->
       s {extensions = removeDuplicates $ Set.insert finalExt (extensions s)}
 
+    -- Removing the generic types from the environment
     mapM_
       ( \case
           Pre.GVar v -> deleteEnv @"genericsEnv" v
@@ -121,6 +132,8 @@ synthExtMember
 synthExtMember _ _ _ =
   throw $ CompilerError "Only extension members are supported"
 
+-- | Removes duplicate extensions from the set
+-- | It just check if two names are equal and if the types are unifiable
 removeDuplicates :: Set Extension -> Set Extension
 removeDuplicates xs = Set.fromList $ go (Set.toList xs) []
  where

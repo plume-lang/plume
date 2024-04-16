@@ -8,5 +8,4 @@ import Plume.Syntax.Common.Type
 import Plume.Syntax.Concrete.Expression as CST
 
 type Expression = ConcreteExpression PlumeType
-
 type Program = [Expression]

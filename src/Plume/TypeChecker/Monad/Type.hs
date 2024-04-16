@@ -2,6 +2,8 @@
 
 module Plume.TypeChecker.Monad.Type where
 
+-- | Defining a meta-variable for types which represents both user-defined
+-- | generics and unresolved types.
 newtype TyVar = MkTyVar {unTyVar :: Int}
   deriving (Eq, Ord, Show)
 
@@ -11,9 +13,13 @@ data PlumeType
   | TypeApp PlumeType [PlumeType]
   deriving (Eq, Show, Ord)
 
+-- | A type scheme is a way to quantify over types in a type system.
+-- | It is used to represent polymorphic types in the type system.
 data PlumeScheme
   = Forall [TyVar] PlumeType
   deriving (Eq, Show, Ord)
+
+-- TYPE SYNONYMS SHORTCUTS
 
 pattern TMut :: PlumeType -> PlumeType
 pattern TMut t = TypeApp (TypeId "mut") [t]

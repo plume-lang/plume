@@ -4,10 +4,11 @@ module Control.Monad.Parser (
   FileContent,
   ParsingError,
   parse,
+  parseTest
 ) where
 
 import Control.Monad.IO as IO
-import Text.Megaparsec hiding (parse)
+import Text.Megaparsec hiding (parse, parseTest)
 
 type Parser = ParsecT Void Text IO
 
@@ -23,3 +24,6 @@ parse
   -> IO (Either ParsingError a)
 parse p filePath fileContent = do
   runParserT p filePath fileContent
+
+parseTest :: Parser a -> FileContent -> IO (Either ParsingError a)
+parseTest p = parse (p <* eof) "test"

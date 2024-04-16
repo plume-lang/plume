@@ -3,12 +3,9 @@
 module Plume.Syntax.Translation.ConcreteToAbstract where
 
 import Control.Monad.Exception
-import Data.Text qualified as T
-import Data.SortedList qualified as SL
 import Plume.Syntax.Abstract qualified as AST
 import Plume.Syntax.Common qualified as Common
 import Plume.Syntax.Concrete qualified as CST
-import Plume.Syntax.Parser
 import Plume.Syntax.Translation.ConcreteToAbstract.MacroResolver
 import Plume.Syntax.Translation.ConcreteToAbstract.Operations
 import Plume.Syntax.Translation.ConcreteToAbstract.Require
@@ -18,6 +15,10 @@ import System.Directory
 import System.FilePath
 import System.Info
 
+-- | The extension of the shared library that is relative
+-- | to the user operating system. This is used to load
+-- | native functions from shared libraries without sacrificing
+-- | platform independence.
 sharedLibExt :: String
 sharedLibExt = case os of
   "darwin" -> "dylib"
@@ -25,22 +26,34 @@ sharedLibExt = case os of
   "mingw32" -> "dll"
   _ -> error "Unsupported operating system"
 
+-- | Interpret spreadable by compiling a spreadable expression into
+-- | a single expression
 interpretSpreadable
-  :: Spreadable [AST.Expression] AST.Expression -> AST.Expression
+  :: Spreadable [AST.Expression] AST.Expression 
+  -> AST.Expression
 interpretSpreadable (Single e) = e
 interpretSpreadable (Spread [e]) = e
 interpretSpreadable (Spread es) = AST.EBlock es
 interpretSpreadable Empty = AST.EBlock []
 
+-- | Spanning a property expression means to split the expression
+-- | according to the UFCS rules that states:
+-- | 
+-- | x.property(arg) <=> property(x, arg)
+-- | 
+-- | So spanning such an expression results in obtaining the possibly
+-- | nested property in a callee.
 spanProperty
-  :: CST.Expression -> Maybe (CST.Expression -> CST.Expression, CST.Expression)
-spanProperty = go
- where
-  go :: CST.Expression -> Maybe (CST.Expression -> CST.Expression, CST.Expression)
-  go (CST.EProperty e p) = Just (id, CST.EProperty e p)
-  go (CST.ELocated e p) = Just ((`CST.ELocated` p), e)
-  go _ = Nothing
+  :: CST.Expression 
+  -> Maybe CST.Expression
+spanProperty (CST.ELocated e _) = spanProperty e
+spanProperty (CST.EProperty e p) = Just (CST.EProperty e p)
+spanProperty _ = Nothing
 
+-- | Main translation from concrete syntax to abstract syntax
+-- | This transformation pass performs some syntactic sugar reductions
+-- | such as UFCS introduction, macro expansion, import resolving,
+-- | operator resolving, etc.
 concreteToAbstract
   :: CST.Expression
   -> TranslatorReader Error AST.Expression
@@ -49,8 +62,16 @@ concreteToAbstract (CST.ELiteral l) = transRet . Right $ AST.ELiteral l
 concreteToAbstract e@(CST.EBinary {}) = convertOperation concreteToAbstract e
 concreteToAbstract e@(CST.EPrefix {}) = convertOperation concreteToAbstract e
 concreteToAbstract e@(CST.EPostfix {}) = convertOperation concreteToAbstract e
+concreteToAbstract m@(CST.EMacro {}) =
+  convertMacro concreteToAbstract m
+concreteToAbstract m@(CST.EMacroFunction {}) =
+  convertMacro concreteToAbstract m
+concreteToAbstract m@(CST.EMacroVariable _) =
+  convertMacro concreteToAbstract m
+concreteToAbstract m@(CST.EMacroApplication {}) =
+  convertMacro concreteToAbstract m
 concreteToAbstract (CST.EApplication e args)
-  | Just (_, e') <- spanProperty e = do
+  | Just e' <- spanProperty e = do
       convertUFCS concreteToAbstract (CST.EApplication e' args)
   | otherwise = do
       e' <- shouldBeAlone <$> concreteToAbstract e
@@ -110,14 +131,6 @@ concreteToAbstract (CST.ELocated e p) = do
 
   writeIORef positionRef old
   return res
-concreteToAbstract m@(CST.EMacro {}) =
-  convertMacro concreteToAbstract m
-concreteToAbstract m@(CST.EMacroFunction {}) =
-  convertMacro concreteToAbstract m
-concreteToAbstract m@(CST.EMacroVariable _) =
-  convertMacro concreteToAbstract m
-concreteToAbstract m@(CST.EMacroApplication {}) =
-  convertMacro concreteToAbstract m
 concreteToAbstract (CST.ESwitch e ps) = do
   -- Same method as described for condition branches
   e' <- shouldBeAlone <$> concreteToAbstract e
@@ -127,8 +140,17 @@ concreteToAbstract (CST.ESwitch e ps) = do
         (\(p, body) -> (p,) . fmap interpretSpreadable <$> concreteToAbstract body)
         ps
   transRet $ AST.ESwitch <$> e' <*> ps'
-concreteToAbstract z@(CST.EProperty {}) = do
-  print z
+concreteToAbstract (CST.EProperty {}) = do
+  -- This case should not happen as the language support
+  -- direct-style UFCS, so we should not have any property
+  -- expressions outside function calls:
+  --
+  -- x = y.property
+  -- x(5) 
+  -- 
+  -- This example is not yet supported, so the compiler will
+  -- throw an error if it encounters a property expression
+
   pos <- readIORef positionRef
   throwError $ case pos of
     Just p -> CompilerError $ "Unexpected property at " <> show p
@@ -148,25 +170,12 @@ concreteToAbstract (CST.ETypeExtension g ann ems) = do
     fmap flat . sequence <$> mapM concreteToAbstractExtensionMember ems
   transRet $ AST.ETypeExtension g ann <$> ems'
 concreteToAbstract (CST.ENativeFunction fp n gens t) = do
-  let strModName = toString fp -<.> sharedLibExt
-  let isStd = "std:" `T.isPrefixOf` fp
-  cwd <- asks fst
-  let modPath =
-        if isStd
-          then do
-            p <- liftIO $ readIORef stdPath
-            case p of
-              Just p' -> return $ Right (p' </> drop 4 strModName)
-              Nothing -> throwError' $ CompilerError "Standard library path not set"
-          else return $ Right (cwd </> strModName)
-  modPath `with` \path -> do
-    liftIO (doesFileExist path) >>= \case
-      False -> do
-        pos <- readIORef positionRef
-        throwError $ case pos of
-          Just p -> ModuleNotFound fp p
-          Nothing -> NoPositionSaved
-      _ -> transRet . Right $ AST.ENativeFunction (fromString path) n gens t
+  -- Native function resolution is kind the same as require resolution
+  -- except we do not parse everything. But we need to resolve the path 
+  -- absolutely to make it work everywhere on the system.
+  let strModName = fromString $ toString fp -<.> sharedLibExt
+  modPath <- getPath strModName (Just sharedLibExt)
+  transRet . Right $ AST.ENativeFunction (fromString modPath) n gens t
 concreteToAbstract (CST.EGenericProperty g n ts t) =
   transRet . Right $ AST.EGenericProperty g n ts t
 concreteToAbstract (CST.EList es) = do
@@ -178,6 +187,7 @@ concreteToAbstract (CST.EList es) = do
 concreteToAbstract (CST.EType ann ts) = do
   bireturn . Single $ AST.EType ann ts
 
+-- | Translate a concrete extension member to an abstract extension member
 concreteToAbstractExtensionMember
   :: CST.ExtensionMember Common.PlumeType
   -> TranslatorReader Error (AST.ExtensionMember Common.PlumeType)
@@ -185,6 +195,7 @@ concreteToAbstractExtensionMember (CST.ExtDeclaration g ann e) = do
   e' <- shouldBeAlone <$> concreteToAbstract e
   return $ Single . AST.ExtDeclaration g ann <$> e'
 
+-- | Entry translation function runner that redirects the translation
 runConcreteToAbstract
   :: Maybe FilePath
   -> FilePath
@@ -192,34 +203,30 @@ runConcreteToAbstract
   -> FilePath
   -> IO (Either Error [AST.Expression])
 runConcreteToAbstract std dir paths fp = do
+  -- Writing the standard library path to the IORef to keep it
+  -- without needing to refetch it every time
   writeIORef stdPath std
+
   -- Getting the current working directory as a starting point
   -- for the reader monad
   cwd <- (</> dir) <$> getCurrentDirectory
 
-  runReaderT
-    ( do
-        imports' <-
-          sequenceMapM
-            ( \(i, p) ->
-                withMaybePos p . local (second (const True)) $
-                  convertRequire concreteToAbstract $
-                    CST.ERequire i
-            )
-            paths
-        case flat <$> imports' of
-          Left err -> throwError' err
-          Right exprs -> do
-            newCWD <- liftIO getCurrentDirectory
-            content <- liftIO $ decodeUtf8 @Text <$> readFileBS fp
-            local (const (newCWD, False)) $ do
-              ops <- liftIO $ readIORef operators
-              liftIO (parsePlumeFile fp content ops) >>= \case
-                Left err -> throwError' $ ParserError err
-                Right (cst, ops') -> do
-                  modifyIORef' operators (`SL.union` ops')
-                  sequenceMapM concreteToAbstract cst >>= \case
-                    Left err -> throwError' err
-                    Right ast -> bireturn $ exprs <> flat ast
-    )
-    (cwd, False)
+  flip runReaderT (cwd, False) $ do
+    -- Translating the imports to get the expressions that are
+    -- imported from the modules
+    exprs <- translateImports paths cwd concreteToAbstract
+
+    -- Fetching again more generally the current directory and
+    -- reading the content of the file
+    newCWD <- liftIO getCurrentDirectory
+    content <- liftIO $ decodeUtf8 @Text <$> readFileBS fp
+    
+    -- Parsing the main module file
+    res <- parseFile (fp, content) newCWD
+
+    -- Finally converting the main parsed file to abstract syntax
+    case res of
+      Left err -> throwError' err
+      Right cst -> sequenceMapM concreteToAbstract cst >>= \case
+        Left err -> throwError' err
+        Right ast -> bireturn $ exprs <> flat ast

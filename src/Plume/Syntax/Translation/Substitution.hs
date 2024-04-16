@@ -5,8 +5,14 @@ import Data.Set qualified as S
 import Plume.Syntax.Abstract qualified as AST
 import Plume.Syntax.Common qualified as AST
 
+-- | Free represents values that are not bound in a given expression.
+-- | For instance, in the expression `let x = 1 in x + y`, `y` is a free variable
+-- | because it is not bound by the `let` expression, but `x` is not a free 
+-- | variable because it is bound by the `let` expression.
 class Free a where
   ftv :: a -> Set Text
+
+-- SOME FREE INSTANCES
 
 instance Free (AST.Annotation a) where
   ftv (AST.Annotation t _) = S.singleton t
@@ -22,6 +28,10 @@ instance Free AST.Pattern where
 instance (Free a) => Free [a] where
   ftv = foldr (S.union . ftv) S.empty
 
+
+-- | Substitute a variable by an expression in an expression
+-- | Used to replace variables with expressions for instance in the
+-- | macro preprocessor
 substitute :: (Text, AST.Expression) -> AST.Expression -> AST.Expression
 substitute (name, expr) (AST.EVariable n)
   | n == name = expr

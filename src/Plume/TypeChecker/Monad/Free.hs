@@ -9,12 +9,22 @@ import Plume.TypeChecker.TLIR
 
 type Substitution = Map TyVar PlumeType
 
+-- | Semigroup instance for Substitution that merges/compose
+-- | two substitutions together.
+-- | 
+-- | The merging operation just applies the first substitution to the second
+-- | substitution and then merges the two substitutions together.
 instance {-# OVERLAPPING #-} Semigroup Substitution where
   s1 <> s2 = Map.map (apply s1) s2 `Map.union` s1
 
+-- | Free represents types that are not bound in a given expression.
+-- | It provides a way to get the free type variables in a type and to apply
+-- | a substitution to a type.
 class Free a where
   free :: a -> Set TyVar
   apply :: Substitution -> a -> a
+
+-- FREE INSTANCES
 
 instance (Free a) => Free [a] where
   free = foldMap free

@@ -14,5 +14,4 @@ import Plume.Syntax.Common.Type
 
 type Expression = AbstractExpression PlumeType
 type ExtensionMem = ExtensionMember PlumeType
-
 type Program = [Expression]
