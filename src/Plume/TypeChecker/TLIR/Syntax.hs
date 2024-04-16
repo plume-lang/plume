@@ -5,6 +5,8 @@ import Plume.Syntax.Common.Literal
 import Plume.Syntax.Concrete.Expression (Position, TypeConstructor)
 import Plume.TypeChecker.TLIR.Modules.Pattern
 
+-- | A more precise AST for the type checker, embedding the type information
+-- | in the expressions
 data TypedExpression t
   = EVariable Text t
   | EExtVariable Text t t

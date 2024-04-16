@@ -7,11 +7,17 @@ import Plume.Syntax.Common.Type qualified as Pre
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.Monad.Type qualified as Post
 
+-- | The `ConvertsTo` typeclass is used to convert a type `a` to a type `b`.
+-- | It is used to convert the types from the CST to the TLIR.
+-- | It could be used for other conversions as well, but it is currently mainly
+-- | used to convert types and data-types that contains types.
 class a `ConvertsTo` b where
   convert :: a -> Checker b
 
 instance Pre.PlumeType `ConvertsTo` Post.PlumeType where
   convert (Pre.TId n) = do
+    -- Check if the type is bound by a generic type variable
+    -- in the generics environment.
     searchEnv @"genericsEnv" n >>= \case
       Just t -> pure (Post.TypeVar t)
       Nothing -> pure (Post.TypeId n)

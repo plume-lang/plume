@@ -10,19 +10,23 @@ import Plume.TypeChecker.TLIR qualified as Post
 
 synthSwitch :: Infer -> Infer
 synthSwitch infer (Pre.ESwitch scrutinee cases) = local id $ do
+  -- Infer the scrutinee and the cases
   (t, scrutinee') <- extractFromArray $ infer scrutinee
   (tys, cases') <- mapAndUnzipM (synthCase infer t) cases
   let (ts', expr) = unzip tys
-
+  
   (ret, xs) <- case ts' of
     [] -> throw EmptyMatch
     (ret : xs) -> return (ret, xs)
-
+  
   (exprTy, xs') <- case expr of
     [] -> return (ret, [])
     (x : xs'') -> return (x, xs'')
 
+  -- Unify the return type with the type of the case expressions
   forM_ xs $ unifiesTo ret
+
+  -- Unify the scrutinee type with the type of the patterns
   forM_ xs' $ unifiesTo exprTy
 
   pure (exprTy, [Post.ESwitch scrutinee' cases'])
@@ -34,11 +38,15 @@ synthCase
   -> (Pre.Pattern, Pre.Expression)
   -> Checker ((PlumeType, PlumeType), (Post.Pattern, Post.Expression))
 synthCase infer scrutTy (pat, expr) = local id $ do
+  -- Synthesize the pattern and infer the expression
   (patTy, patExpr, patEnv) <- synthPattern pat
   (exprTy, expr') <- local id . extractFromArray $ localEnv patEnv (infer expr)
+
+  -- Pattern type should unify with the scrutinee type
   scrutTy `unifiesTo` patTy
   pure ((patTy, exprTy), (patExpr, expr'))
 
+-- | Locally perform an action without changing the environment globally
 localEnv :: Map Text PlumeScheme -> Checker a -> Checker a
 localEnv env action = do
   vars <- gets (typeEnv . environment)
@@ -47,6 +55,9 @@ localEnv env action = do
   replaceEnv @"typeEnv" vars
   pure res
 
+-- | Synthesizing a pattern consists of inferring the type of the pattern
+-- | like regular expressions, but also returning the environment created 
+-- | by the pattern (e.g. variables in the pattern).
 synthPattern
   :: Pre.Pattern
   -> Checker (PlumeType, Post.Pattern, Map Text PlumeScheme)
@@ -106,6 +117,8 @@ typeOfLiteral (LBool b) = (TBool, LBool b)
 typeOfLiteral (LString s) = (TString, LString s)
 typeOfLiteral (LChar c) = (TChar, LChar c)
 
+-- | Function that maps monadic actions over a list and then unzips the result
+-- | into three separate lists.
 mapAndUnzip3M :: (Monad m) => (a -> m (b, c, d)) -> [a] -> m ([b], [c], [d])
 mapAndUnzip3M f xs = do
   (bs, cs, ds) <- unzip3 <$> mapM f xs

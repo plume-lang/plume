@@ -28,19 +28,22 @@ withoutLocated (Post.ELocated expr _) = withoutLocated expr
 withoutLocated e = e
 
 synthesize :: Pre.Expression -> Checker (PlumeType, [Post.Expression])
--- Some basic and primitive expressions
+-- | Some basic and primitive expressions
 synthesize (Pre.ELocated expr pos) = withPosition pos $ synthesize expr
 synthesize (Pre.EVariable name) = do
+  -- Checking if the variable is a value
   searchEnv @"typeEnv" name >>= \case
     Just scheme -> do
       ty <- instantiate scheme
       pure (ty, [Post.EVariable name ty])
     Nothing ->
+      -- Checking if the variable is a data-type constructor or variable
       searchEnv @"datatypeEnv" name >>= \case
         Just sch -> do
           ty <- instantiate sch
           pure (ty, [Post.EVariable name ty])
         Nothing -> do
+          -- Checking if variable might be an extension
           extExists <- doesExtensionExistM name
           if extExists
             then do
@@ -81,7 +84,7 @@ synthesize (Pre.EList xs) = do
       xs
   forM_ tys $ unifiesTo tv
   pure (TList tv, [Post.EList xs'])
--- Calling synthesis modules
+-- | Calling synthesis modules
 synthesize app@(Pre.EApplication {}) = synthApp synthesize app
 synthesize clos@(Pre.EClosure {}) = synthClosure synthesize clos
 synthesize decl@(Pre.EDeclaration {}) = synthDecl synthesize decl
@@ -90,9 +93,10 @@ synthesize ext@(Pre.ETypeExtension {}) = synthExt synthesize ext
 synthesize ty@(Pre.EType {}) = synthDataType ty
 synthesize sw@(Pre.ESwitch {}) = synthSwitch synthesize sw
 synthesize nat@(Pre.ENativeFunction {}) = synthNative nat
--- This should never be called
+-- | This should never be called
 synthesize e = throw . CompilerError $ "Not implemented: " <> show e
 
+-- | Locally synthesize a list of expressions
 synthesizeMany :: [Pre.Expression] -> Checker [Post.Expression]
 synthesizeMany xs = do
   xs' <- concatMapM (fmap snd . localPosition . synthesize) xs
