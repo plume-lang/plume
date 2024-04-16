@@ -225,8 +225,9 @@ runConcreteToAbstract std dir paths fp = do
     res <- parseFile (fp, content) newCWD
 
     -- Finally converting the main parsed file to abstract syntax
-    case res of
-      Left err -> throwError' err
-      Right cst -> sequenceMapM concreteToAbstract cst >>= \case
+    local (const (newCWD, False)) $
+      case res of
         Left err -> throwError' err
-        Right ast -> bireturn $ exprs <> flat ast
+        Right cst -> sequenceMapM concreteToAbstract cst >>= \case
+          Left err -> throwError' err
+          Right ast -> bireturn $ exprs <> flat ast

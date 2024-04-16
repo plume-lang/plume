@@ -96,11 +96,12 @@ convertRequire f (CST.ERequire modName) = do
         
           res <- parseFile (path, content) newCurrentDirectory
 
-          case res of 
-            Left err -> throwError err
-            Right cst -> sequenceMapM f cst >>= \case
+          local (const (newCurrentDirectory, False)) $
+            case res of 
               Left err -> throwError err
-              Right ast -> bireturn . Spread $ exprs <> flat ast
+              Right cst -> sequenceMapM f cst >>= \case
+                Left err -> throwError err
+                Right ast -> bireturn . Spread $ exprs <> flat ast
 
 convertRequire _ _ = throwError $ CompilerError "Received invalid require expression"
 
