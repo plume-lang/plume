@@ -1,8 +1,5 @@
-{-# LANGUAGE LambdaCase #-}
-
 module Plume.Compiler.Desugaring.Modules.ANF where
 
-import Data.Set qualified as S
 import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Compiler.Desugaring.Modules.Switch
 import Plume.Compiler.Desugaring.Monad
@@ -15,28 +12,16 @@ desugarANF _ f (Pre.CEApplication x xs) = do
   (x', stmts1) <- f x
   (xs', stmts2) <- mapAndUnzipM f xs
 
-  nativeFuns <- readIORef nativeFunctions
-  (xs'', stmts3) <-
-    mapAndUnzipM
-      ( \case
-          Post.DEApplication n args
-            | n `S.notMember` nativeFuns -> do
-                new <- freshName
-                return (Post.DEVar new, [Post.DSDeclaration new (Post.DEApplication n args)])
-          _x -> return (_x, [])
-      )
-      xs'
-
   case x' of
     Post.DEVar name -> do
-      let stmts' = stmts1 <> concat stmts2 <> concat stmts3
+      let stmts' = stmts1 <> concat stmts2
 
-      return (Post.DEApplication name xs'', stmts')
+      return (Post.DEApplication name xs', stmts')
     _ -> do
       fresh <- freshName
-      let stmts' = stmts1 <> [Post.DSDeclaration fresh x'] <> concat stmts2 <> concat stmts3
+      let stmts' = stmts1 <> [Post.DSDeclaration fresh x'] <> concat stmts2
 
-      return (Post.DEApplication fresh xs'', stmts')
+      return (Post.DEApplication fresh xs', stmts')
 desugarANF t f (Pre.CEDeclaration name expr body) = do
   (expr', stmt1) <- f expr
   (body', stmts2) <- desugarANF t f body

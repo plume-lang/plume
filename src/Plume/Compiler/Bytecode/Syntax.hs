@@ -8,19 +8,26 @@ data Instruction
   | StoreGlobal Int
   | Update
   | Return
+  | ReturnConst Int
   | Compare Comparator
-  | And
-  | Or
+  | And | Or
+  | Add | Sub | AddConst Int | SubConst Int
   | LoadNative Int Int Int
   | MakeList Int
   | ListGet Int
   | Call Int
-  | JumpIfRel Int
+  | CallGlobal Int Int | CallLocal Int Int
+  | JumpElseRel Int
+  | JumpElseRelCmp Int Comparator
+  | JumpElseRelCmpConstant Int Comparator Int
+  | IJumpElseRelCmp Int Comparator
+  | IJumpElseRelCmpConstant Int Comparator Int
   | JumpRel Int
   | TypeOf
   | ConstructorName
   | Phi Int Int
   | MakeLambda Int Int
+  | MakeAndStoreLambda Int Int Int
   | MakeMutable
   | UnMut
   | GetIndex
@@ -37,6 +44,7 @@ data Comparator
   | NotEqualTo
   | LessThanOrEqualTo
   | GreaterThanOrEqualTo
+  | AndCmp | OrCmp
   deriving (Show, Eq)
 
 data Constant

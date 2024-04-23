@@ -74,6 +74,62 @@ assemblerState =
     newIORef $
       AssemblerState mempty mempty mempty 0 mempty mempty mempty mempty
 
+assembleLit :: Literal -> IO Int
+assembleLit l = do
+  AssemblerState {constants} <- readIORef assemblerState
+  case Map.lookup l constants of
+    Just i' -> pure i'
+    Nothing -> do
+      modifyIORef' assemblerState $ \s ->
+        s {constants = Map.insert l (Map.size constants) constants}
+      let idx = Map.size constants
+      pure idx
+
+assembleCondition :: Pre.DesugaredExpr -> IO ([BC.Instruction], Int -> BC.Instruction)
+assembleCondition (Pre.DEEqualsTo e1 (Pre.DELiteral l@(LInt _))) = do
+  e1' <- assemble e1
+  l' <- assembleLit l
+  pure (e1', \i -> BC.IJumpElseRelCmpConstant i BC.EqualTo l')
+assembleCondition (Pre.DEEqualsTo e1 (Pre.DELiteral l)) = do
+  e1' <- assemble e1
+  l' <- assembleLit l
+  pure (e1', \i -> BC.JumpElseRelCmpConstant i BC.EqualTo l')
+assembleCondition (Pre.DEEqualsTo e1 e2) = do
+  e1' <- assemble e1
+  e2' <- assemble e2
+  pure (e1' ++ e2', (`BC.JumpElseRelCmp` BC.EqualTo))
+assembleCondition (Pre.DEGreaterThan e1 e2) = do
+  e1' <- assemble e1
+  e2' <- assembleLit (LInt $ toInteger e2)
+  pure (e1', \i -> BC.IJumpElseRelCmpConstant i BC.GreaterThan e2')
+assembleCondition (Pre.DEAnd e1 e2) = do
+  e1' <- assemble e1
+  e2' <- assemble e2
+  pure (e1' ++ e2', (`BC.JumpElseRelCmp` BC.AndCmp))
+assembleCondition (Pre.DEApplication "or::bool" [e1, e2]) = do
+  e1' <- assemble e1
+  e2' <- assemble e2
+  pure (e1' ++ e2', (`BC.JumpElseRelCmp` BC.OrCmp))
+assembleCondition (Pre.DEApplication "<=::int" [e1, e2]) = do
+  e1' <- assemble e1
+  e2' <- assemble e2
+  pure (e1' ++ e2', (`BC.IJumpElseRelCmp` BC.LessThanOrEqualTo))
+assembleCondition (Pre.DEApplication ">=::int" [e1, e2]) = do
+  e1' <- assemble e1
+  e2' <- assemble e2
+  pure (e1' ++ e2', (`BC.IJumpElseRelCmp` BC.GreaterThanOrEqualTo))
+assembleCondition (Pre.DEApplication "!=::int" [e1, e2]) = do
+  e1' <- assemble e1
+  e2' <- assemble e2
+  pure (e1' ++ e2', (`BC.IJumpElseRelCmp` BC.NotEqualTo))
+assembleCondition (Pre.DEApplication "==::int" [e1, e2]) = do
+  e1' <- assemble e1
+  e2' <- assemble e2
+  pure (e1' ++ e2', (`BC.IJumpElseRelCmp` BC.EqualTo))
+assembleCondition e = do
+  e' <- assemble e
+  pure (e', BC.JumpElseRel)
+
 assemble :: Pre.DesugaredExpr -> IO [BC.Instruction]
 assemble Pre.DESpecial = pure [BC.Special]
 assemble (Pre.DEVar n) = do
@@ -89,29 +145,42 @@ assemble (Pre.DEIndex e1 e2) = do
   e1' <- assemble e1
   e2' <- assemble e2
   pure $ e1' ++ e2' ++ [BC.GetIndex]
+assemble (Pre.DEApplication "add_int" [x, Pre.DELiteral l]) = do
+  x' <- assemble x
+  l' <- assembleLit l
+  pure $ x' ++ [BC.AddConst l']
+assemble (Pre.DEApplication "sub_int" [x, Pre.DELiteral l]) = do
+  x' <- assemble x
+  l' <- assembleLit l
+  pure $ x' ++ [BC.SubConst l']
+assemble (Pre.DEApplication "add_int" [x, y]) = do
+  x' <- assemble x
+  y' <- assemble y
+  pure $ x' ++ y' ++ [BC.Add]
+assemble (Pre.DEApplication "sub_int" [x, y]) = do
+  x' <- assemble x
+  y' <- assemble y
+  pure $ x' ++ y' ++ [BC.Sub]
+assemble (Pre.DEApplication "<=::int" [x, y]) = do
+  x' <- assemble x
+  y' <- assemble y
+  pure $ x' ++ y' ++ [BC.Compare BC.LessThanOrEqualTo]
 assemble (Pre.DEApplication f args) = do
   AssemblerState {nativeFunctions, locals, globals} <-
     readIORef assemblerState
   args' <- concat <$> mapM assemble args
   pure $
     args' ++ case Map.lookup f globals of
-      Just i -> [BC.LoadGlobal i, BC.Call (length args)]
+      Just i -> [BC.CallGlobal i (length args)]
       Nothing -> case Map.lookup f locals of
-        Just i ->
-          [BC.LoadLocal i, BC.Call (length args)]
+        Just i -> [BC.CallLocal i (length args)]
         Nothing -> case Map.lookup f nativeFunctions of
           Just (funLibIdx, name, libAddr) -> do
             [BC.LoadNative name libAddr funLibIdx, BC.Call (length args)]
           _ -> error $ "Function not found: " <> show f
 assemble (Pre.DELiteral l) = do
-  AssemblerState {constants} <- readIORef assemblerState
-  case Map.lookup l constants of
-    Just i' -> pure [BC.LoadConstant i']
-    Nothing -> do
-      modifyIORef' assemblerState $ \s ->
-        s {constants = Map.insert l (Map.size constants) constants}
-      let idx = Map.size constants
-      pure [BC.LoadConstant idx]
+  l' <- assembleLit l
+  pure [BC.LoadConstant l']
 assemble (Pre.DEList es) = do
   es' <- concat <$> mapM assemble es
   pure $ es' ++ [BC.MakeList $ length es]
@@ -122,12 +191,13 @@ assemble (Pre.DEDictionary es) = do
   es' <- concat <$> mapM assemble es
   pure $ es' ++ [BC.MakeList $ length es]
 assemble (Pre.DEIf e1 e2 e3) = do
-  e1' <- assemble e1
+  (e1', f) <- assembleCondition e1
   e2' <- concatMapM assembleStmt e2
   e3' <- concatMapM assembleStmt e3
+  print e2'
   pure $
     e1'
-      ++ [BC.JumpIfRel $ length e2' + (if containsReturn e2' then 1 else 2)]
+      ++ [f $ length e2' + (if containsReturn e2' then 1 else 2)]
       ++ e2'
       ++ [BC.JumpRel $ length e3' + 1 | not (containsReturn e2')]
       ++ e3'
@@ -178,6 +248,9 @@ assembleDecl isMut n e = do
 
 assembleStmt :: Pre.DesugaredStatement -> IO [BC.Instruction]
 assembleStmt (Pre.DSExpr e) = assemble e
+assembleStmt (Pre.DSReturn (Pre.DELiteral l)) = do
+  e' <- assembleLit l
+  pure [BC.ReturnConst e']
 assembleStmt (Pre.DSReturn e) = do
   e' <- assemble e
   pure $ e' ++ [BC.Return]
@@ -222,9 +295,8 @@ assembleProgram (Pre.DPFunction n args stmts) = do
         s {locals = mempty, currentSize = s.currentSize + length res}
 
       return
-        ( [BC.MakeLambda (length res) (length (args <> freed))]
-            ++ res
-            ++ [BC.StoreGlobal i]
+        ( BC.MakeAndStoreLambda i (length res) (length (args <> freed))
+            : res
         )
     Nothing -> error $ "Function not declared: " <> show n
 assembleProgram (Pre.DPDeclaration n e) = do
@@ -314,6 +386,7 @@ containsReturn :: [BC.Instruction] -> Bool
 containsReturn = any isReturn
  where
   isReturn BC.Return = True
+  isReturn BC.ReturnConst {} = True
   isReturn _ = False
 
 assembleConstants :: Map Literal Int -> [BC.Constant]

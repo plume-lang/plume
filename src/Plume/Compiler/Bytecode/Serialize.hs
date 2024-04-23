@@ -9,44 +9,106 @@ import Plume.Compiler.Bytecode.Syntax
 import Prelude hiding (encodeUtf8)
 
 encodeInteger :: (Integral a) => a -> Put
-encodeInteger = putInt64le . fromIntegral
+encodeInteger = putInt32le . fromIntegral
 
 encodeComparator :: Comparator -> Put
-encodeComparator LessThan = putInt64le 0
-encodeComparator GreaterThan = putInt64le 1
-encodeComparator EqualTo = putInt64le 2
-encodeComparator NotEqualTo = putInt64le 3
-encodeComparator LessThanOrEqualTo = putInt64le 4
-encodeComparator GreaterThanOrEqualTo = putInt64le 5
+encodeComparator LessThan = putInt32le 0
+encodeComparator GreaterThan = putInt32le 1
+encodeComparator EqualTo = putInt32le 2
+encodeComparator NotEqualTo = putInt32le 3
+encodeComparator LessThanOrEqualTo = putInt32le 4
+encodeComparator GreaterThanOrEqualTo = putInt32le 5
+encodeComparator AndCmp = putInt32le 6
+encodeComparator OrCmp = putInt32le 7
+
+encodeNull :: Put
+encodeNull = putInt32le 0
+
+replicateNull :: Int -> Put
+replicateNull = flip replicateM_ encodeNull
+
+encodeInstr :: Int -> Put
+encodeInstr = putInt32le . fromIntegral
 
 encodeInstruction :: Instruction -> Put
-encodeInstruction (LoadLocal i) = putWord8 0 >> encodeInteger i
-encodeInstruction (StoreLocal i) = putWord8 1 >> encodeInteger i
-encodeInstruction (LoadConstant i) = putWord8 2 >> encodeInteger i
-encodeInstruction (LoadGlobal i) = putWord8 3 >> encodeInteger i
-encodeInstruction (StoreGlobal i) = putWord8 4 >> encodeInteger i
-encodeInstruction Return = putWord8 5
-encodeInstruction (Compare c) = putWord8 6 >> encodeComparator c
-encodeInstruction And = putWord8 7
-encodeInstruction Or = putWord8 8
-encodeInstruction (LoadNative i cp fp) = putWord8 9 >> encodeInteger i >> encodeInteger cp >> encodeInteger fp
-encodeInstruction (MakeList i) = putWord8 10 >> encodeInteger i
-encodeInstruction (ListGet i) = putWord8 11 >> encodeInteger i
-encodeInstruction (Call i) = putWord8 12 >> encodeInteger i
-encodeInstruction (JumpIfRel i) = putWord8 13 >> encodeInteger i
-encodeInstruction TypeOf = putWord8 14
-encodeInstruction ConstructorName = putWord8 15
-encodeInstruction (Phi i j) = putWord8 16 >> encodeInteger i >> encodeInteger j
-encodeInstruction (MakeLambda i l) = putWord8 17 >> encodeInteger i >> encodeInteger l
-encodeInstruction GetIndex = putWord8 18
-encodeInstruction Special = putWord8 19
-encodeInstruction (JumpRel i) = putWord8 20 >> encodeInteger i
-encodeInstruction (Slice i) = putWord8 21 >> encodeInteger i
-encodeInstruction ListLength = putWord8 22
-encodeInstruction Halt = putWord8 23
-encodeInstruction Update = putWord8 24
-encodeInstruction MakeMutable = putWord8 25
-encodeInstruction UnMut = putWord8 26
+encodeInstruction (LoadLocal i) = 
+  encodeInstr 0 >> encodeInteger i >> replicateNull 2
+encodeInstruction (StoreLocal i) = 
+  encodeInstr 1 >> encodeInteger i >> replicateNull 2
+encodeInstruction (LoadConstant i) = 
+  encodeInstr 2 >> encodeInteger i >> replicateNull 2
+encodeInstruction (LoadGlobal i) = 
+  encodeInstr 3 >> encodeInteger i >> replicateNull 2
+encodeInstruction (StoreGlobal i) = 
+  encodeInstr 4 >> encodeInteger i >> replicateNull 2
+encodeInstruction Return = 
+  encodeInstr 5 >> replicateNull 3
+encodeInstruction (Compare c) = 
+  encodeInstr 6 >> encodeComparator c >> replicateNull 2
+encodeInstruction And = 
+  encodeInstr 7 >> replicateNull 3
+encodeInstruction Or = 
+  encodeInstr 8 >> replicateNull 3
+encodeInstruction (LoadNative i cp fp) = 
+  encodeInstr 9 >> encodeInteger i >> encodeInteger cp >> encodeInteger fp
+encodeInstruction (MakeList i) = 
+  encodeInstr 10 >> encodeInteger i >> replicateNull 2
+encodeInstruction (ListGet i) = 
+  encodeInstr 11 >> encodeInteger i >> replicateNull 2
+encodeInstruction (Call i) = 
+  encodeInstr 12 >> encodeInteger i >> replicateNull 2
+encodeInstruction (JumpElseRel i) = 
+  encodeInstr 13 >> encodeInteger i >> replicateNull 2
+encodeInstruction TypeOf = 
+  encodeInstr 14 >> replicateNull 3
+encodeInstruction ConstructorName = 
+  encodeInstr 15 >> replicateNull 3
+encodeInstruction (Phi i j) = 
+  encodeInstr 16 >> encodeInteger i >> encodeInteger j >> encodeNull
+encodeInstruction (MakeLambda i l) = 
+  encodeInstr 17 >> encodeInteger i >> encodeInteger l >> encodeNull
+encodeInstruction GetIndex = 
+  encodeInstr 18 >> replicateNull 3
+encodeInstruction Special = 
+  encodeInstr 19 >> replicateNull 3
+encodeInstruction (JumpRel i) = 
+  encodeInstr 20 >> encodeInteger i >> replicateNull 2
+encodeInstruction (Slice i) = 
+  encodeInstr 21 >> encodeInteger i >> replicateNull 2
+encodeInstruction ListLength = 
+  encodeInstr 22 >> replicateNull 3
+encodeInstruction Halt = 
+  encodeInstr 23 >> replicateNull 3
+encodeInstruction Update = 
+  encodeInstr 24 >> replicateNull 3
+encodeInstruction MakeMutable = 
+  encodeInstr 25 >> replicateNull 3
+encodeInstruction UnMut = 
+  encodeInstr 26 >> replicateNull 3
+encodeInstruction Add = 
+  encodeInstr 27 >> replicateNull 3
+encodeInstruction Sub = 
+  encodeInstr 28 >> replicateNull 3
+encodeInstruction (ReturnConst i) = 
+  encodeInstr 29 >> encodeInteger i >> replicateNull 2
+encodeInstruction (AddConst i) = 
+  encodeInstr 30 >> encodeInteger i >> replicateNull 2
+encodeInstruction (SubConst i) = 
+  encodeInstr 31 >> encodeInteger i >> replicateNull 2
+encodeInstruction (JumpElseRelCmp i c) =
+  encodeInstr 32 >> encodeInteger i >> encodeComparator c >> encodeNull
+encodeInstruction (IJumpElseRelCmp i c) =
+  encodeInstr 33 >> encodeInteger i >> encodeComparator c >> encodeNull
+encodeInstruction (JumpElseRelCmpConstant i c j) =
+  encodeInstr 34 >> encodeInteger i >> encodeComparator c >> encodeInteger j
+encodeInstruction (IJumpElseRelCmpConstant i c j) =
+  encodeInstr 35 >> encodeInteger i >> encodeComparator c >> encodeInteger j
+encodeInstruction (CallGlobal i j) =
+  encodeInstr 36 >> encodeInteger i >> encodeInteger j >> encodeNull
+encodeInstruction (CallLocal i j) =
+  encodeInstr 37 >> encodeInteger i >> encodeInteger j >> encodeNull
+encodeInstruction (MakeAndStoreLambda i j k) =
+  encodeInstr 38 >> encodeInteger i >> encodeInteger j >> encodeInteger k
 
 encodeText :: Text -> Put
 encodeText w = do
@@ -68,14 +130,14 @@ encodeMetaData FunctionMetaData {arity, address, localsSpace} = do
 
 encodeProgram :: Program -> Put
 encodeProgram Program {instructions, constants, nativeLibraries} = do
-  encodeInteger $ length instructions
-  mapM_ encodeInstruction instructions
-
   encodeInteger $ length constants
   mapM_ encodeConstant constants
 
   encodeInteger $ length nativeLibraries
   mapM_ encodeNative nativeLibraries
+
+  encodeInteger $ length instructions
+  mapM_ encodeInstruction instructions
 
 encodeNative :: (FilePath, Int) -> Put
 encodeNative (path, idx) = do
