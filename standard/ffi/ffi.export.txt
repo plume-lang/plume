@@ -39,5 +39,6 @@ get_args
 does_file_exist
 execute_command
 input
+print_int
 
 ffi_fetch

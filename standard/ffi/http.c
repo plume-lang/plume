@@ -5,6 +5,8 @@
 #include "cons.h"
 #include <stdio.h>
 
+size_t data_size = 0;
+
 size_t write_callback(void* contents, size_t size, size_t nmemb, char** response) {
   size_t realsize = size * nmemb;
   *response = realloc(*response, realsize + 1);
@@ -14,21 +16,25 @@ size_t write_callback(void* contents, size_t size, size_t nmemb, char** response
   }
   memcpy(*response, contents, realsize);
   (*response)[realsize] = '\0';
+  data_size = realsize;
   return realsize;
 }
 
 Value ffi_fetch(size_t argc, Module* mod, Value* args) {
   ASSERT_FMT(argc == 1, "expected 1 argument, but got %zu", argc);
   Value url = args[0];
-  ASSERT_FMT(url.type == VALUE_STRING, "expected string, but got %u", url.type);
+  ASSERT_FMT(get_type(url) == TYPE_STRING, "expected string, but got %s", type_of(url));
 
-  const char* url_str = url.string_value;
+  const char* url_str = GET_STRING(url);
 
   CURL* curl = curl_easy_init();
-  if (!curl) return make_err(MAKE_STRING("Failed to initialize curl"));
+  if (!curl) return make_err(MAKE_STRING("Failed to initialize curl", 25));
+  
+  data_size = 0;
 
   // Store the response in a string
   char* response = malloc(1);
+  
   curl_easy_setopt(curl, CURLOPT_URL, url_str);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
@@ -36,9 +42,10 @@ Value ffi_fetch(size_t argc, Module* mod, Value* args) {
 
   if (res != CURLE_OK) {
     curl_easy_cleanup(curl);
-    return make_err(MAKE_STRING((char*) curl_easy_strerror(res)));
+    char* err = (char*) curl_easy_strerror(res);
+    return make_err(MAKE_STRING(err, strlen(err)));
   }
 
   curl_easy_cleanup(curl);
-  return make_ok(MAKE_STRING(response));
+  return make_ok(MAKE_STRING(response, data_size));
 }
