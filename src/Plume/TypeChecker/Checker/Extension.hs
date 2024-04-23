@@ -96,13 +96,10 @@ synthExtMember
 
         let newScheme = Forall (apply s1 convertedGenerics) (apply s1 closureTy)
         let newExt = apply s1 $ MkExtension name extTy newScheme
+        exts <- gets extensions
+        let appliedExts = Set.map (apply s1) (exts <> Set.singleton newExt)
 
-        modifyIORef' checkState $ \s ->
-          s
-            { extensions =
-                removeDuplicates $ Set.delete ext (extensions s) <> Set.singleton newExt
-            }
-        (s2, _) <- solveExtend (map (second (apply s1)) cs.extConstraints)
+        (s2, _) <- solveExtend (map (second (apply s1)) cs.extConstraints) appliedExts
         let s3 = s2 <> s1
         updateSubst s3
 

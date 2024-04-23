@@ -69,6 +69,7 @@ synthDecl
         writeIORef cyclicCounter 0
         let constraint = MkConstraints cs'' cs'.extConstraints cs'.substitution
         s1 <- solveConstraints constraint
+        updateSubst s1
         pure ((exprTy, b), s1)
 
       _ -> throw $ CompilerError "Generic mutable variables are not supported"

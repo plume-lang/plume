@@ -17,21 +17,13 @@ errorStack = unsafePerformIO $ newIORef mempty
 solve :: [PlumeConstraint] -> Checker Substitution
 solve [] = pure Map.empty
 solve ((p, c) : cs) = do
-  -- Get the current substitution to apply it to the constraint
-  -- that need to be solved 
-  stSub <- getSubst
-  s <- withPosition p $ solveConstraint (apply stSub c)
-
-  -- Updating the substitution with the new one from solved constraint
-  updateSubst s
+  s <- withPosition p $ solveConstraint c
 
   -- Solving remaining constraints
   s' <- solve (map (second $ apply s) cs)
 
-  -- And re-updating the substitution with the new one merged
-  let s'' = s' <> s
-  updateSubst s''
-  pure s''
+  -- And returning the new one merged
+  pure (s' <> s)
 
 -- | Solve type constraints using the `mgu` unification algorithm
 solveConstraint :: TypeConstraint -> Checker Substitution
@@ -46,33 +38,27 @@ solveConstraint (Hole _) =
 -- | Find an extension with a specific type without throwing
 -- | any error.
 findExtensionWithType
-  :: Text -> PlumeType -> PlumeType -> Checker (Either PlumeError Extension)
-findExtensionWithType n t _ = do
-  -- Getting the current substitution to apply it to the extension list
-  sub <- getSubst
-  exts <- Set.toList . applyExts sub <$> gets extensions
-  let t' = apply sub t
-
+  :: Text
+  -> PlumeType
+  -> Set Extension
+  -> Checker (Either PlumeError Extension)
+findExtensionWithType n t exts = do
   -- Finding the extension with the same name and type that unifies
   -- with the given type
   let found =
-        filter
+        Set.filter
           ( \(MkExtension n' _ (Forall _ sndTy)) ->
               n == n'
-                && isRight (mgu t' sndTy)
+                && isRight (mgu t sndTy)
           )
           exts
-  case found of
-    -- If a single extension is found, return it
-    [ext'] -> pure $ Right ext'
-
-    -- If no extension is found, return an error
-    [] -> Left <$> throw' (NoExtensionFound n t')
-
-    -- Otherwise, it means that multiple extensions were found
-    _ -> do
-      let found' = map (\(MkExtension _ ty _) -> ty) found
-      Left <$> throw' (MultipleExtensionsFound n found' t')
+  
+  if Set.null found then Left <$> throw' (NoExtensionFound n t)
+  else if Set.size found == 1 then pure $ Right $ Set.findMin found
+  else do
+    let foundL = Set.toList found
+    let found' = map (\(MkExtension _ ty _) -> ty) foundL
+    Left <$> throw' (MultipleExtensionsFound n found' t)
 
 -- | Check if a type is not a type variable
 isNotTVar :: PlumeType -> Bool
@@ -98,10 +84,11 @@ maxCyclicCounter :: Int
 maxCyclicCounter = 15
 
 -- | Resolve cyclic constraints
-resolveCyclic :: [PlumeConstraint] -> Checker (Substitution, [PlumeConstraint])
-resolveCyclic cs = do
-  s <- getSubst
-
+resolveCyclic 
+  :: [PlumeConstraint]
+  -> Set Extension
+  -> Checker (Substitution, [PlumeConstraint])
+resolveCyclic cs exts = do
   -- Checking if the cyclic maximum counter has been reached
   counter <- readIORef cyclicCounter
   when (counter > maxCyclicCounter) $ do
@@ -119,35 +106,34 @@ resolveCyclic cs = do
   modifyIORef' cyclicCounter (+ 1)
 
   -- Solving the constraints
-  s' <- solveExtend (map (second (apply s)) cs)
+  s' <- solveExtend cs exts
 
   -- Resetting the cyclic counter as the resolution was successful
   -- and updating the substitution and finally returning the result
   modifyIORef' cyclicCounter (const 0)
-  updateSubst (fst s')
+
   pure s'
 
 -- | Type extension constraint resolution algorithm
 solveExtend
-  :: [PlumeConstraint] -> Checker (Substitution, [PlumeConstraint])
-solveExtend (x@(p, DoesExtend t name funTy) : xs) = withPosition p $ do
-  s1 <- getSubst
-
+  :: [PlumeConstraint]
+  -> Set Extension
+  -> Checker (Substitution, [PlumeConstraint])
+solveExtend (x@(p, DoesExtend _ name funTy) : xs) exts = withPosition p $ do
   -- Trying to find an extension that matches the constraint
-  ext <- findExtensionWithType name funTy t
+  ext <- findExtensionWithType name funTy exts
   case ext of
     -- If an extension is found, we try to unify the function type
     -- with the extension type
     Right (MkExtension _ _ sch) -> do
-      extFun <- apply s1 <$> instantiate sch
-      let s2 = mgu (apply s1 funTy) extFun
+      extFun <- instantiate sch
+      let s2 = mgu funTy extFun
       case s2 of
         Right s -> do
-          let s' = s <> s1
-          updateSubst s'
-
+          let exts' = Set.map (apply s) exts
           -- Solving the remaining constraints
-          solveExtend (map (second $ apply s') xs)
+          (s', cs) <- solveExtend (map (second $ apply s) xs) exts'
+          pure (s' <> s, cs)
         Left e -> throw e
 
     -- If no extension is found, we add the error to the error stack
@@ -155,20 +141,19 @@ solveExtend (x@(p, DoesExtend t name funTy) : xs) = withPosition p $ do
     Left e@(_, err) -> do
       modifyIORef' errorStack (Set.insert e)
       
-      (s1', _) <- solveExtend xs
-      (s2', cs1) <- resolveCyclic [second (apply s1') x]
+      (s1', _) <- solveExtend xs exts
+      let exts' = Set.map (apply s1') exts
+      (s2', cs1) <- resolveCyclic [second (apply s1') x] exts'
 
       let s3 = s2' <> s1'
       case cs1 of
         -- If no constraints are left, we return the substitution
-        [] -> updateSubst s3 $> (s3, cs1)
+        [] -> return (s3, cs1)
 
         -- Otherwise, we throw the error
         _ -> throw (apply s3 err)
-solveExtend (_ : xs) = solveExtend xs
-solveExtend [] = do
-  s <- getSubst
-  pure (s, [])
+solveExtend (_ : xs) exts = solveExtend xs exts
+solveExtend [] _ = pure (Map.empty, [])
 
 -- | Constraint solving main function
 solveConstraints :: Constraints -> Checker Substitution
@@ -181,7 +166,14 @@ solveConstraints cs = do
 
   -- Solving the extension constraints using the substitution
   -- from the type constraints
-  (s', _) <- solveExtend (map (second $ apply s) cs.extConstraints)
+  (s', _) <- case cs.extConstraints of
+    [] -> pure (Map.empty, [])
+    xs -> do
+      generalSub <- getSubst
+      let newSub = s <> generalSub
+      exts <- Set.map (apply newSub) <$> gets extensions
+      
+      solveExtend (map (second $ apply newSub) xs) exts
 
   -- Merging the two substitutions together
   pure $ s' <> s
