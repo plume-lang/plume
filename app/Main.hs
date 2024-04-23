@@ -20,6 +20,7 @@ import Plume.TypeChecker.Checker
 import System.Directory
 import System.FilePath
 import Prelude hiding (putStrLn, readFile)
+import System.IO.Pretty
 
 fromEither :: a -> Either b a -> a
 fromEither _ (Right a) = a
@@ -34,9 +35,7 @@ main = do
     Just file -> do
       doesFileExist file >>= \case
         False -> do
-          putStr "File "
-          putStr file
-          putStrLn " does not exist"
+          ppFailure ("File " <> fromString file <> " does not exist")
           exitFailure
         True -> pure ()
 
@@ -50,8 +49,11 @@ main = do
             Just _ -> ("std:prelude", Nothing) : paths
             Nothing -> paths
 
+      ppBuilding "Parsing file and dependencies..."
       runConcreteToAbstract env dir paths' file `with` \ast -> do
+        ppBuilding "Typechecking..."
         runSynthesize ast `with` \tlir -> do
+          ppBuilding "Compiling and optimizing..."
           erased <- erase tlir
           runClosureConversion erased `with` \closed -> do
             desugared <- desugar closed
@@ -60,8 +62,8 @@ main = do
             sbc <- serialize bytecode
             let new_path = file -<.> "bin"
             writeFileLBS new_path sbc
-            putStrLn $ "Bytecode written to " <> fromString new_path
-    Nothing -> putStrLn "No file provided"
+            ppSuccess ("Bytecode written to " <> fromString new_path)
+    Nothing -> ppFailure "No input file provided"
 
 printBytecode :: Program -> IO ()
 printBytecode bytecode =

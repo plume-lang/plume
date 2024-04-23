@@ -7,6 +7,7 @@ module Plume.Syntax.Internal.Pretty.ANSI (
   anCol,
   anBold,
   anItalic,
+  anColDull,
 ) where
 
 import Prettyprinter as PP
@@ -27,6 +28,9 @@ class ANSIPretty a where
 
 anCol :: Color -> Doc AnsiStyle -> Doc AnsiStyle
 anCol = annotate . color
+
+anColDull :: Color -> Doc AnsiStyle -> Doc AnsiStyle
+anColDull = annotate . colorDull
 
 anBold :: Doc AnsiStyle -> Doc AnsiStyle
 anBold = annotate bold

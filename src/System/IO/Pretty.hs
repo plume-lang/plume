@@ -1,4 +1,11 @@
-module System.IO.Pretty (printText, ppPut, ppPrint) where
+module System.IO.Pretty (
+  printText,
+  ppPut,
+  ppPrint,
+  ppSuccess,
+  ppFailure,
+  ppBuilding,
+) where
 
 import Data.Text.IO
 import Plume.Syntax.Internal.Pretty.ANSI
@@ -13,3 +20,12 @@ ppPut = putDoc . ansiPretty
 
 ppPrint :: (ANSIPretty a) => a -> IO ()
 ppPrint x = ppPut x >> putStrLn ""
+
+ppSuccess :: Text -> IO ()
+ppSuccess x = putDoc (anColDull Green "✓" <+> pretty x) >> putStrLn ""
+
+ppFailure :: Text -> IO ()
+ppFailure x = putDoc (anColDull Red "✗" <+> pretty x) >> putStrLn ""
+
+ppBuilding :: Text -> IO ()
+ppBuilding x = putDoc (anColDull Yellow "⚙" <+> pretty x) >> putStrLn ""
