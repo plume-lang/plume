@@ -42,3 +42,5 @@ build
 _*
 
 compile_commands.json
+
+*.plmc
