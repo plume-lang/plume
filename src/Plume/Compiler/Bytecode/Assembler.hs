@@ -194,7 +194,6 @@ assemble (Pre.DEIf e1 e2 e3) = do
   (e1', f) <- assembleCondition e1
   e2' <- concatMapM assembleStmt e2
   e3' <- concatMapM assembleStmt e3
-  print e2'
   pure $
     e1'
       ++ [f $ length e2' + (if containsReturn e2' then 1 else 2)]
