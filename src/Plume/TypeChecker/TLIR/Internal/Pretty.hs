@@ -17,7 +17,7 @@ instance {-# OVERLAPS #-} ANSIPretty Program where
   ansiPretty [] = mempty
 
 prettyTy :: PlumeType -> Doc AnsiStyle
-prettyTy (TypeVar (MkTyVar n)) = anCol Yellow ("t" <> pretty n)
+prettyTy t@(TypeVar _) = anCol Yellow (show t)
 prettyTy (TypeId n) = anItalic (pretty n)
 prettyTy (args :->: ret) =
   parens (hsep . punctuate comma $ map prettyTy args)
@@ -26,6 +26,7 @@ prettyTy (args :->: ret) =
 prettyTy (TTuple ts) = parens (hsep . punctuate comma $ map prettyTy ts)
 prettyTy (TList t) = brackets (prettyTy t)
 prettyTy (TypeApp t ts) = prettyTy t <> parens (hsep . punctuate comma $ map prettyTy ts)
+prettyTy (TypeQuantified n) = anItalic (pretty n)
 
 instance ANSIPretty PlumeType where ansiPretty = prettyTy
 

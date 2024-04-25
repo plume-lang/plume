@@ -13,9 +13,9 @@ synthNative (Pre.ENativeFunction fp name generics ty) = do
     Just (sch, pos) -> throwRaw (pos, DuplicateNative name sch)
     Nothing -> pure ()
 
-  convertedGenerics <- convert generics
+  void (convert generics :: Checker [QuVar])
   convertedTy <- convert ty
-  let scheme = Forall convertedGenerics convertedTy
+  let scheme = convertedTy
 
   insertEnvWith @"typeEnv" (<>) $ Map.singleton name scheme
   pos <- fetchPosition

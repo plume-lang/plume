@@ -4,9 +4,9 @@ import Data.Map qualified as Map
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Common.Annotation
 import Plume.TypeChecker.Checker.Monad
-import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
+import Plume.TypeChecker.Constraints.Solver (unifiesWith)
 
 synthClosure :: Infer -> Infer
 synthClosure infer (Pre.EClosure args ret body) = local id $ do
@@ -25,7 +25,7 @@ synthClosure infer (Pre.EClosure args ret body) = local id $ do
         infer body
 
   -- Unifying specified return type with the inferred return type
-  retTy `unifiesTo` convertedRet
+  retTy `unifiesWith` convertedRet
 
   -- Creating the closure type
   let closureTy = map (.annotationValue) convertedArgs :->: retTy
@@ -37,4 +37,4 @@ synthClosure _ _ = throw $ CompilerError "Only closures are supported"
 -- | arguments.
 createEnvFromAnnotations :: [Annotation PlumeType] -> Map Text PlumeScheme
 createEnvFromAnnotations xs =
-  Map.fromList $ map (\(Annotation n ty) -> (n, Forall [] ty)) xs
+  Map.fromList $ map (\(Annotation n ty) -> (n, ty)) xs

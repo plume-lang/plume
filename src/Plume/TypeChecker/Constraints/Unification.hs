@@ -1,18 +1,53 @@
+{-# LANGUAGE LambdaCase #-}
 module Plume.TypeChecker.Constraints.Unification where
 
-import Data.Map qualified as Map
-import Data.Set qualified as Set
 import Plume.TypeChecker.Constraints.Definition
 import Plume.TypeChecker.Monad
 
-infix 4 `unifiesTo`
+-- infix 4 `unifiesTo`
+
+doesUnifyWith :: PlumeType -> PlumeType -> IO Bool
+doesUnifyWith t t' = do
+  t1 <- compressPaths t
+  t2 <- compressPaths t'
+  doesUnifyWithH t1 t2
+
+doesUnifyWithH :: PlumeType -> PlumeType -> IO Bool
+doesUnifyWithH t1 t2 | t1 == t2 = pure True
+doesUnifyWithH (TypeVar tv) t = do
+  tv' <- readIORef tv
+  case tv' of
+    Link t' -> doesUnifyWith t' t
+    Unbound _ _ -> pure True
+doesUnifyWithH t (TypeVar tv) = do
+  tv' <- readIORef tv
+  case tv' of
+    Link t' -> doesUnifyWith t t'
+    Unbound _ _ -> pure True
+doesUnifyWithH (TypeApp t1 t1') (TypeApp t2 t2') =
+  and <$> zipWithM doesUnifyWith (t1:t1') (t2:t2')
+doesUnifyWithH (TypeQuantified q1) t = not <$> doesOccurQ q1 t
+doesUnifyWithH t (TypeQuantified q2) = not <$> doesOccurQ q2 t
+doesUnifyWithH _ _ = pure False
+
+doesOccurQ :: QuVar -> PlumeType -> IO Bool
+doesOccurQ q (TypeVar tv) = do
+  tv' <- readIORef tv
+  case tv' of
+    Link t -> doesOccurQ q t
+    Unbound _ _ -> pure False
+doesOccurQ q (TypeApp t ts) = do
+  b <- doesOccurQ q t
+  b' <- or <$> traverse (doesOccurQ q) ts
+  pure (b || b')
+doesOccurQ _ _ = pure False
 
 -- | Adding a constraint equivalence between two types onto
 -- | the constraint stack
-unifiesTo :: PlumeType -> PlumeType -> Checker ()
-t1 `unifiesTo` t2 = do
-  p <- fetchPosition
-  pushConstraint @"tyConstraints" (p, t1 :~: t2)
+-- unifiesTo :: PlumeType -> PlumeType -> Checker ()
+-- t1 `unifiesTo` t2 = do
+--   p <- fetchPosition
+--   pushConstraint @"tyConstraints" (p, t1 :~: t2)
 
 -- | Creating a constraint from a type constraint
 createConstraint :: TypeConstraint -> Checker PlumeConstraint
@@ -20,58 +55,61 @@ createConstraint c = do
   p <- fetchPosition
   pure (p, c)
 
--- | Adding a extension constraint onto the constraint stack
-doesExtend :: PlumeType -> Text -> PlumeType -> Checker ()
-doesExtend t n a = do
-  p <- fetchPosition
-  pushConstraint @"extConstraints" (p, DoesExtend t n a)
+-- check to see if a TVar (the first argument) occurs in the type
+-- given as the second argument. Fail if it does.
+-- At the same time, update the levels of all encountered free
+-- variables to be the min of variable's current level and
+-- the level of the given variable tvr.
+doesOccur :: IORef TyVar -> PlumeType -> IO ()
+doesOccur tvr (TypeVar tv') = do
+  tvr' <- readIORef tvr
+  tvr'' <- readIORef tv'
+  case tvr'' of
+    Link t -> doesOccur tvr t
+    Unbound name lvl -> do
+      let newMinLvl = case tvr' of
+            Link _ -> lvl
+            Unbound _ lvl' -> min lvl' lvl
+      writeIORef tv' (Unbound name newMinLvl)
+doesOccur tv (TypeApp t1 t2) = do
+  doesOccur tv t1
+  traverse_ (doesOccur tv) t2
+doesOccur _ _ = pure ()
 
--- | Unification algorithm for type variables:
--- | - If the two types are the same, return the empty substitution
--- | - If one of the types is a type variable, return a substitution
--- |   that binds the type variable to the other type. But only if the
--- |   type variable is not in the free variables of the other type.
-variable :: TyVar -> PlumeType -> Either TypeError Substitution
-variable n t
-  | t == TypeVar n = Right Map.empty
-  | n `Set.member` free t =
-      Left (InfiniteType n t)
-  | otherwise = Right $ Map.singleton n t
+mgu :: PlumeType -> PlumeType -> Checker ()
+mgu t t' = do
+  t1 <- liftIO $ compressPaths t
+  t2 <- liftIO $ compressPaths t'
+  if t1 == t2
+    then pure ()
+    else case (t1, t2) of
+      (TypeVar tv1, _) -> readIORef tv1 >>= \case
+        Link tl -> mgu tl t2
+        Unbound _ _ -> liftIO $ do
+          doesOccur tv1 t2
+          writeIORef tv1 (Link t2)
+      (_, TypeVar tv2) -> readIORef tv2 >>= \case
+        Link tl -> mgu t1 tl
+        Unbound _ _ -> liftIO $ do
+          doesOccur tv2 t1
+          writeIORef tv2 (Link t1)
+      (TypeApp t1a t1b, TypeApp t2a t2b) -> do
+        mgu t1a t2a
+        zipWithM_ mgu t1b t2b
+      (TypeId n, TypeId n') | n == n' -> pure ()
+      _ -> throw (UnificationFail t1 t2)
 
--- | Unification algorithm for two types:
--- | - If the two types are the same, return the empty substitution
--- | - If one of the types is a type variable, unify them using the
--- |   `variable` function
--- | - If the two types are type applications, unify their arguments
--- |   and their head
--- | - If the two types are type identifiers, check if they are the same
--- |   and return the empty substitution
--- | - Otherwise, return a unification error
-mgu
-  :: PlumeType
-  -> PlumeType
-  -> Either TypeError Substitution
-mgu (TypeVar i) t = variable i t
-mgu t (TypeVar i) = variable i t
-mgu (TypeApp t1 t2) (TypeApp t3 t4) = mguMany (t1 : t2) (t3 : t4)
-mgu t1@(TypeId n) t2@(TypeId n') =
-  if n == n'
-    then Right Map.empty
-    else Left (UnificationFail t1 t2)
-mgu t1 t2 = Left (UnificationFail t1 t2)
-
--- | Unifying multiple types together.
--- | Given types must follow some conditions such as having the same length.
--- | It there are no types to unify, return the empty substitution.
--- | Otherwise, unify the first types together and then unify the rest of the
--- | types recursively using the last substitution.
-mguMany
-  :: [PlumeType]
-  -> [PlumeType]
-  -> Either TypeError Substitution
-mguMany [] [] = Right Map.empty
-mguMany (t1 : t1s) (t2 : t2s) = do
-  s1 <- mgu t1 t2
-  s2 <- mguMany (apply s1 t1s) (apply s1 t2s)
-  return $ s2 <> s1
-mguMany t1s t2s = Left (UnificationMismatch t1s t2s)
+compressPaths :: PlumeType -> IO PlumeType
+compressPaths (TypeVar tv) = do
+  tv' <- readIORef tv
+  case tv' of
+    Link t -> do
+      t' <- compressPaths t
+      writeIORef tv (Link t')
+      pure t'
+    Unbound _ _ -> pure (TypeVar tv)
+compressPaths (TypeApp t ts) = do
+  t' <- compressPaths t
+  ts' <- traverse compressPaths ts
+  pure (TypeApp t' ts')
+compressPaths t = pure t

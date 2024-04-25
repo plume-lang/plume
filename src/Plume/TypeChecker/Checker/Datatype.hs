@@ -17,7 +17,7 @@ datatypes = unsafePerformIO $ newIORef mempty
 
 synthDataType :: Infer
 synthDataType (Pre.EType (Annotation name generics) cons) = do
-  convertedGenerics :: [TyVar] <- mapM convert generics
+  convertedGenerics :: [PlumeType] <- mapM convert generics
 
   -- Creating the header of the data type: if there are no generics
   -- the header is just the type name, otherwise it becomes a type
@@ -25,10 +25,10 @@ synthDataType (Pre.EType (Annotation name generics) cons) = do
   let header =
         if null generics
           then TypeId name
-          else TypeApp (TypeId name) $ map TypeVar convertedGenerics
+          else TypeApp (TypeId name) convertedGenerics
 
   -- Synthesizing the constructors of the data type
-  (cons', m) <- mapAndUnzipM (synthCons (convertedGenerics, header)) cons
+  (cons', m) <- mapAndUnzipM (synthCons ([], header)) cons
 
   -- Inserting the data type in the metadata
   modifyIORef datatypes (M.insert name (M.unions m))
@@ -41,17 +41,17 @@ synthCons
   :: ([TyVar], PlumeType)
   -> TypeConstructor Pre.PlumeType
   -> Checker (TypeConstructor PlumeType, Map Text Int)
-synthCons (gens, header) (TVariable name) = do
-  let scheme = Forall gens header
+synthCons (_, header) (TVariable name) = do
+  let scheme = header
   insertEnv @"datatypeEnv" name scheme
 
   let dataType = M.singleton name 0
 
   pure (TVariable name, dataType)
-synthCons (gens, header) (TConstructor name args) = do
+synthCons (_, header) (TConstructor name args) = do
   args' <- mapM convert args
   let ty = args' :->: header
-  let scheme = Forall gens ty
+  let scheme = ty
   insertEnv @"datatypeEnv" name scheme
 
   let dataType = M.singleton name (length args)

@@ -4,6 +4,7 @@ module Plume.TypeChecker.Monad (
   module Monad,
   runChecker,
   Checker,
+  CheckerT(..),
   throw,
   throwRaw,
   insertWith,
@@ -11,6 +12,7 @@ module Plume.TypeChecker.Monad (
   insertEnv,
   insertEnvWith,
   deleteEnv,
+  deleteManyEnv,
   replaceEnv,
   fresh,
   instantiate,
@@ -20,10 +22,11 @@ module Plume.TypeChecker.Monad (
   localPosition,
   maybeM,
   extractFromArray,
-  pushConstraint,
-  getSubst,
-  updateSubst,
-  getLocalConstraints,
+  enterLevel,
+  exitLevel,
+  removeLink,
+  removeExtLink,
+  removeNewEntries,
 ) where
 
 import Control.Monad.Except
@@ -31,10 +34,10 @@ import Control.Monad.Exception
 import Data.List qualified as L
 import Data.Map qualified as Map
 import Data.Text.IO qualified as T
+import Data.Text qualified as T
 import GHC.Records
 import Plume.Syntax.Concrete (Position)
 import Plume.TypeChecker.Monad.Error as Monad
-import Plume.TypeChecker.Monad.Free as Monad
 import Plume.TypeChecker.Monad.State as Monad
 import Plume.TypeChecker.Monad.Type as Monad
 
@@ -136,20 +139,20 @@ insertWith f value = do
 
 -- | Push a constraint into the constraint stack
 -- | Used to generate type constraints during the type-checking process.
-{-# INLINE pushConstraint #-}
-pushConstraint
-  :: forall l a
-   . (HasField l Constraints [a])
-  => a
-  -> Checker ()
-pushConstraint c = do
-  modify $ \s ->
-    s
-      { constraints =
-          setField @l
-            s.constraints
-            (getField @l s.constraints ++ [c])
-      }
+-- {-# INLINE pushConstraint #-}
+-- pushConstraint
+--   :: forall l a
+--    . (HasField l Constraints [a])
+--   => a
+--   -> Checker ()
+-- pushConstraint c = do
+--   modify $ \s ->
+--     s
+--       { constraints =
+--           setField @l
+--             s.constraints
+--             (getField @l s.constraints ++ [c])
+--       }
 
 -- | Search for a key in the environment
 -- | Equivalent to `Map.lookup` but for the environment.
@@ -191,6 +194,16 @@ deleteEnv name = do
   let rec' = setField @l env (Map.delete name (getField @l env))
   modify $ \s -> setField @"environment" s rec'
 
+deleteManyEnv 
+  :: forall l a
+   . (HasField l Environment (Map Text a))
+  => [Text]
+  -> Checker ()
+deleteManyEnv names = do
+  env <- get <&> environment
+  let rec' = setField @l env (foldr Map.delete (getField @l env) names)
+  modify $ \s -> setField @"environment" s rec'
+
 -- | Replace the environment with a new one
 -- | This function modifies the environment in the state.
 replaceEnv
@@ -216,19 +229,57 @@ insertEnvWith f value = do
   modify $ \s ->
     setField @"environment" s (setField @l env (f value env'))
 
+genSymbol :: Checker Text
+genSymbol = do
+  s <- readIORef currentSymbol
+  writeIORef currentSymbol (s + 1)
+  if s < 26
+    then pure $ T.singleton (chr (s + 97))
+    else pure $ "t" <> show s
+
+enterLevel :: Checker ()
+enterLevel = modifyIORef' currentLevel (+ 1)
+
+exitLevel :: Checker ()
+exitLevel = modifyIORef' currentLevel (\x -> x - 1)
+  
 -- | Generate a fresh type variable
 fresh :: Checker PlumeType
 fresh = do
-  n <- get <&> nextTyVar
-  modify $ \s -> s {nextTyVar = n + 1}
-  pure $ TypeVar (MkTyVar n)
+  s <- genSymbol
+  lvl <- readIORef currentLevel
+  ref <- newIORef (Unbound s lvl)
+  pure $ TypeVar ref
 
--- | Instantiate a polymorphic type with fresh type variables
--- | For instance, `forall a. a -> a` will be instantiated to `t0 -> t0`
-instantiate :: PlumeScheme -> Checker PlumeType
-instantiate (Forall vars ty) = do
-  subst <- Map.fromList <$> traverse (\v -> (v,) <$> fresh) vars
-  pure $ apply subst ty
+type Substitution = Map Text PlumeType
+
+-- | instantiation: replace schematic variables with fresh TVar
+instantiate :: PlumeType -> Checker PlumeType
+instantiate = fmap fst <$> go mempty
+  where
+    go :: Substitution -> PlumeType -> Checker (PlumeType, Substitution)
+    go subst (TypeQuantified name) = case Map.lookup name subst of
+      Just t -> pure (t, subst)
+      Nothing -> do
+        t <- fresh
+        pure (t, Map.insert name t subst)
+    go subst (TypeApp t ts) = do
+      (t', subst') <- go subst t
+      (ts', subst'') <- goMany subst' ts
+      pure (TypeApp t' ts', subst'')
+    go subst (TypeVar ref) = do
+      v <- readIORef ref
+      case v of
+        Link t -> go subst t
+        Unbound _ _ -> pure (TypeVar ref, subst)
+    go subst t = pure (t, subst)
+
+    goMany :: Substitution -> [PlumeType] -> Checker ([PlumeType], Substitution)
+    goMany subst (x:xs) = do
+      (x', subst') <- go subst x
+      (xs', subst'') <- goMany subst' xs
+      pure (x':xs', subst'')
+    goMany subst [] = pure ([], subst)
 
 -- | Fetch the current position from the position stack
 fetchPosition :: Checker Position
@@ -282,67 +333,24 @@ extractFromArray ls = do
         CompilerError $
           "Expected a single element, received: " <> show (length r)
 
--- | Update the substitution with a new substitution
--- | This function modifies the substitution in the state.
-{-# INLINE updateSubst #-}
-updateSubst :: Substitution -> Checker ()
-updateSubst s2 = do
-  modify $ \st ->
-    st {constraints = st.constraints {substitution = s2 <> st.constraints.substitution}}
-
--- | Get the current substitution
-{-# INLINE getSubst #-}
-getSubst :: Checker Substitution
-getSubst = gets (substitution . constraints)
-
--- | Perform a computation locally and return the result combined with
--- | the generated constraints from that action.
--- | This function do not localize some of the state fields:
--- |  - removing new entries from the constraints as they're already
--- |    returned 
--- |  - next type variable as each type variable should be unique globally
--- |    (there shouln't be any type variable conflict because it could create
--- |    some substitution application issues)
--- |  - extensions as they're global and should be the same for the whole
--- |    type-checking process
--- |  - positions because if we need to localize the positions, we should
--- |    use `localPosition` instead
-getLocalConstraints :: Checker a -> Checker (a, Constraints)
-getLocalConstraints m = do
-  old <- readIORef checkState
-  a <- m
-  s <- readIORef checkState
-  writeIORef
-    checkState
-    ( old
-        { constraints = removeNewEntriesCons s.constraints old.constraints
-        , nextTyVar = s.nextTyVar
-        , extensions = s.extensions
-        , positions = s.positions
-        }
-    )
-  let sCons = s.constraints
-      oCons = old.constraints
-  let mkCons =
-        MkConstraints
-          (sCons.tyConstraints L.\\ oCons.tyConstraints)
-          (sCons.extConstraints L.\\ oCons.extConstraints)
-          (sCons.substitution <> oCons.substitution)
-  return (a, mkCons)
-
--- | Remove new entries from the constraints
-removeNewEntriesCons :: Constraints -> Constraints -> Constraints
-removeNewEntriesCons xs ys =
-  MkConstraints
-    (removeNewEntries ty1 ty2)
-    (removeNewEntries ext1 ext2)
-    (xs.substitution <> ys.substitution)
- where
-  ty1 = xs.tyConstraints
-  ty2 = ys.tyConstraints
-  ext1 = xs.extConstraints
-  ext2 = ys.extConstraints
-
 -- | Remove new entries between the "old" `xs` list and the "new" `ys` list 
 removeNewEntries :: (Eq a) => [a] -> [a] -> [a]
 removeNewEntries xs ys = xs L.\\ (xs L.\\ ys)
+
+removeLink :: PlumeType -> Checker PlumeType
+removeLink (TypeVar ref) = do
+  v <- readIORef ref
+  case v of
+    Link t -> removeLink t
+    Unbound {} -> pure $ TypeVar ref
+removeLink (TypeApp t ts) = do
+  t' <- removeLink t
+  ts' <- mapM removeLink ts
+  pure $ TypeApp t' ts'
+removeLink t = pure t
+
+removeExtLink :: Extension -> Checker Extension
+removeExtLink (MkExtension name ty scheme) = do
+  ty' <- removeLink ty
+  scheme' <- removeLink scheme
+  pure $ MkExtension name ty' scheme'

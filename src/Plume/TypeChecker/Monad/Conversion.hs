@@ -19,7 +19,7 @@ instance Pre.PlumeType `ConvertsTo` Post.PlumeType where
     -- Check if the type is bound by a generic type variable
     -- in the generics environment.
     searchEnv @"genericsEnv" n >>= \case
-      Just t -> pure (Post.TypeVar t)
+      Just t -> pure t
       Nothing -> pure (Post.TypeId n)
   convert (Pre.TApp x xs) = do
     x' <- convert x
@@ -31,37 +31,30 @@ instance (a `ConvertsTo` PlumeType) => Maybe a `ConvertsTo` PlumeType where
     Just x -> convert x
     Nothing -> fresh
 
-instance Text `ConvertsTo` TyVar where
+instance Text `ConvertsTo` Post.QuVar where
   convert v = do
     searchEnv @"datatypeEnv" v >>= \case
       Just _ ->
         throw $ CompilerError "Generic type variable shadowing datatype"
       Nothing -> do
-        n <- gets nextTyVar
-        modify' $ \s -> s {nextTyVar = n + 1}
-        let ty = Post.MkTyVar n
+        let ty = Post.TypeQuantified v
         insertEnv @"genericsEnv" v ty
-        pure ty
+        pure v
 
 instance (Maybe Pre.PlumeType, Bool) `ConvertsTo` Post.PlumeType where
   convert (x, True) = TMut <$> convert x
   convert (x, False) = convert x
 
-instance Pre.PlumeGeneric `ConvertsTo` Post.TyVar where
+instance Pre.PlumeGeneric `ConvertsTo` Post.PlumeType where
   convert (Pre.GVar v) = do
     searchEnv @"datatypeEnv" v >>= \case
       Just _ ->
         throw $ CompilerError "Generic type variable shadowing datatype"
       Nothing -> do
-        n <- gets nextTyVar
-        modify' $ \s -> s {nextTyVar = n + 1}
-        let ty = Post.MkTyVar n
+        let ty = Post.TypeQuantified v
         insertEnv @"genericsEnv" v ty
         pure ty
   convert _ = throw $ CompilerError "Not implemented"
-
-instance Post.TyVar `ConvertsTo` Int where
-  convert (MkTyVar n) = pure n
 
 instance (a `ConvertsTo` b) => [a] `ConvertsTo` [b] where
   convert = mapM convert

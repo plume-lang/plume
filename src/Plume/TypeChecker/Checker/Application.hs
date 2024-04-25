@@ -2,8 +2,8 @@ module Plume.TypeChecker.Checker.Application where
 
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.TypeChecker.Checker.Monad
-import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.TLIR qualified as Post
+import Plume.TypeChecker.Constraints.Solver (unifiesWith, doesExtend)
 
 synthApp :: Infer -> Infer
 synthApp infer (Pre.EApplication f xs) = local id $ do
@@ -25,7 +25,7 @@ synthApp infer (Pre.EApplication f xs) = local id $ do
   -- When unifying the two types, we get the following substitution:
   -- `t1 ~ str` and `t2 ~ int`
   ret <- fresh 
-  t `unifiesTo` ts :->: ret
+  t `unifiesWith` ts :->: ret
 
   -- Checking if the function is an extension
   exts <- gets extensions
@@ -54,7 +54,7 @@ doesExtensionExistM name = do
   pure . isJust $ find ((== name) . extName) exts
 
 -- | Check extension existence in a given set of extensions
-doesExtensionExist :: Text -> Set Extension -> Bool
+doesExtensionExist :: Text -> [Extension] -> Bool
 doesExtensionExist name exts = isJust $ find ((== name) . extName) exts
 
 -- | Check if an expression is an extension

@@ -2,22 +2,42 @@
 
 module Plume.TypeChecker.Monad.Type where
 
+import GHC.Show
+import GHC.IO
+import Prelude hiding (show)
+
+type Level = Int
+
 -- | Defining a meta-variable for types which represents both user-defined
 -- | generics and unresolved types.
-newtype TyVar = MkTyVar {unTyVar :: Int}
-  deriving (Eq, Ord, Show)
+data TyVar
+  = Link PlumeType
+  | Unbound QuVar Level
+  deriving (Eq, Show)
+
+type QuVar = Text
 
 data PlumeType
-  = TypeVar TyVar
+  = TypeVar (IORef TyVar)
+  | TypeQuantified QuVar
   | TypeId Text
   | TypeApp PlumeType [PlumeType]
-  deriving (Eq, Show, Ord)
+  deriving (Eq)
+
+instance Show PlumeType where
+  show (TypeVar ref) = do
+    let v = unsafePerformIO $ readIORef ref
+    case v of
+      Link t -> "link(" <> show t <> ")"
+      Unbound q l -> "U" <> toString q <> "-" <> show l
+  show (TypeQuantified q) = "@" <> toString q
+  show (args :->: ret) = "(" <> show args <> " -> " <> show ret <> ")"
+  show (TypeId t) = toString t
+  show (TypeApp t ts) = show t <> " " <> show ts  
 
 -- | A type scheme is a way to quantify over types in a type system.
 -- | It is used to represent polymorphic types in the type system.
-data PlumeScheme
-  = Forall [TyVar] PlumeType
-  deriving (Eq, Show, Ord)
+type PlumeScheme = PlumeType
 
 -- TYPE SYNONYMS SHORTCUTS
 

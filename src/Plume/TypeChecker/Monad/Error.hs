@@ -35,14 +35,15 @@ data TypeError
   | UnboundVariable Text
   | DuplicateNative Text PlumeScheme
   | CompilerError Text
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Show)
 
 -- THROWABLE INSTANCES FOR TYPE ERROR
 
 instance Throwable PlumeType
 
 instance Throwable TyVar where
-  showError (MkTyVar i) = "t" <> show i
+  showError (Link i) = "t" <> show i
+  showError (Unbound i _) = "@" <> show i
 
 instance (Throwable a) => Throwable [a] where
   showError = T.intercalate ", " . map showError
@@ -70,8 +71,8 @@ instance Throwable TypeError where
   showError (DuplicateNative n s) =
     "Native function " <> showError (n, s) <> " already defined"
 
-instance Throwable (Text, PlumeScheme) where
-  showError (n, Forall vs t) = n <> "<" <> showError vs <> ">: " <> showError t
+instance Throwable a => Throwable (Text, a) where
+  showError (n, e) = n <> ": " <> showError e
 
 type PlumeError = (Position, TypeError)
 

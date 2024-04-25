@@ -1,97 +1,84 @@
 module Plume.TypeChecker.Monad.Free where
 
-import Data.Map qualified as Map
-import Data.Set qualified as Set
 import Plume.Syntax.Common.Annotation
-import Plume.TypeChecker.Monad.Error
 import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR
+import Plume.TypeChecker.Constraints.Unification (compressPaths)
+import Plume.Syntax.Concrete (TypeConstructor(..))
 
-type Substitution = Map TyVar PlumeType
+freeAnn :: Annotation PlumeType -> IO (Annotation PlumeType)
+freeAnn (Annotation name t) = do
+  t' <- compressPaths t
+  pure $ Annotation name t'
 
--- | Semigroup instance for Substitution that merges/compose
--- | two substitutions together.
--- | 
--- | The merging operation just applies the first substitution to the second
--- | substitution and then merges the two substitutions together.
-instance {-# OVERLAPPING #-} Semigroup Substitution where
-  s1 <> s2 = Map.map (apply s1) s2 `Map.union` s1
+freeTypeConstructor :: TypeConstructor PlumeType -> IO (TypeConstructor PlumeType)
+freeTypeConstructor (TVariable name) = pure $ TVariable name
+freeTypeConstructor (TConstructor name xs) = do
+  xs' <- mapM compressPaths xs
+  pure $ TConstructor name xs'
 
--- | Free represents types that are not bound in a given expression.
--- | It provides a way to get the free type variables in a type and to apply
--- | a substitution to a type.
-class Free a where
-  free :: a -> Set TyVar
-  apply :: Substitution -> a -> a
+freePattern :: Pattern -> IO Pattern
+freePattern (PVariable name t) = PVariable name <$> compressPaths t
+freePattern (PConstructor name xs) = PConstructor name <$> mapM freePattern xs
+freePattern (PSpecialVar name t) = PSpecialVar name <$> compressPaths t
+freePattern (PList xs sl) = PList <$> mapM freePattern xs <*> traverse freePattern sl
+freePattern (PLiteral l) = pure $ PLiteral l
+freePattern PWildcard = pure PWildcard
 
--- FREE INSTANCES
-
-instance (Free a) => Free [a] where
-  free = foldMap free
-  apply = map . apply
-
-instance (Free a) => Free (Maybe a) where
-  free = foldMap free
-  apply s = fmap (apply s)
-
-instance (Free a) => Free (Annotation a) where
-  free (Annotation _ t) = free t
-  apply s (Annotation n t) = Annotation n (apply s t)
-
-instance (Free a, Free b) => Free (a, b) where
-  free (a, b) = free a <> free b
-  apply s (a, b) = (apply s a, apply s b)
-
-instance Free PlumeType where
-  free (TypeVar v) = Set.singleton v
-  free (TypeId _) = mempty
-  free (TypeApp f xs) = free f <> foldMap free xs
-
-  apply s (TypeVar v) = Map.findWithDefault (TypeVar v) v s
-  apply _ t@(TypeId _) = t
-  apply s (TypeApp f xs) = TypeApp (apply s f) (map (apply s) xs)
-
-instance Free PlumeScheme where
-  free (Forall vs t) = free t Set.\\ Set.fromList vs
-  apply s (Forall vs t) = Forall vs (apply (foldr Map.delete s vs) t)
-
-instance (Free t) => Free (TypedExpression t) where
-  free _ = mempty
-
-  apply s (EVariable n t) = EVariable n (apply s t)
-  apply s (EApplication f xs) = EApplication (apply s f) (apply s xs)
-  apply s (EClosure args ret body) = EClosure (apply s args) (apply s ret) (apply s body)
-  apply s (EConditionBranch cond then' else') = EConditionBranch (apply s cond) (apply s then') (apply s else')
-  apply _ (EType n ts) = EType n ts
-  apply s (EEqualsType e t) = EEqualsType (apply s e) t
-  apply s (EAnd e1 e2) = EAnd (apply s e1) (apply s e2)
-  apply s (EIndex e1 e2) = EIndex (apply s e1) (apply s e2)
-  apply s (EDeclaration a e1 e2) = EDeclaration (apply s a) (apply s e1) (apply s e2)
-  apply s (EMutDeclaration a e1 e2) = EMutDeclaration (apply s a) (apply s e1) (apply s e2)
-  apply s (EMutUpdate a e1 e2) = EMutUpdate (apply s a) (apply s e1) (apply s e2)
-  apply _ (ELiteral l) = ELiteral l
-  apply s (EExtVariable n t t') = EExtVariable n (apply s t) (apply s t')
-  apply s (EList xs) = EList (apply s xs)
-  apply s (EBlock xs) = EBlock (apply s xs)
-  apply s (ELocated e p) = ELocated (apply s e) p
-  apply s (ESwitch e cs) = ESwitch (apply s e) (apply s cs)
-  apply s (EReturn e) = EReturn (apply s e)
-  apply s (ENativeFunction fp n t) = ENativeFunction fp n (apply s t)
-  apply s (EExtensionDeclaration n t arg body) = EExtensionDeclaration n (apply s t) (apply s arg) (apply s body)
-  apply s (EUnMut e) = EUnMut (apply s e)
-
-instance (Free t) => Free (TypedPattern t) where
-  free _ = mempty
-  apply s (PVariable n t) = PVariable n (apply s t)
-  apply s (PConstructor n xs) = PConstructor n (apply s xs)
-  apply _ (PLiteral l) = PLiteral l
-  apply s (PSpecialVar n t) = PSpecialVar n (apply s t)
-  apply _ PWildcard = PWildcard
-  apply s (PList xs sl) = PList (apply s xs) (apply s sl)
-
-instance Free TypeError where
-  free _ = mempty
-  apply _ (CompilerError e) = CompilerError e
-  apply s (NoExtensionFound n t) = NoExtensionFound n (apply s t)
-  apply s (MultipleExtensionsFound n ts t) = MultipleExtensionsFound n (apply s ts) (apply s t)
-  apply _ e = e
+free :: Expression -> IO Expression
+free (EVariable name t) = do
+  t' <- compressPaths t
+  pure $ EVariable name t'
+free (EApplication f xs) = do
+  f' <- free f
+  xs' <- mapM free xs
+  pure $ EApplication f' xs'
+free (EExtVariable name t1 t2) = do
+  t1' <- compressPaths t1
+  t2' <- compressPaths t2
+  pure $ EExtVariable name t1' t2'
+free (EList xs) = EList <$> mapM free xs
+free (EEqualsType e t) = EEqualsType <$> free e <*> pure t
+free (EAnd e1 e2) = EAnd <$> free e1 <*> free e2
+free (EIndex e1 e2) = EIndex <$> free e1 <*> free e2
+free (EType t xs) = EType t <$> mapM freeTypeConstructor xs
+free (EDeclaration ann e1 e2) = do
+  ann' <- freeAnn ann
+  e1' <- free e1
+  e2' <- traverse free e2
+  pure $ EDeclaration ann' e1' e2'
+free (EMutDeclaration ann e1 e2) = do
+  ann' <- freeAnn ann
+  e1' <- free e1
+  e2' <- traverse free e2
+  pure $ EMutDeclaration ann' e1' e2'
+free (EMutUpdate ann e1 e2) = do
+  ann' <- freeAnn ann
+  e1' <- free e1
+  e2' <- traverse free e2
+  pure $ EMutUpdate ann' e1' e2'
+free (EUnMut e) = EUnMut <$> free e
+free (EExtensionDeclaration name t1 ann e) = do
+  ann' <- freeAnn ann
+  e' <- free e
+  pure $ EExtensionDeclaration name t1 ann' e'
+free (EConditionBranch e1 e2 e3) = do
+  e1' <- free e1
+  e2' <- free e2
+  e3' <- traverse free e3
+  pure $ EConditionBranch e1' e2' e3'
+free (EClosure anns t e) = do
+  anns' <- mapM freeAnn anns
+  e' <- free e
+  pure $ EClosure anns' t e'
+free (EBlock xs) = EBlock <$> mapM free xs
+free (ELocated e p) = ELocated <$> free e <*> pure p
+free (ESwitch e xs) = do
+  e' <- free e
+  xs' <- mapM (\(p, b) -> (,) <$> freePattern p <*> free b) xs
+  pure $ ESwitch e' xs'
+free (EReturn e) = EReturn <$> free e
+free (ENativeFunction name t1 t2) = do
+  t2' <- compressPaths t2
+  pure $ ENativeFunction name t1 t2'
+free (ELiteral l) = pure $ ELiteral l
