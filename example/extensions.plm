@@ -1,0 +1,21 @@
+mut string: str = "Hello"
+
+extend<A> (c: mut A) {
+  value: A = *c
+}
+
+infix 3 +=
+
+extend (c: mut str) {
+  fn (+=) (s: str): unit {
+    c = *c + s
+    return unit
+  }
+
+}
+
+println(string.value)
+
+string += " World!"
+
+println(string.value)
