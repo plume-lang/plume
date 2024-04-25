@@ -7,7 +7,7 @@ import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
 
 synthNative :: Infer
-synthNative (Pre.ENativeFunction fp name generics ty) = do
+synthNative (Pre.ENativeFunction fp name generics ty st) = do
   nats <- gets natives
   case Map.lookup name nats of
     Just (sch, pos) -> throwRaw (pos, DuplicateNative name sch)
@@ -24,6 +24,6 @@ synthNative (Pre.ENativeFunction fp name generics ty) = do
 
   pure
     ( TUnit
-    , [Post.ENativeFunction fp name convertedTy]
+    , [Post.ENativeFunction fp name convertedTy st]
     )
 synthNative _ = throw $ CompilerError "Only native functions are supported"

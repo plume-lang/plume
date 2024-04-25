@@ -1,6 +1,7 @@
 module Plume.Compiler.ClosureConversion.Syntax where
 
 import Plume.Syntax.Common.Literal
+import Plume.Syntax.Abstract.Expression (IsStandard)
 
 data ClosedExpr
   = CEVar Text
@@ -48,7 +49,7 @@ data ClosedStatement
 data ClosedProgram
   = CPFunction Text [Text] ClosedStatement
   | CPStatement ClosedStatement
-  | CPNativeFunction Text Text Int
+  | CPNativeFunction Text Text Int IsStandard
   | CPDeclaration Text ClosedExpr
   | CPMutDeclaration Text ClosedExpr
   | CPMutUpdate Update ClosedExpr

@@ -6,6 +6,7 @@ import Plume.Compiler.ClosureConversion.Syntax (Update(..))
 import qualified Data.List as List
 import GHC.IO (unsafePerformIO)
 import qualified Data.Map as Map
+import Plume.Syntax.Abstract.Expression (IsStandard)
 
 data Instruction
   = LoadLocal Int
@@ -64,7 +65,7 @@ data Constant
 data Program = Program
   { pInstructions :: [Instruction]
   , pConstants :: [Constant]
-  , pNativeLibraries :: [(FilePath, Int)]
+  , pNativeLibraries :: [((FilePath, IsStandard), Int)]
   }
 
 data FunctionMetaData = FunctionMetaData
@@ -120,7 +121,7 @@ data AssemblerState = AssemblerState
   , currentSize :: Int
   , locals :: Map Text Int
   , globals :: Map Text Int
-  , nativeLibraries :: [(FilePath, [Text])]
+  , nativeLibraries :: [((FilePath, IsStandard), [Text])]
   , cwd :: FilePath
   }
   deriving (Show, Eq)

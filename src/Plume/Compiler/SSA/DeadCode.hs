@@ -109,7 +109,7 @@ freeProgList xs = fst $ go xs (S.empty, S.empty)
   go (DPStatement stmt : rest) s =
     let freeStmt = freeStmtList [stmt]
      in go rest (freeStmt <> s)
-  go (DPNativeFunction _ n _ : rest) s = go rest (second (S.insert n) s)
+  go (DPNativeFunction _ n _ _ : rest) s = go rest (second (S.insert n) s)
   go (DPDeclaration n e : rest) s =
     let freeE = free e S.\\ S.singleton n
      in go rest (bimap (S.union freeE) (S.insert n) s)
@@ -156,11 +156,11 @@ removeDeadCode s (DPDeclaration n e : rest) =
    in if n `S.member` freeVars
         then (DPDeclaration n <$> e') <> rest'
         else rest'
-removeDeadCode s (DPNativeFunction fp n arity : rest) =
+removeDeadCode s (DPNativeFunction fp n arity st : rest) =
   let rest' = removeDeadCode (S.insert n s) rest
       freeVars = freeProgList rest'
    in if n `S.member` freeVars
-        then DPNativeFunction fp n arity : rest'
+        then DPNativeFunction fp n arity st : rest'
         else rest'
 removeDeadCode s (DPMutDeclaration n e : rest) =
   let e' = maybeToList $ removeDeadCodeExpr s e

@@ -78,7 +78,7 @@ free (ESwitch e xs) = do
   xs' <- mapM (\(p, b) -> (,) <$> freePattern p <*> free b) xs
   pure $ ESwitch e' xs'
 free (EReturn e) = EReturn <$> free e
-free (ENativeFunction name t1 t2) = do
+free (ENativeFunction name t1 t2 st) = do
   t2' <- compressPaths t2
-  pure $ ENativeFunction name t1 t2'
+  pure $ ENativeFunction name t1 t2' st
 free (ELiteral l) = pure $ ELiteral l

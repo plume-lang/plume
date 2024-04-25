@@ -105,9 +105,9 @@ desugarProgram = \case
   Pre.CPStatement x -> do
     x' <- desugarStatement (False, False, False) x
     return $ createBlockProg' x'
-  Pre.CPNativeFunction fp x y -> do
+  Pre.CPNativeFunction fp x y st -> do
     modifyIORef' nativeFunctions $ Set.insert x
-    return [Post.DPNativeFunction fp x y]
+    return [Post.DPNativeFunction fp x y st]
   Pre.CPDeclaration n e -> do
     (e', stmts) <- desugarExpr (False, False, True) e
     return (createBlockProg stmts ++ [Post.DPDeclaration n e'])
