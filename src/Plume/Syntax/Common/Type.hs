@@ -32,6 +32,10 @@ data PlumeGeneric
   | GExtends Text [Text]
   deriving (Eq, Show)
 
+getGenericName :: PlumeGeneric -> Text
+getGenericName (GVar name) = name
+getGenericName (GExtends name _) = name
+
 -- TYPE SYNONYMS SHORTCUTS
 
 -- | A type that represents a mutable reference to another type
