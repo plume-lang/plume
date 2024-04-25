@@ -131,7 +131,8 @@ library
         binary,
         template-haskell,
         MissingH,
-        sorted-list
+        sorted-list,
+        diagnose
 
     mixins:
         base hiding (Prelude),

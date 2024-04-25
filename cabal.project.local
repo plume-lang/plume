@@ -1,0 +1,3 @@
+ignore-project: False
+package diagnose
+  flags: +megaparsec-compat
