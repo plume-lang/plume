@@ -4,6 +4,7 @@ import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Compiler.Desugaring.Modules.Switch
 import Plume.Compiler.Desugaring.Monad
 import Plume.Compiler.Desugaring.Syntax qualified as Post
+import Control.Monad.Exception (compilerError)
 
 desugarANF
   :: (IsToplevel, IsReturned, IsExpression)
@@ -82,4 +83,4 @@ desugarANF (isNotTop, isReturned, _) f (Pre.CEConditionBranch e1 e2 e3) = do
  where
   createBr (e, st) = st <> [Post.DSReturn e]
 desugarANF _ _ _ =
-  error "Received incorrect expression, not an ANF convertible one"
+  compilerError "Received incorrect expression, not an ANF convertible one"

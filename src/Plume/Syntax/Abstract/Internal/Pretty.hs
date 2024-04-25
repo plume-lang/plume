@@ -7,6 +7,7 @@ import Plume.Syntax.Concrete.Internal.Pretty ()
 import Plume.Syntax.Internal.Pretty.ANSI
 import Prettyprinter.Render.Terminal
 import Prelude hiding (intercalate)
+import Control.Monad.Exception (compilerError)
 
 instance ANSIPretty Expression where ansiPretty = prettyExpr
 
@@ -85,7 +86,7 @@ prettyExpr (ENativeFunction fp n gens (args :->: ret) _) =
     <+> parens (hsep . punctuate comma $ map ansiPretty args)
     <+> ":"
     <+> prettyTy ret
-prettyExpr (ENativeFunction {}) = error "ENativeFunction: invalid type"
+prettyExpr (ENativeFunction {}) = compilerError "ENativeFunction: invalid type"
 prettyExpr (EGenericProperty gens n ts t) =
   anCol Blue "property"
     <+> ansiPretty gens

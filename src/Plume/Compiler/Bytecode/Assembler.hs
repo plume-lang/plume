@@ -12,6 +12,7 @@ import Plume.Compiler.ClosureConversion.Syntax (Update(..))
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Translation.Generics
 import Plume.Compiler.Bytecode.Arithmetic (compileFunction)
+import Control.Monad.Exception (compilerError)
 
 assembleCondition :: Pre.DesugaredExpr -> IO ([BC.Instruction], Int -> BC.Instruction)
 assembleCondition (Pre.DEEqualsTo e1 (Pre.DELiteral l@(LInt _))) = do
@@ -223,7 +224,7 @@ assembleProgram (Pre.DPNativeFunction fp n _ st) = do
   BC.AssemblerState {BC.nativeFunctions, BC.constants, BC.nativeLibraries} <-
     readIORef BC.assemblerState
   case Map.lookup n nativeFunctions of
-    Just _ -> error "Native function already declared"
+    Just _ -> compilerError "Native function already declared"
     Nothing -> do
       i <- case Map.lookup (LString n) constants of
         Just i' -> pure i'

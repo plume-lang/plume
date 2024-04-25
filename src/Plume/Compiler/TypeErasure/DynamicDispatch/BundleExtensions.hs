@@ -5,6 +5,7 @@ import Data.Text qualified as T
 import Plume.Syntax.Common.Annotation
 import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR
+import Control.Monad.Exception (compilerError)
 
 createName :: PlumeType -> Text
 createName (TypeId n) = n
@@ -83,4 +84,4 @@ bundleExtension (EExtensionDeclaration n t (Annotation arg _) body) =
       (EClosure [Annotation arg t] t body)
       Nothing
 bundleExtension (ELocated e _) = bundleExtension e
-bundleExtension _ = error "Invalid extension"
+bundleExtension _ = compilerError "Invalid extension given"

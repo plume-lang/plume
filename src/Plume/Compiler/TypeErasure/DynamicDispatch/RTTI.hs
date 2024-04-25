@@ -3,6 +3,7 @@ module Plume.Compiler.TypeErasure.DynamicDispatch.RTTI where
 import Plume.Syntax.Common.Literal
 import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR
+import Control.Monad.Exception (compilerError)
 
 data RTTIResult
   = Item RTTIResult [RTTIResult]
@@ -29,4 +30,4 @@ createCondition e (Item (Single x) xs) =
           xs
           [0 :: Integer ..]
       )
-createCondition _ (Item _ _) = error "Type application equality not supported yet"
+createCondition _ (Item _ _) = compilerError "Type application equality not supported yet"

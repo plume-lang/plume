@@ -6,6 +6,7 @@ import Plume.Syntax.Concrete
 import Plume.Syntax.Internal.Pretty.ANSI
 import Prettyprinter.Render.Terminal
 import Prelude hiding (intercalate)
+import Control.Monad.Exception (compilerError)
 
 instance {-# OVERLAPS #-} ANSIPretty Program where
   ansiPretty [d] = ansiPretty d
@@ -140,7 +141,7 @@ prettyExpr _ (ENativeFunction fp n gens (args :->: ret)) =
     <> parens (hsep . punctuate comma $ map ansiPretty args)
       <+> ":"
       <+> ansiPretty ret
-prettyExpr _ (ENativeFunction {}) = error "ENativeFunction: invalid type"
+prettyExpr _ (ENativeFunction {}) = compilerError "ENativeFunction: invalid type"
 prettyExpr _ (EGenericProperty gens n ts t) =
   anCol Blue "property"
     <> angles (hsep . punctuate comma $ map ansiPretty gens)

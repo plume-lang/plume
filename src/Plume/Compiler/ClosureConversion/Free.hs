@@ -5,6 +5,7 @@ module Plume.Compiler.ClosureConversion.Free where
 import Data.Foldable
 import Data.Set qualified as S
 import Plume.Compiler.ClosureConversion.Syntax
+import Control.Monad.Exception (compilerError)
 
 class Free a where
   free :: a -> S.Set Text
@@ -125,7 +126,7 @@ instance Substitutable ClosedExpr ClosedExpr where
 convertToUpdate :: ClosedExpr -> Update
 convertToUpdate (CEVar x) = UVariable x
 convertToUpdate (CEProperty e f) = UProperty (convertToUpdate e) f
-convertToUpdate _ = error "Invalid update"
+convertToUpdate _ = compilerError "Invalid update"
 
 instance Substitutable ClosedStatement ClosedExpr where
   substitute e (CSExpr e') = CSExpr (substitute e e')

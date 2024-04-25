@@ -8,6 +8,8 @@ import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR
 import Prettyprinter.Render.Terminal
 import Prelude hiding (intercalate)
+import Prettyprinter.Render.String (renderString)
+import Control.Monad.Exception (compilerError)
 
 instance ANSIPretty Expression where ansiPretty = prettyExpr
 
@@ -119,7 +121,7 @@ prettyExpr (ENativeFunction fp n (args :->: ret) _) =
     <+> parens (hsep . punctuate comma $ map prettyTy args)
     <+> ":"
     <+> prettyTy ret
-prettyExpr (ENativeFunction {}) = error "ENativeFunction: invalid type"
+prettyExpr (ENativeFunction {}) = compilerError "ENativeFunction: invalid type"
 prettyExpr (EList es) = brackets (hsep $ punctuate comma $ map prettyExpr es)
 prettyExpr (EExtensionDeclaration name extTy args body) =
   anCol Blue "extension"
@@ -144,3 +146,6 @@ prettyPat (PList ps sl) =
         punctuate comma $
           map prettyPat ps <> [".." <> ansiPretty sl]
     )
+
+prettyToString :: Doc AnsiStyle -> String
+prettyToString = renderString . layoutPretty defaultLayoutOptions

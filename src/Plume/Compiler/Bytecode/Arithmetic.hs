@@ -3,6 +3,7 @@ import Plume.Compiler.Bytecode.Syntax qualified as BC
 import Data.Map qualified as Map
 import qualified Plume.Compiler.Desugaring.Syntax as Pre
 import Plume.Syntax.Common (Literal(LInt))
+import Control.Monad.Exception (compilerError)
 
 type Instructions = [BC.Instruction]
 type Callback = Pre.DesugaredExpr -> IO Instructions
@@ -27,21 +28,21 @@ compileFunction assemble (Pre.DEApplication f args) = do
           Just (funLibIdx, name, libAddr) -> do
             [BC.LoadNative name libAddr funLibIdx, BC.Call (length args)]
           _ -> error $ "Function not found: " <> show f
-compileFunction _ _ = error "Invalid function application"
+compileFunction _ _ = compilerError "Invalid function application"
 
 equals :: Callback -> Pre.DesugaredExpr -> IO Instructions
 equals cb (Pre.DEApplication _ [a, b]) = do
   a' <- cb a
   b' <- cb b
   pure $ a' <> b' <> [BC.Compare BC.EqualTo]
-equals _ _ = error "Invalid arguments for equals"
+equals _ _ = compilerError "Invalid arguments for equals"
 
 notEquals :: Callback -> Pre.DesugaredExpr -> IO Instructions
 notEquals cb (Pre.DEApplication _ [a, b]) = do
   a' <- cb a
   b' <- cb b
   pure $ a' <> b' <> [BC.Compare BC.NotEqualTo]
-notEquals _ _ = error "Invalid arguments for notEquals"
+notEquals _ _ = compilerError "Invalid arguments for notEquals"
 
 add :: Callback -> Pre.DesugaredExpr -> IO Instructions
 add cb (Pre.DEApplication "+::int" [a, Pre.DELiteral l@(LInt _)]) = do
@@ -68,7 +69,7 @@ add cb (Pre.DEApplication "add_int" [a, b]) = do
   a' <- cb a
   b' <- cb b
   pure $ a' <> b' <> [BC.Add]
-add _ _ = error "Invalid arguments for add"
+add _ _ = compilerError "Invalid arguments for add"
 
 sub :: Callback -> Pre.DesugaredExpr -> IO Instructions
 sub cb (Pre.DEApplication "-::int" [a, Pre.DELiteral l@(LInt _)]) = do
@@ -87,7 +88,7 @@ sub cb (Pre.DEApplication "sub_int" [a, b]) = do
   a' <- cb a
   b' <- cb b
   pure $ a' <> b' <> [BC.Sub]
-sub _ _ = error "Invalid arguments for sub"
+sub _ _ = compilerError "Invalid arguments for sub"
 
 mul :: Callback -> Pre.DesugaredExpr -> IO Instructions
 mul cb (Pre.DEApplication "*::int" [a, Pre.DELiteral l@(LInt _)]) = do
@@ -114,4 +115,4 @@ mul cb (Pre.DEApplication "mul_int" [a, b]) = do
   a' <- cb a
   b' <- cb b
   pure $ a' <> b' <> [BC.Mul]
-mul _ _ = error "Invalid arguments for mul"
+mul _ _ = compilerError "Invalid arguments for mul"

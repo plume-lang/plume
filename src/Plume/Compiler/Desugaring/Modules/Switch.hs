@@ -10,6 +10,7 @@ import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Compiler.Desugaring.Monad
 import Plume.Compiler.Desugaring.Syntax qualified as Post
 import Plume.Syntax.Common.Literal
+import Control.Monad.Exception (compilerError)
 
 type Desugar' =
   Desugar Pre.ClosedStatement [ANFResult (Maybe Post.DesugaredStatement)]
@@ -65,11 +66,11 @@ desugarSwitch (_, shouldReturn, isExpr) (fExpr, _) (Pre.CESwitch x cases) = do
     else do
       let ifs' = createIfsStatement res
       return (Post.DEVar "nil", stmts <> decl <> ifs')
-desugarSwitch _ _ _ = error "Received incorrect expression, not a switch."
+desugarSwitch _ _ _ = compilerError "Received incorrect expression, not a switch."
 
 unboxStatement :: Post.DesugaredStatement -> Post.DesugaredExpr
 unboxStatement (Post.DSExpr x) = x
-unboxStatement _ = error "Incorrect statement"
+unboxStatement _ = compilerError "Incorrect statement"
 
 createConditionExpr :: [Post.DesugaredExpr] -> Post.DesugaredExpr
 createConditionExpr [] = Post.DELiteral (LBool True)
@@ -104,7 +105,7 @@ createIfsExpr [x] = x
 createIfsExpr (Post.DEIf c t _ : xs) = Post.DEIf c t [e]
  where
   e = Post.DSExpr $ createIfsExpr xs
-createIfsExpr _ = error "Incorrect list of conditions"
+createIfsExpr _ = compilerError "Incorrect list of conditions"
 
 createLets :: Map Text Post.DesugaredExpr -> [Post.DesugaredStatement]
 createLets = M.foldrWithKey (\k v acc -> Post.DSDeclaration k v : acc) []

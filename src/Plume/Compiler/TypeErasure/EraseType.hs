@@ -15,6 +15,7 @@ import Plume.TypeChecker.Constraints.Solver (isNotTVar)
 import Plume.TypeChecker.Constraints.Unification (doesUnifyWith)
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.TLIR qualified as Pre
+import Control.Monad.Exception (compilerError)
 
 {-# NOINLINE dispatched #-}
 dispatched :: IORef [((PlumeType, Text), Text)]
@@ -62,7 +63,7 @@ eraseType (Pre.EExtensionDeclaration name _ arg (Pre.EClosure args _ b) : xs) = 
   modifyIORef' program (<> [fun])
   eraseType xs
 eraseType (Pre.EType tyName ts : xs) = do
-  let tys = map createFunction ts
+  tys <- mapM createFunction ts
   modifyIORef' program (<> tys)
   eraseType xs
  where
@@ -92,15 +93,15 @@ eraseType (Pre.EType tyName ts : xs) = do
             )
       )
       ts
-  createFunction :: Pre.TypeConstructor PlumeType -> Post.UntypedProgram
+  createFunction :: Pre.TypeConstructor PlumeType -> IO Post.UntypedProgram
   createFunction (Pre.TVariable n) = case List.lookup n ts' of
-    Just f -> Post.UPStatement (Post.USDeclaration n (f []))
-    Nothing -> error "Type constructor not found"
+    Just f -> return $ Post.UPStatement (Post.USDeclaration n (f []))
+    Nothing -> compilerError "Type constructor not found"
   createFunction (Pre.TConstructor n vars) = case List.lookup n ts' of
-    Just f -> Post.UPFunction n args (Post.USReturn (f args))
+    Just f -> return $ Post.UPFunction n args (Post.USReturn (f args))
      where
       args = map createVariant [0 .. length vars - 1]
-    Nothing -> error "Type constructor not found"
+    Nothing -> compilerError "Type constructor not found"
 eraseType (Pre.EDeclaration (Annotation name _) e Nothing : xs) = do
   e' <- eraseExpr e
   modifyIORef' program (<> [Post.UPDeclaration name e'])
@@ -132,7 +133,7 @@ eraseStatement (Pre.EConditionBranch e1 e2 e3) = do
   e3' <- maybeM e3 eraseStatement
   case e3' of
     Just e3'' -> Post.USConditionBranch <$> eraseExpr e1 <*> eraseStatement e2 <*> pure e3''
-    Nothing -> error "Condition branch without a body"
+    Nothing -> compilerError "Condition branch without a body"
 eraseStatement (Pre.ELocated e _) = eraseStatement e
 eraseStatement e = Post.USExpr <$> eraseExpr e
 
@@ -142,13 +143,13 @@ eraseExpr (Pre.EMutDeclaration (Annotation n _) e1 e2) = do
   e2' <- maybeM e2 eraseExpr
   case e2' of
     Just e2'' -> return $ Post.UEMutDeclaration n e1' e2''
-    Nothing -> error "Mut declaration without a body"
+    Nothing -> compilerError "Mut declaration without a body"
 eraseExpr (Pre.EMutUpdate (Annotation n _) e1 e2) = do
   e1' <- eraseExpr e1
   e2' <- maybeM e2 eraseExpr
   case e2' of
     Just e2'' -> return $ Post.UEMutUpdate n e1' e2''
-    Nothing -> error "Mut update without a body"
+    Nothing -> compilerError "Mut update without a body"
 eraseExpr (Pre.EVariable x _) = pure $ Post.UEVar x
 eraseExpr (Pre.EApplication f args) =
   Post.UEApplication <$> eraseExpr f <*> mapM eraseExpr args
@@ -157,14 +158,14 @@ eraseExpr (Pre.EUnMut e) = Post.UEUnMut <$> eraseExpr e
 eraseExpr (Pre.EList es) = Post.UEList <$> mapM eraseExpr es
 eraseExpr (Pre.EDeclaration (Annotation n _) e1 e2) = case e2 of
   Just e2' -> Post.UEDeclaration n <$> eraseExpr e1 <*> eraseExpr e2'
-  Nothing -> error "Declaration without a body"
+  Nothing -> compilerError "Declaration without a body"
 eraseExpr (Pre.EConditionBranch e1 e2 e3) = case e3 of
   Just e3' ->
     Post.UEConditionBranch
       <$> eraseExpr e1
       <*> eraseExpr e2
       <*> eraseExpr e3'
-  Nothing -> error "Condition branch without a body"
+  Nothing -> compilerError "Condition branch without a body"
 eraseExpr (Pre.ESwitch e cases) = do
   e' <- eraseExpr e
   cases' <- mapM (bimapM erasePattern eraseExpr) cases
@@ -178,7 +179,7 @@ eraseExpr (Pre.EClosure args _ body) = do
       (map (\(Annotation n _) -> n) args)
       (Post.USExpr b)
 eraseExpr (Pre.EExtVariable x fun t) = do
-  let err = error $
+  let err = compilerError $
           "Invalid function type for extension variable: "
             <> x
             <> " with type"
@@ -196,15 +197,15 @@ eraseExpr (Pre.EExtVariable x fun t) = do
     m <- readIORef dispatched
     findWithKeyM (\(t', n) -> (n == x &&) <$> ty `doesUnifyWith` t') m >>= \case
       Just (_, n) -> return n
-      Nothing -> error $ "Extension not found: " <> show x <> " for type " <> show ty
+      Nothing -> compilerError $ "Extension not found: " <> show x <> " for type " <> show ty
 eraseExpr (Pre.ELocated e _) = eraseExpr e
 eraseExpr (Pre.EEqualsType e t) = Post.UEEqualsType <$> eraseExpr e <*> pure t
-eraseExpr (Pre.ENativeFunction {}) = error "Native functions aren't expressions"
-eraseExpr (Pre.EExtensionDeclaration {}) = error "Extension declarations aren't expressions"
+eraseExpr (Pre.ENativeFunction {}) = compilerError "Native functions aren't expressions"
+eraseExpr (Pre.EExtensionDeclaration {}) = compilerError "Extension declarations aren't expressions"
 eraseExpr (Pre.EAnd e1 e2) = Post.UEAnd <$> eraseExpr e1 <*> eraseExpr e2
 eraseExpr (Pre.EIndex e i) = Post.UEIndex <$> eraseExpr e <*> eraseExpr i
-eraseExpr (Pre.EReturn _) = error "Return isn't an expression"
-eraseExpr (Pre.EType {}) = error "Type isn't an expression"
+eraseExpr (Pre.EReturn _) = compilerError "Return isn't an expression"
+eraseExpr (Pre.EType {}) = compilerError "Type isn't an expression"
 
 erasePattern :: Pre.TypedPattern PlumeType -> IO Post.UntypedPattern
 erasePattern (Pre.PVariable x _) = pure $ Post.UPVariable x

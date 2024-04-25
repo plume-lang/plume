@@ -128,7 +128,7 @@ parseFile (path, content) cwd = do
     ops <- liftIO $ readIORef operators
     x <- liftIO $! parsePlumeFile path content ops
     case x of
-      Left err -> throwError' $ ParserError err
+      Left err -> throwError' $ ParserError err path content
       Right (cst, ops') -> do
         modifyIORef' operators (ops' `SL.union`)
         return $ Right cst

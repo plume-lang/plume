@@ -64,7 +64,7 @@ convertMacro f (CST.EMacroApplication name args) = do
         throwError $ case pos of
           Just p -> ArgumentsMismatch argsNames (length args) p
           Nothing -> NoPositionSaved
-convertMacro _ _ = error "Impossible happened"
+convertMacro _ _ = compilerError "Impossible happened"
 
 -- | Substitute a spreadable expression with a list of expressions
 substituteSpread :: [(Text, AST.Expression)] -> MacroBody -> MacroBody

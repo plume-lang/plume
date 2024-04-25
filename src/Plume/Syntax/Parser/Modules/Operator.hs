@@ -8,6 +8,7 @@ import Control.Monad.Parser
 import Data.Foldable hiding (elem)
 import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer
+import Control.Monad.Exception (compilerError)
 
 -- OPERATOR SHORTHANDS
 
@@ -80,7 +81,7 @@ sortCustomOperators ops = map ((: []) . parseOperator) (SL.fromSortedList ops)
         CInfixL -> InfixL (CustomInfix name <$ symbol name)
         CInfixR -> InfixR (CustomInfix name <$ symbol name)
     | otherwise =
-        error "Invalid operator type"
+        compilerError "Invalid operator type"
 
 pattern CustomInfix :: Text -> Expression -> Expression -> Expression
 pattern CustomInfix name e1 e2 = EApplication (EVariable name) [e1, e2]

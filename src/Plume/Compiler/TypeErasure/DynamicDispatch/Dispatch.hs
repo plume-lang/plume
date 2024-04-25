@@ -6,6 +6,7 @@ import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Literal
 import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR
+import Control.Monad.Exception (compilerError)
 
 type ExtensionVariable = Text
 type ExtensionName = Text
@@ -36,7 +37,7 @@ createIfSequence :: [TypedExpression PlumeType] -> TypedExpression PlumeType
 createIfSequence [] = EEqualsType (ELiteral (LBool True)) "True"
 createIfSequence [EConditionBranch _ body _] = EReturn body
 createIfSequence (EConditionBranch cond body _ : xs) = EConditionBranch cond (EReturn body) (Just (createIfSequence xs))
-createIfSequence _ = error "Invalid if sequence"
+createIfSequence _ = compilerError "Invalid if sequence"
 
 createIf
   :: (TypedExpression PlumeType, TypedExpression PlumeType)

@@ -27,19 +27,21 @@ module Plume.TypeChecker.Monad (
   removeLink,
   removeExtLink,
   removeNewEntries,
+  interpretError,
 ) where
 
 import Control.Monad.Except
-import Control.Monad.Exception
 import Data.List qualified as L
 import Data.Map qualified as Map
-import Data.Text.IO qualified as T
 import Data.Text qualified as T
 import GHC.Records
 import Plume.Syntax.Concrete (Position)
 import Plume.TypeChecker.Monad.Error as Monad
 import Plume.TypeChecker.Monad.State as Monad
 import Plume.TypeChecker.Monad.Type as Monad
+import System.IO.Pretty (ppFailure, printErrorFromString)
+import Plume.TypeChecker.TLIR.Internal.Pretty (prettyToString, prettyTy)
+import Control.Monad.Exception (IOThrowable (showErrorIO), compilerError)
 
 -- | Checker monad transformer, used to handle the type-checking process
 -- | with the ability to throw errors.
@@ -69,7 +71,7 @@ throw e = MkChecker $ do
   pos <- readIORef checkState <&> positions
   case viaNonEmpty last pos of
     Nothing -> liftIO $ do
-      T.putStrLn (showError e)
+      ppFailure (show e)
       exitFailure
     Just p -> throwError (p, e)
 
@@ -286,7 +288,7 @@ fetchPosition :: Checker Position
 fetchPosition = do
   pos <- get <&> positions
   case viaNonEmpty last pos of
-    Nothing -> error "No position found in checker state"
+    Nothing -> compilerError "No position found in checker state"
     Just p -> pure p
 
 -- | Track the current position in the position stack
@@ -354,3 +356,111 @@ removeExtLink (MkExtension name ty scheme) = do
   ty' <- removeLink ty
   scheme' <- removeLink scheme
   pure $ MkExtension name ty' scheme'
+
+showTy :: PlumeType -> String
+showTy = prettyToString . prettyTy
+
+interpretError :: PlumeError -> IO ()
+interpretError (p, UnificationFail t1 t2) =
+  printErrorFromString
+    mempty
+    ( "Expected type " <> prettyToString (prettyTy t2)
+        <> " but received type "
+        <> prettyToString (prettyTy t1)
+    , Nothing
+    , p
+    )
+    "while performing typechecking"
+interpretError (p, InfiniteType i t) =
+  printErrorFromString
+    mempty
+    ( "Infinite type " <> show i
+        <> " in type "
+        <> pp
+    , Just (show i <> " may occur in the type " <> pp)
+    , p
+    )
+    "while performing typechecking"
+  where pp = prettyToString (prettyTy t)
+interpretError (p, UnificationMismatch t t1' t2') =
+  printErrorFromString
+    mempty
+    ( getMissingError t1' t2'
+    , Nothing
+    , p
+    )
+    "while performing typechecking"
+  where 
+    getMissingError ts1 ts2
+      | null ts1 = "Type " <> showTy t <> " has no arguments, but should have" <> show (length ts2) <> " arguments"
+      | length ts1 < length ts2 = "Expected more arguments, got " <> show (length ts1) <> " but expected " <> show (length ts2)
+      | otherwise = "Expected less arguments, got " <> show (length ts1) <> " but expected " <> show (length ts2)
+interpretError (p, NoExtensionFound e t) =
+  printErrorFromString
+    mempty
+    ( "No extension named " <> show e <> " found for type " <> showTy t
+    , Nothing
+    , p
+    )
+    "while performing typechecking"
+interpretError (p, MultipleExtensionsFound e ts t) =
+  printErrorFromString
+    mempty
+    ( "Multiple extensions "
+        <> show e
+        <> " found for type "
+        <> showTy t
+        <> ": "
+        <> showList ts
+    , Nothing
+    , p
+    )
+    "while performing typechecking"
+interpretError (p, EmptyMatch) =
+  printErrorFromString
+    mempty
+    ( "Empty switch expression"
+    , Just "Switch expression must have at least one branch"
+    , p
+    )
+    "while performing typechecking"
+interpretError (p, UnboundTypeVariable i) =
+  printErrorFromString
+    mempty
+    ( "Unbound type variable " <> show i
+    , Nothing
+    , p
+    )
+    "while performing typechecking"
+interpretError (p, UnboundVariable v) =
+  printErrorFromString
+    mempty
+    ( "Unbound variable " <> show v
+    , Nothing
+    , p
+    )
+    "while performing typechecking"
+interpretError (p, CompilerError e) =
+  printErrorFromString
+    mempty
+    ( "Compiler error: " <> toString e
+    , Just "Please report this error to the Plume developers"
+    , p
+    )
+    "while performing typechecking"
+interpretError (p, DuplicateNative n s) =
+  printErrorFromString
+    mempty
+    ( "Native function " <> toString n <> " with signature " <> showTy s <> " already defined"
+    , Nothing
+    , p
+    )
+    "while performing typechecking"
+
+showList :: [PlumeType] -> String
+showList [] = ""
+showList [x] = " and " <> showTy x
+showList (x:xs) = showTy x <> ", " <> showList xs
+
+instance IOThrowable PlumeError where
+  showErrorIO e = interpretError e >> exitFailure

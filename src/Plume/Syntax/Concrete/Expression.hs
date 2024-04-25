@@ -14,11 +14,21 @@ import Plume.Syntax.Common.Pattern
 import Plume.Syntax.Common.Type
 import Text.Megaparsec.Pos
 import Prelude hiding (intercalate)
+import GHC.Records (HasField(..))
 
 -- | A position is a tuple of two source positions.
 -- | The first position is the start position and the second position 
 -- | is the end position.
 type Position = (SourcePos, SourcePos)
+
+instance HasField "sourceLine" SourcePos Pos where
+  hasField r = (\p -> SourcePos (sourceName r) p (sourceColumn r), sourceLine r)
+
+instance HasField "sourceColumn" SourcePos Pos where
+  hasField r = (SourcePos (sourceName r) (sourceLine r), sourceColumn r)
+
+instance HasField "sourceName" SourcePos String where
+  hasField r = (\p -> SourcePos p (sourceLine r) (sourceColumn r), sourceName r)
 
 -- | A binary operator is an operator that takes two operands.
 -- | The operands are placed on the left and right side of the operator.

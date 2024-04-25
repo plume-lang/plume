@@ -9,6 +9,7 @@ import Control.Monad.Parser
 import GHC.IO
 import Plume.Syntax.Concrete.Expression (Position)
 import Plume.Syntax.Parser.Lexer
+import System.IO.Pretty (printErrorFromString, parseError, ppFailure)
 
 -- UTILITY REFERENCES
 
@@ -55,7 +56,7 @@ data Error
   | ArgumentsMismatch [Text] Int Position
   | ModuleNotFound Text Position
   | NoPositionSaved
-  | ParserError ParsingError
+  | ParserError ParsingError FilePath FileContent
 
 instance Throwable Error where
   showError = \case
@@ -72,7 +73,7 @@ instance Throwable Error where
     ModuleNotFound name pos ->
       "Module " <> name <> " not found at " <> show pos
     NoPositionSaved -> "No position saved"
-    ParserError err -> showError err
+    ParserError err _ _ -> showError err
 
 -- | A translator error is a type that represents an error that can occur
 -- | during the translation process. It is a type alias for an Either type
@@ -176,7 +177,7 @@ instance (Throwable err) => Throwable (Spreadable [err] err) where
 -- | and returns a translator reader that sets the position to the given
 -- | position.
 withMaybePos
-  :: (Throwable err)
+  :: (IOThrowable err)
   => Maybe Position
   -> TranslatorReader err a
   -> TranslatorReader err a
@@ -187,7 +188,7 @@ withMaybePos Nothing f = f
 -- | returns a translator reader that sets the position to the given
 -- | position locally.
 withPosition
-  :: (Throwable err) => Position -> TranslatorReader err a -> TranslatorReader err a
+  :: (IOThrowable err) => Position -> TranslatorReader err a -> TranslatorReader err a
 withPosition pos f = do
   old <- readIORef positionRef
   writeIORef positionRef (Just pos)
@@ -208,3 +209,32 @@ sequenceMapM
   -> t a
   -> f (m (t a1))
 sequenceMapM f = (sequence <$>) . mapM f
+
+instance IOThrowable Error where
+  showErrorIO e = interpretError e >> exitFailure
+
+interpretError :: Error -> IO ()
+interpretError (CompilerError e) = ppFailure e
+interpretError (ModuleNotFound m p) = 
+  printErrorFromString
+    mempty 
+    ("Module " <> toString m <> " not found", Nothing, p) 
+    "while performing require resolution"
+interpretError NoPositionSaved = ppFailure "No position was found during syntax pre-desugaring"
+interpretError (ParserError e fp fc) = parseError e fp fc
+interpretError (MacroNotFound n p) = 
+  printErrorFromString 
+    mempty 
+    ("Macro " <> toString n <> " not found", Nothing, p) 
+    "while performing macro resolution"
+interpretError (ArgumentsMismatch args n p) =
+  printErrorFromString
+    mempty
+    ( "Invalid number of arguments for macro. Expected " 
+      <> show (length args) 
+      <> " but got " 
+      <> show n
+    , Nothing
+    , p
+    )
+    "while performing macro resolution"

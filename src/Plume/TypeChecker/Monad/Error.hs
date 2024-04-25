@@ -27,7 +27,7 @@ import Text.Megaparsec
 data TypeError
   = UnificationFail PlumeType PlumeType
   | InfiniteType TyVar PlumeType
-  | UnificationMismatch [PlumeType] [PlumeType]
+  | UnificationMismatch PlumeType [PlumeType] [PlumeType]
   | NoExtensionFound Text PlumeType
   | MultipleExtensionsFound Text [PlumeType] PlumeType
   | EmptyMatch
@@ -53,7 +53,7 @@ instance Throwable TypeError where
     "Cannot unify " <> showError t1 <> " with " <> showError t2
   showError (InfiniteType i t) =
     "Infinite type " <> showError i <> " in " <> showError t
-  showError (UnificationMismatch ts1 ts2) =
+  showError (UnificationMismatch _ ts1 ts2) =
     "Missing arguments with " <> showError ts1 <> " compared to " <> showError ts2
   showError (NoExtensionFound e t) =
     "No extension named " <> show e <> " found for type " <> showError t
