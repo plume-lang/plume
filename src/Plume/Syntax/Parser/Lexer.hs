@@ -237,7 +237,10 @@ nonLexedID = do
   -- (such as reserved keyword)
   if r `Set.member` reservedWords
     then fail $ "The identifier " ++ show r ++ " is a reserved word"
-    else return r
+    else
+      if isIdentCharStart r
+        then return r
+        else fail $ "The identifier " ++ show r ++ " is not valid"
 
 -- | Parse an identifier
 -- | An identifier is a sequence of valid identifier characters

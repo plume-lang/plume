@@ -57,8 +57,7 @@ tTuple = do
 -- |
 -- | SYNTAX: [t] with t being the type of the list
 tList :: Parser PlumeType
-tList =
-  TList <$> brackets tType
+tList = TList <$> brackets tType
 
 -- | Parse a type constructor
 -- | A type constructor is a type that is defined by the user and that is

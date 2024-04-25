@@ -83,7 +83,7 @@ mutArg =
 -- | a type parser.
 annotated :: P.Parser a -> P.Parser (Cmm.Annotation (Maybe a))
 annotated p = do
-  n <- L.identifier
+  n <- L.lexeme $ L.nonLexedID <* P.lookAhead (P.optional $ L.symbol ":")
   a <- optional $ L.symbol ":" *> p
   return $ n Cmm.:@: a
 
@@ -120,8 +120,14 @@ eBlock =
 -- | SYNTAX:
 -- |  - identifier that starts with a letter or underscore and may
 -- |    contain letters, digits and underscores
+-- |  - it should not be a keyword
+-- |  - it should not be followed by a colon or an equal sign (avoid 
+-- |    declaration conflicts)
 eVariable :: P.Parser CST.Expression
-eVariable = CST.EVariable <$> L.identifier
+eVariable = CST.EVariable <$> L.lexeme (L.nonLexedID <* isNotDecl)
+  where 
+    isNotDecl :: P.Parser ()
+    isNotDecl = P.notFollowedBy (L.lexeme $ P.oneOf (":=" :: String))
 
 -- | Parses an if expression
 -- | An if expression is a conditional expression that may have an else
@@ -368,7 +374,8 @@ sMutDeclaration = do
 -- | expressions.
 sDeclaration :: P.Parser CST.Expression
 sDeclaration = do
-  name <- P.try $ typeAnnot <* L.symbol "="
+  name <- P.try $ typeAnnot <* P.lookAhead (L.symbol "=")
+  void $ L.symbol "="
   value <- eBlock
 
   body <- P.optional $ L.reserved "in" *> eBlock
@@ -427,7 +434,22 @@ eExtensionMember :: P.Parser (CST.ExtensionMember Cmm.PlumeType)
 eExtensionMember =
   P.choice
     [ eExtFunction
+    , eExtVariable
     ]
+
+-- | Parses an extension variable
+-- | An extension variable is a variable that is added to a type to extend its
+-- | functionalities. It is a syntactic sugar for a declaration.
+-- |
+-- | SYNTAX:
+-- |  - name: ty = expr
+-- | where `name` is an identifier, `ty` is a type annotation and `expr` is
+-- | an expression.
+eExtVariable :: P.Parser (CST.ExtensionMember Cmm.PlumeType)
+eExtVariable = do
+  name <- P.try $ typeAnnot <* P.lookAhead (L.symbol "=")
+  void $ L.symbol "="
+  CST.ExtDeclaration [] name <$> parseExpression
 
 -- | Parses an extension function
 -- | An extension function is a function that is added to a type to extend its
