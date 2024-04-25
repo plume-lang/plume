@@ -4,7 +4,7 @@ module Control.Monad.Parser (
   FileContent,
   ParsingError,
   parse,
-  parseTest
+  parseTest'
 ) where
 
 import Control.Monad.IO as IO
@@ -25,5 +25,5 @@ parse
 parse p filePath fileContent = do
   runParserT p filePath fileContent
 
-parseTest :: Parser a -> FileContent -> IO (Either ParsingError a)
-parseTest p = parse (p <* eof) "test"
+parseTest' :: Parser a -> FileContent -> IO (Either ParsingError a)
+parseTest' p = parse (p <* eof) "<test>"
