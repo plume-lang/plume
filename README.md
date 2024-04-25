@@ -7,21 +7,23 @@
     A programming language that promotes functional programming for everyone.
     <br/>
     <br/>
-    <a href="https://github.com/sisypheus-dev/plume-language"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/plume-lang/plume/wiki"><strong>Explore the docs »</strong></a>
     <br/>
     <br/>
-    <a href="https://github.com/sisypheus-dev/plume-language/issues">Report Bug</a>
+    <a href="https://github.com/plume-lang/plume/issues">Report Bug</a>
     .
-    <a href="https://github.com/sisypheus-dev/plume-language/issues">Request Feature</a>
+    <a href="https://github.com/plume-lang/plume/issues">Request Feature</a>
+    .
+    <a href="https://discord.gg/rJGdHEfKhj">Join the community</a>
   </p>
 </p>
 
 <div align="center">
   
-![Downloads](https://img.shields.io/github/downloads/sisypheus-dev/plume-language/total) 
-![Contributors](https://img.shields.io/github/contributors/sisypheus-dev/plume-language?color=dark-green) 
-![Issues](https://img.shields.io/github/issues/sisypheus-dev/plume-language) 
-![License](https://img.shields.io/github/license/sisypheus-dev/plume-language)
+![Downloads](https://img.shields.io/github/downloads/plume-lang/plume/total) 
+![Contributors](https://img.shields.io/github/contributors/plume-lang/plume?color=dark-green) 
+![Issues](https://img.shields.io/github/issues/plume-lang/plume) 
+![License](https://img.shields.io/github/license/plume-lang/plume)
 
 </div>
 
@@ -79,7 +81,7 @@ You need to install these dependencies in order to compile and run Plume.
 1. Clone the repo
 
 ```sh
-git clone https://github.com/sisypheus-dev/plume-language.git
+git clone https://github.com/plume-lang/plume.git
 ```
 
 2. Update fetched Cabal packages
@@ -96,16 +98,16 @@ cabal install # or cabal run in order just to run it
 
 ## Roadmap
 
-See the [open issues](https://github.com/sisypheus-dev/plume-language/issues) for a list of proposed features (and known issues).
+See the [open issues](https://github.com/plume-lang/plume/issues) for a list of proposed features (and known issues).
 
 ## Contributing
 
 Contributions are what make open-source communities such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
-- If you have suggestions for adding or removing projects, feel free to [open an issue](https://github.com/sisypheus-dev/plume-language/issues/new) to discuss it, or directly create a pull request after you edit the _README.md_ file with the necessary changes.
+- If you have suggestions for adding or removing projects, feel free to [open an issue](https://github.com/plume-lang/plume/issues/new) to discuss it, or directly create a pull request after you edit the _README.md_ file with the necessary changes.
 - Please make sure you check your spelling and grammar.
 - Create individual PR for each suggestion.
-- Please also read through the [Code Of Conduct](https://github.com/sisypheus-dev/plume-language/blob/main/CODE_OF_CONDUCT.md) before posting your first idea as well.
+- Please also read through the [Code Of Conduct](https://github.com/plume-lang/plume/blob/main/CODE_OF_CONDUCT.md) before posting your first idea as well.
 
 ### Creating A Pull Request
 
@@ -117,7 +119,7 @@ Contributions are what make open-source communities such an amazing place to lea
 
 ## License
 
-Distributed under the MIT License. See [LICENSE](https://github.com/sisypheus-dev/plume-language/blob/main/LICENSE.md) for more information.
+Distributed under the MIT License. See [LICENSE](https://github.com/plume-lang/plume/blob/main/LICENSE.md) for more information.
 
 ## Authors
 
