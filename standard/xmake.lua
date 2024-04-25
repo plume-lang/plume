@@ -1,5 +1,5 @@
 add_rules("mode.debug", "mode.release", "mode.profile")
-add_requires("libcurl")
+add_requires("libcurl", { system = false })
 
 target("plume-natives")
   set_kind("shared")
