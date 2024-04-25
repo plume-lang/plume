@@ -13,18 +13,12 @@ import Plume.Syntax.Translation.ConcreteToAbstract.UFCS
 import Plume.Syntax.Translation.Generics
 import System.Directory
 import System.FilePath
-import System.Info
+import qualified Data.Text as T
 
--- | The extension of the shared library that is relative
--- | to the user operating system. This is used to load
--- | native functions from shared libraries without sacrificing
--- | platform independence.
+-- | The shared library extension for all platforms
+{-# INLINE sharedLibExt #-}
 sharedLibExt :: String
-sharedLibExt = case os of
-  "darwin" -> "dylib"
-  "linux" -> "so"
-  "mingw32" -> "dll"
-  _ -> error "Unsupported operating system"
+sharedLibExt = "plmc"
 
 -- | Interpret spreadable by compiling a spreadable expression into
 -- | a single expression
@@ -174,8 +168,8 @@ concreteToAbstract (CST.ENativeFunction fp n gens t) = do
   -- except we do not parse everything. But we need to resolve the path 
   -- absolutely to make it work everywhere on the system.
   let strModName = fromString $ toString fp -<.> sharedLibExt
-  modPath <- getPath strModName (Just sharedLibExt)
-  transRet . Right $ AST.ENativeFunction (fromString modPath) n gens t
+  let (isStd, path) = if "std:" `T.isPrefixOf` fp then (True, T.drop 4 strModName) else (False, strModName)
+  transRet . Right $ AST.ENativeFunction path n gens t isStd
 concreteToAbstract (CST.EGenericProperty g n ts t) =
   transRet . Right $ AST.EGenericProperty g n ts t
 concreteToAbstract (CST.EList es) = do

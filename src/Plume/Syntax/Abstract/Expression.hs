@@ -39,9 +39,11 @@ data AbstractExpression t
   | ESwitch (AbstractExpression t) [(Pattern, AbstractExpression t)]
   | EReturn (AbstractExpression t)
   | ETypeExtension [PlumeGeneric] (Annotation t) [ExtensionMember t]
-  | ENativeFunction Text Text [Text] t
+  | ENativeFunction Text Text [Text] t IsStandard
   | EGenericProperty [PlumeGeneric] Text [t] t
   deriving (Show)
+
+type IsStandard = Bool
 
 -- ABSTRACT EXPRESSION INSTANCES
 
@@ -66,8 +68,8 @@ instance (Eq t) => Eq (AbstractExpression t) where
   EReturn e1 == EReturn e2 = e1 == e2
   ETypeExtension gs1 a1 ms1 == ETypeExtension gs2 a2 ms2 =
     gs1 == gs2 && a1 == a2 && ms1 == ms2
-  ENativeFunction n1 p1 as1 t1 == ENativeFunction n2 p2 as2 t2 =
-    n1 == n2 && p1 == p2 && as1 == as2 && t1 == t2
+  ENativeFunction n1 p1 as1 t1 st1 == ENativeFunction n2 p2 as2 t2 st2 =
+    n1 == n2 && p1 == p2 && as1 == as2 && t1 == t2 && st1 == st2
   EGenericProperty gs1 n1 ts1 t1 == EGenericProperty gs2 n2 ts2 t2 =
     gs1 == gs2 && n1 == n2 && ts1 == ts2 && t1 == t2
   _ == _ = False
