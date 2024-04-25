@@ -74,6 +74,8 @@ synthDecl
     newScheme <- liftIO $ compressPaths exprTy'
     insertEnv @"typeEnv" name newScheme
 
+    when (Post.containsReturn expr') $ throw (DeclarationReturn "declaration")
+
     -- Removing the generic types from the environment
     mapM_ (deleteEnv @"genericsEnv" . getGenericName) generics
 

@@ -27,6 +27,9 @@ synthClosure infer (Pre.EClosure args ret body) = local id $ do
   -- Unifying specified return type with the inferred return type
   retTy `unifiesWith` convertedRet
 
+  when (Post.isBlock body' && not (Post.containsReturn body')) $ 
+    throw (NoReturnFound retTy)
+
   -- Creating the closure type
   let closureTy = map (.annotationValue) convertedArgs :->: retTy
 

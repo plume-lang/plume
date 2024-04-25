@@ -456,6 +456,25 @@ interpretError (p, DuplicateNative n s) =
     , p
     )
     "while performing typechecking"
+interpretError (p, NoReturnFound t) =
+  printErrorFromString
+    mempty
+    ( "No return found in the expression for type " <> showTy t
+    , Just "Every function must have a return in its body"
+    , p
+    )
+    "while performing typechecking"
+interpretError (p, DeclarationReturn st) =
+  printErrorFromString
+    mempty
+    ( "Did not expect a return type in this expression"
+    , Just $ toString (capitalize st) <> " must not have a return type"
+    , p
+    )
+    "while performing typechecking"
+
+capitalize :: Text -> Text
+capitalize = T.toTitle . T.toLower
 
 showList :: [PlumeType] -> String
 showList [] = ""

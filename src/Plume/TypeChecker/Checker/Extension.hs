@@ -82,6 +82,9 @@ synthExtMember
     
     exitLevel
 
+    when (Post.isBlock body' && not (Post.containsReturn body')) $ 
+      throw (NoReturnFound convertedRet)
+
     pure $
       Post.EExtensionDeclaration
         ann.annotationName
@@ -131,6 +134,8 @@ synthExtMember
 
     exitLevel
 
+    when (Post.isBlock body' && not (Post.containsReturn body')) $ 
+      throw (NoReturnFound inferedTy)
     let newArgs = zipWith Annotation argsNames (map getConverted convertedArgs)
 
     pure $
@@ -163,6 +168,8 @@ synthExtMember
     preExts' <- liftIO $ removeDuplicates $ compressedExt : exts
     modifyIORef' checkState $ \s -> s {extensions = preExts'}
 
+    when (Post.containsReturn value') $ throw (DeclarationReturn "extension variable")
+
     pure $
       Post.EExtensionDeclaration
         name
@@ -182,7 +189,7 @@ synthExtMember
     exts <- gets extensions
     preExts <- liftIO $ removeDuplicates $ preExt : exts
     modifyIORef' checkState $ \s -> s {extensions = preExts}
-    
+
     insertEnvWith @"typeEnv" Map.union (Map.singleton extVar extTy)
 
     enterLevel
@@ -198,6 +205,8 @@ synthExtMember
     modifyIORef' checkState $ \s -> s {extensions = preExts'}
 
     exitLevel
+    
+    when (Post.containsReturn value') $ throw (DeclarationReturn "extension variable")
 
     pure $
       Post.EExtensionDeclaration

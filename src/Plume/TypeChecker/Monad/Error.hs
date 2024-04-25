@@ -35,6 +35,8 @@ data TypeError
   | UnboundVariable Text
   | DuplicateNative Text PlumeScheme
   | CompilerError Text
+  | NoReturnFound PlumeType
+  | DeclarationReturn Text
   deriving (Eq, Show)
 
 -- THROWABLE INSTANCES FOR TYPE ERROR
@@ -70,6 +72,8 @@ instance Throwable TypeError where
   showError (CompilerError e) = "Compiler error: " <> e
   showError (DuplicateNative n s) =
     "Native function " <> showError (n, s) <> " already defined"
+  showError (NoReturnFound t) = "No return found for type " <> showError t
+  showError DeclarationReturn {} = "Declaration return"
 
 instance Throwable a => Throwable (Text, a) where
   showError (n, e) = n <> ": " <> showError e

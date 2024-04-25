@@ -17,12 +17,6 @@ import Plume.TypeChecker.Constraints.Solver
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.TLIR qualified as Post
 
-doesContainReturn :: [Post.Expression] -> Bool
-doesContainReturn = any $ \case
-  Post.EReturn {} -> True
-  Post.EBlock xs -> doesContainReturn xs
-  _ -> False
-
 withoutLocated :: Post.Expression -> Post.Expression
 withoutLocated (Post.ELocated expr _) = withoutLocated expr
 withoutLocated e = e
