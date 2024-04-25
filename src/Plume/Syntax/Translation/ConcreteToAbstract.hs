@@ -134,21 +134,9 @@ concreteToAbstract (CST.ESwitch e ps) = do
         (\(p, body) -> (p,) . fmap interpretSpreadable <$> concreteToAbstract body)
         ps
   transRet $ AST.ESwitch <$> e' <*> ps'
-concreteToAbstract (CST.EProperty {}) = do
-  -- This case should not happen as the language support
-  -- direct-style UFCS, so we should not have any property
-  -- expressions outside function calls:
-  --
-  -- x = y.property
-  -- x(5) 
-  -- 
-  -- This example is not yet supported, so the compiler will
-  -- throw an error if it encounters a property expression
-
-  pos <- readIORef positionRef
-  throwError $ case pos of
-    Just p -> CompilerError $ "Unexpected property at " <> show p
-    Nothing -> CompilerError "Unexpected property"
+concreteToAbstract (CST.EProperty i e) = do
+  e' <- shouldBeAlone <$> concreteToAbstract e
+  transRet $ AST.EApplication (AST.EVariable i) . (: []) <$> e'
 concreteToAbstract (CST.EReturn e) = do
   -- Return can be a spread element, so we need to check if it is and
   -- then combine the expressions into a single expression by wrapping

@@ -34,7 +34,9 @@ synthDecl
     -- that indicates if the variable is mutable
     (declFun, isMut') <-
       searchEnv @"typeEnv" name >>= \case
-        Just (TMut _) -> return (Post.EMutUpdate, True)
+        Just (TMut t) -> do
+          t `unifiesWith` convertedTy
+          return (Post.EMutUpdate, True)
         Nothing ->
           return $
             if isMut

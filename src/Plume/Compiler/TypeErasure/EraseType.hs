@@ -62,6 +62,16 @@ eraseType (Pre.EExtensionDeclaration name _ arg (Pre.EClosure args _ b) : xs) = 
 
   modifyIORef' program (<> [fun])
   eraseType xs
+eraseType (Pre.EExtensionDeclaration name _ arg e : xs) = do
+  let arg' = arg.annotationName
+  let name' = name <> "::" <> createName arg.annotationValue
+  modifyIORef
+    dispatched
+    (((arg.annotationValue, name), name') :)
+  e' <- eraseExpr e
+  let fun = Post.UPFunction name' [arg'] (Post.USReturn e')
+  modifyIORef' program (<> [fun])
+  eraseType xs
 eraseType (Pre.EType tyName ts : xs) = do
   tys <- mapM createFunction ts
   modifyIORef' program (<> tys)

@@ -115,7 +115,7 @@ synthExtMember
 
     enterLevel
     (inferedTy, body') <- 
-      local (\s -> s {returnType = Just convertedRet'}) .  extractFromArray $ 
+      local (\s -> s {returnType = Just convertedRet'}) . extractFromArray $ 
         infer body
 
     let extFunTy = (extTy : map getConverted convertedArgs) :->: inferedTy
@@ -139,6 +139,73 @@ synthExtMember
         extTy
         (Annotation extVar extTy)
         (Post.EClosure newArgs inferedTy body')
+synthExtMember 
+  infer (extVar, preExtTy, extGens) 
+  (Pre.ExtDeclaration [] (Annotation name (Just ty)) value) = do
+    void (convert extGens :: Checker [PlumeType])
+    extTy <- convert preExtTy
+    convertedValue <- convert ty
+
+    let preFun = [extTy] :->: convertedValue
+        preExt = MkExtension name extTy preFun
+    exts <- gets extensions
+    preExts <- liftIO $ removeDuplicates $ preExt : exts
+    modifyIORef' checkState $ \s -> s {extensions = preExts}
+
+    insertEnvWith @"typeEnv" Map.union (Map.singleton extVar extTy)
+
+    (inferedTy', value') <- extractFromArray $ infer value
+
+    inferedTy' `unifiesWith` convertedValue
+
+    compressedFun <- liftIO $ compressPaths preFun
+    let compressedExt = MkExtension name extTy compressedFun
+    preExts' <- liftIO $ removeDuplicates $ compressedExt : exts
+    modifyIORef' checkState $ \s -> s {extensions = preExts'}
+
+    pure $
+      Post.EExtensionDeclaration
+        name
+        extTy
+        (Annotation extVar extTy)
+        value'
+synthExtMember 
+  infer (extVar, preExtTy, extGens)
+  (Pre.ExtDeclaration [] (Annotation name Nothing) value) = do
+    void (convert extGens :: Checker [PlumeType])
+    extTy :: PlumeType <- convert preExtTy
+    convertedValue :: PlumeType <- fresh
+
+    preFun :: PlumeType <- fresh
+
+    let preExt = MkExtension name extTy preFun
+    exts <- gets extensions
+    preExts <- liftIO $ removeDuplicates $ preExt : exts
+    modifyIORef' checkState $ \s -> s {extensions = preExts}
+    
+    insertEnvWith @"typeEnv" Map.union (Map.singleton extVar extTy)
+
+    enterLevel
+    (inferedTy', value') <- extractFromArray $ infer value
+
+    let extFunTy = [extTy] :->: inferedTy'
+    convertedValue `unifiesWith` inferedTy'
+    preFun `unifiesWith` extFunTy
+
+    compressedFun <- liftIO $ compressPaths preFun
+    let compressedExt = MkExtension name extTy compressedFun
+    preExts' <- liftIO $ removeDuplicates $ compressedExt : exts
+    modifyIORef' checkState $ \s -> s {extensions = preExts'}
+
+    exitLevel
+
+    pure $
+      Post.EExtensionDeclaration
+        name
+        extTy
+        (Annotation extVar extTy)
+        value'
+
 synthExtMember _ _ _ = throw $ CompilerError "Only extension members are supported"
 
 createEnvFromConverted :: [(Text, Converted)] -> Map Text PlumeScheme
