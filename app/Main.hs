@@ -6,7 +6,7 @@ import Control.Monad.Exception
 import Control.Monad.Parser
 import Data.Either
 import Data.Text.IO hiding (putStr)
-import Plume.Compiler.Bytecode.Assembler hiding (nativeLibraries)
+import Plume.Compiler.Bytecode.Assembler
 import Plume.Compiler.Bytecode.Serialize
 import Plume.Compiler.Bytecode.Syntax
 import Plume.Compiler.ClosureConversion.Conversion
@@ -72,4 +72,4 @@ printBytecode bytecode =
         putStr (show i <> ": ")
         print instr
     )
-    (zip [0 :: Int ..] $ instructions bytecode)
+    (zip [0 :: Int ..] $ pInstructions bytecode)
