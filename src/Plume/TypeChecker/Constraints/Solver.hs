@@ -1,69 +1,86 @@
 module Plume.TypeChecker.Constraints.Solver where
 
-import Data.Map qualified as Map
-import Data.Set qualified as Set
-import GHC.IO
+import GHC.IO hiding (liftIO)
 import Plume.TypeChecker.Constraints.Definition
 import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.Monad
+import Control.Monad.Except (MonadError(catchError))
 
 -- | Stacking errors to provide better error messages during the constraint
 -- | resolution process
 {-# NOINLINE errorStack #-}
-errorStack :: IORef (Set PlumeError)
+errorStack :: IORef [PlumeError]
 errorStack = unsafePerformIO $ newIORef mempty
 
 -- | Solve basic type constraints (equality and equivalence)
-solve :: [PlumeConstraint] -> Checker Substitution
-solve [] = pure Map.empty
+solve :: [PlumeConstraint] -> Checker ()
+solve [] = pure ()
 solve ((p, c) : cs) = do
-  s <- withPosition p $ solveConstraint c
+  withPosition p $ solveConstraint c
 
   -- Solving remaining constraints
-  s' <- solve (map (second $ apply s) cs)
+  solve cs
 
-  -- And returning the new one merged
-  pure (s' <> s)
+infix 4 `unifiesWith`
+
+unifiesWith :: PlumeType -> PlumeType -> Checker ()
+unifiesWith t1 t2 = do
+  p <- fetchPosition
+  withPosition p $ mgu t1 t2
+
+infix 4 `doesExtend`
+
+-- | Adding a extension constraint onto the constraint stack
+doesExtend :: PlumeType -> Text -> PlumeType -> Checker ()
+doesExtend t n a = do
+  p <- fetchPosition
+  void . withPosition p $ solveExtend [(p, DoesExtend t n a)] =<< gets extensions
 
 -- | Solve type constraints using the `mgu` unification algorithm
-solveConstraint :: TypeConstraint -> Checker Substitution
-solveConstraint (t1 :~: t2) = case mgu t1 t2 of
-  Right s -> pure s
-  Left e -> throw e
+solveConstraint :: TypeConstraint -> Checker ()
+solveConstraint (t1 :~: t2) = mgu t1 t2
 solveConstraint (DoesExtend {}) =
   throw $ CompilerError "Only functions are supported in extensions"
 solveConstraint (Hole _) =
   throw $ CompilerError "Holes are not supported yet"
+
+doesThrowError :: Checker a -> Checker Bool
+doesThrowError action = MkChecker $ do
+  catchError (runCheckerT action >> pure False) (\_ -> pure True)
 
 -- | Find an extension with a specific type without throwing
 -- | any error.
 findExtensionWithType
   :: Text
   -> PlumeType
-  -> Set Extension
+  -> [Extension]
   -> Checker (Either PlumeError Extension)
 findExtensionWithType n t exts = do
   -- Finding the extension with the same name and type that unifies
   -- with the given type
-  let found =
-        Set.filter
-          ( \(MkExtension n' _ (Forall _ sndTy)) ->
-              n == n'
-                && isRight (mgu t sndTy)
-          )
-          exts
+  found <- filterM
+    ( \(MkExtension n' _ sndTy) -> 
+      if n /= n'
+        then pure False
+        else liftIO $ doesUnifyWith t sndTy
+    )
+    exts
   
-  if Set.null found then Left <$> throw' (NoExtensionFound n t)
-  else if Set.size found == 1 then pure $ Right $ Set.findMin found
-  else do
-    let foundL = Set.toList found
-    let found' = map (\(MkExtension _ ty _) -> ty) foundL
-    Left <$> throw' (MultipleExtensionsFound n found' t)
+  case found of 
+    [] -> Left <$> throw' (NoExtensionFound n t)
+    [ext] -> pure $ Right ext
+    _ -> do
+      let found' = map (\(MkExtension _ ty _) -> ty) found
+      Left <$> throw' (MultipleExtensionsFound n found' t)
 
 -- | Check if a type is not a type variable
-isNotTVar :: PlumeType -> Bool
-isNotTVar (TypeVar _) = False
-isNotTVar _ = True
+isNotTVar :: PlumeType -> IO Bool
+isNotTVar (TypeVar tv) = do
+  tv' <- readIORef tv
+  case tv' of
+    Link t -> isNotTVar t
+    Unbound _ _ -> pure False
+isNotTVar _ = pure True
 
 -- | Throw a type error with the current position without adding
 -- | it to the error stack
@@ -86,14 +103,14 @@ maxCyclicCounter = 15
 -- | Resolve cyclic constraints
 resolveCyclic 
   :: [PlumeConstraint]
-  -> Set Extension
-  -> Checker (Substitution, [PlumeConstraint])
+  -> [Extension]
+  -> Checker [PlumeConstraint]
 resolveCyclic cs exts = do
   -- Checking if the cyclic maximum counter has been reached
   counter <- readIORef cyclicCounter
   when (counter > maxCyclicCounter) $ do
     errors <- readIORef errorStack
-    if Set.null errors
+    if null errors
       then 
         throw $
           CompilerError $
@@ -110,70 +127,40 @@ resolveCyclic cs exts = do
 
   -- Resetting the cyclic counter as the resolution was successful
   -- and updating the substitution and finally returning the result
-  modifyIORef' cyclicCounter (const 0)
+  writeIORef cyclicCounter 0
 
   pure s'
 
 -- | Type extension constraint resolution algorithm
 solveExtend
   :: [PlumeConstraint]
-  -> Set Extension
-  -> Checker (Substitution, [PlumeConstraint])
+  -> [Extension]
+  -> Checker [PlumeConstraint]
 solveExtend (x@(p, DoesExtend _ name funTy) : xs) exts = withPosition p $ do
   -- Trying to find an extension that matches the constraint
-  ext <- findExtensionWithType name funTy exts
+  funTy' <- liftIO $ compressPaths funTy
+  ext <- findExtensionWithType name funTy' exts
   case ext of
     -- If an extension is found, we try to unify the function type
     -- with the extension type
     Right (MkExtension _ _ sch) -> do
       extFun <- instantiate sch
-      let s2 = mgu funTy extFun
-      case s2 of
-        Right s -> do
-          let exts' = Set.map (apply s) exts
-          -- Solving the remaining constraints
-          (s', cs) <- solveExtend (map (second $ apply s) xs) exts'
-          pure (s' <> s, cs)
-        Left e -> throw e
+      mgu funTy' extFun
+      solveExtend xs exts
 
     -- If no extension is found, we add the error to the error stack
     -- and try to resolve it later (using the `resolveCyclic` function)
     Left e@(_, err) -> do
-      modifyIORef' errorStack (Set.insert e)
+      modifyIORef' errorStack (e:)
       
-      (s1', _) <- solveExtend xs exts
-      let exts' = Set.map (apply s1') exts
-      (s2', cs1) <- resolveCyclic [second (apply s1') x] exts'
+      void $ solveExtend xs exts
+      cs1 <- resolveCyclic [x] exts
 
-      let s3 = s2' <> s1'
       case cs1 of
         -- If no constraints are left, we return the substitution
-        [] -> return (s3, cs1)
+        [] -> return cs1
 
         -- Otherwise, we throw the error
-        _ -> throw (apply s3 err)
+        _ -> throw err
 solveExtend (_ : xs) exts = solveExtend xs exts
-solveExtend [] _ = pure (Map.empty, [])
-
--- | Constraint solving main function
-solveConstraints :: Constraints -> Checker Substitution
-solveConstraints cs = do
-  -- Resetting the cyclic counter
-  writeIORef cyclicCounter 0
-
-  -- Solving the type constraints in the first place
-  s <- solve cs.tyConstraints
-
-  -- Solving the extension constraints using the substitution
-  -- from the type constraints
-  (s', _) <- case cs.extConstraints of
-    [] -> pure (Map.empty, [])
-    xs -> do
-      generalSub <- getSubst
-      let newSub = s <> generalSub
-      exts <- Set.map (apply newSub) <$> gets extensions
-      
-      solveExtend (map (second $ apply newSub) xs) exts
-
-  -- Merging the two substitutions together
-  pure $ s' <> s
+solveExtend [] _ = pure mempty

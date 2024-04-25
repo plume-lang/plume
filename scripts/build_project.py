@@ -3,6 +3,9 @@ from shutil import which
 import os.path
 from glob import glob
 import platform
+from sys import argv
+
+is_root = argv[1] == '--root' if len(argv) > 1 else False
 
 # Check for Cabal and XMake 
 if not which('cabal') or not which('xmake'):
@@ -40,10 +43,11 @@ system(f"cp {executable} bin/{executable_out}")
 runtime_executable = f"plume-vm{ext}"
 runtime_executable_out = f"plume{ext}"
 
-system('xmake b --root -P runtime')
+xmake_root = '--root' if is_root else ''
+system(f'xmake b {xmake_root} -P runtime')
 system(f"cp runtime/bin/{runtime_executable} bin/{runtime_executable_out}")
 
-system('xmake config --root -P standard --ccache=n -y')
-system('xmake b --root -P standard')
+system(f'xmake config {xmake_root} -P standard --ccache=n -y')
+system(f'xmake b {xmake_root} -P standard')
 
 print('Build ran successfully')

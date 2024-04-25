@@ -5,8 +5,8 @@ import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Common.Pattern qualified as Pre
 import Plume.TypeChecker.Checker.Monad
-import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.TLIR qualified as Post
+import Plume.TypeChecker.Constraints.Solver (unifiesWith)
 
 synthSwitch :: Infer -> Infer
 synthSwitch infer (Pre.ESwitch scrutinee cases) = local id $ do
@@ -24,10 +24,10 @@ synthSwitch infer (Pre.ESwitch scrutinee cases) = local id $ do
     (x : xs'') -> return (x, xs'')
 
   -- Unify the return type with the type of the case expressions
-  forM_ xs $ unifiesTo ret
+  forM_ xs $ unifiesWith ret
 
   -- Unify the scrutinee type with the type of the patterns
-  forM_ xs' $ unifiesTo exprTy
+  forM_ xs' $ unifiesWith exprTy
 
   pure (exprTy, [Post.ESwitch scrutinee' cases'])
 synthSwitch _ _ = throw $ CompilerError "Only switches are supported"
@@ -43,7 +43,7 @@ synthCase infer scrutTy (pat, expr) = local id $ do
   (exprTy, expr') <- local id . extractFromArray $ localEnv patEnv (infer expr)
 
   -- Pattern type should unify with the scrutinee type
-  scrutTy `unifiesTo` patTy
+  scrutTy `unifiesWith` patTy
   pure ((patTy, exprTy), (patExpr, expr'))
 
 -- | Locally perform an action without changing the environment globally
@@ -75,7 +75,7 @@ synthPattern (Pre.PVariable name) = do
       return
         ( ty
         , Post.PVariable name ty
-        , Map.singleton name (Forall [] ty)
+        , Map.singleton name ty
         )
 synthPattern (Pre.PLiteral l) = do
   let (ty, l') = typeOfLiteral l
@@ -87,19 +87,19 @@ synthPattern (Pre.PConstructor name pats) = do
       inst <- instantiate t'
       ret <- fresh
       (patsTy, pats', env) <- mapAndUnzip3M synthPattern pats
-      inst `unifiesTo` (patsTy :->: ret)
+      inst `unifiesWith` (patsTy :->: ret)
       return (ret, Post.PConstructor name pats', mconcat env)
     Nothing -> throw $ UnboundVariable name
 synthPattern (Pre.PList pats slice) = do
   tv <- fresh
   (patsTy, pats', env) <- mapAndUnzip3M synthPattern pats
-  forM_ patsTy (`unifiesTo` tv)
+  forM_ patsTy (`unifiesWith` tv)
 
   slRes <- maybeM slice synthPattern
 
   case slRes of
     Just (slTy, sl', slEnv) -> do
-      slTy `unifiesTo` TList tv
+      slTy `unifiesWith` TList tv
       return (TList tv, Post.PList pats' (Just sl'), mconcat env <> slEnv)
     Nothing -> return (TList tv, Post.PList pats' Nothing, mconcat env)
 synthPattern (Pre.PSlice n) = do
@@ -107,7 +107,7 @@ synthPattern (Pre.PSlice n) = do
   return
     ( TList tv
     , Post.PVariable n (TList tv)
-    , Map.singleton n (Forall [] (TList tv))
+    , Map.singleton n (TList tv)
     )
 
 typeOfLiteral :: Literal -> (PlumeType, Literal)

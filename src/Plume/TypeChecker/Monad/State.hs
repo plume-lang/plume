@@ -1,12 +1,8 @@
 module Plume.TypeChecker.Monad.State where
 
-import Data.Map qualified as Map
-import Data.Set qualified as Set
 import GHC.IO hiding (liftIO)
 import GHC.Records
 import Plume.Syntax.Concrete
-import Plume.TypeChecker.Constraints.Definition
-import Plume.TypeChecker.Monad.Free
 import Plume.TypeChecker.Monad.Type
 
 -- | Type checker state
@@ -15,27 +11,14 @@ import Plume.TypeChecker.Monad.Type
 -- | constraints, the created extensions, the return type, the positions
 -- | and the native functions
 data CheckState = MkCheckState
-  { nextTyVar :: Int
-  , environment :: Environment
-  , constraints :: Constraints
-  , extensions :: Set Extension
+  { environment :: Environment
+  , extensions ::  [Extension]
   , returnType :: Maybe PlumeType
   , positions :: [Position]
   , natives :: Map Text (PlumeScheme, Position)
   }
   deriving (Eq)
 
--- | Constraints
--- | The constraints are used to store the constraints generated during the
--- | type checking process. It stores the type constraints, the extension
--- | constraints and the substitution.
--- | Types and extensions are unified using the substitution.
-data Constraints = MkConstraints
-  { tyConstraints :: [PlumeConstraint]
-  , extConstraints :: [PlumeConstraint]
-  , substitution :: Substitution
-  }
-  deriving (Eq)
 
 -- | Environment
 -- | The environment is used to store the type and datatype environment
@@ -45,7 +28,7 @@ data Constraints = MkConstraints
 data Environment = MkEnvironment
   { typeEnv :: Map Text PlumeScheme
   , datatypeEnv :: Map Text PlumeScheme
-  , genericsEnv :: Map Text TyVar
+  , genericsEnv :: Map Text PlumeType
   }
   deriving (Eq)
 
@@ -62,16 +45,14 @@ data Extension
   , extType :: PlumeType
   , extScheme :: PlumeScheme
   }
-  deriving (Eq, Ord, Show)
+  deriving (Show, Eq)
 
 -- | Empty state
 -- | The empty state is the initial state of the type checker
 emptyState :: CheckState
 emptyState =
   MkCheckState
-    { nextTyVar = 0
-    , environment = MkEnvironment mempty mempty mempty
-    , constraints = MkConstraints mempty mempty mempty
+    { environment = MkEnvironment mempty mempty mempty
     , extensions = mempty
     , returnType = Nothing
     , positions = []
@@ -82,7 +63,6 @@ emptyState =
 -- | and Extension types
 deriveHasField ''CheckState
 deriveHasField ''Environment
-deriveHasField ''Constraints
 deriveHasField ''Extension
 
 -- | Check state reference
@@ -90,23 +70,10 @@ deriveHasField ''Extension
 checkState :: IORef CheckState
 checkState = unsafePerformIO $ newIORef emptyState
 
-instance Free Extension where
-  free (MkExtension _ t s) = free t <> free s
+{-# NOINLINE currentLevel #-}
+currentLevel :: IORef Level
+currentLevel = unsafePerformIO $ newIORef 0
 
-  apply s (MkExtension n t (Forall gens ty)) =
-    MkExtension n (apply s t) (Forall (apply s gens) (apply s ty))
-
--- | Apply a substitution to a set of extensions without 
--- | overwriting the for-all quantified variables
-applyExts :: Substitution -> Set Extension -> Set Extension
-applyExts s = Set.map applyE
- where
-  applyE (MkExtension n t sc) =
-    MkExtension n (apply s t) (apply s sc)
-
-instance Free TyVar where
-  free = Set.singleton
-
-  apply s i = case Map.lookup i s of
-    Just (TypeVar i') -> i'
-    _ -> i
+{-# NOINLINE currentSymbol #-}
+currentSymbol :: IORef Int
+currentSymbol = unsafePerformIO $ newIORef 0

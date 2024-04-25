@@ -78,7 +78,7 @@ jobs:
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
       - name: Build compiler and VM
-        run: python3 scripts/build_project.py
+        run: python3 scripts/build_project.py --root
 
       - name: Create ZIP archive on UNIX
         if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')

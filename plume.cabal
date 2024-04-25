@@ -98,6 +98,7 @@ library
         Plume.Compiler.Bytecode.Syntax
         Plume.Compiler.Bytecode.Assembler
         Plume.Compiler.Bytecode.Serialize
+        Plume.Compiler.Bytecode.Arithmetic
 
         System.IO.Pretty
 

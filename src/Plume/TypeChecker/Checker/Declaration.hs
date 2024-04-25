@@ -4,19 +4,18 @@ module Plume.TypeChecker.Checker.Declaration where
 
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Common.Annotation
-import Plume.Syntax.Common.Type qualified as Pre
 import Plume.TypeChecker.Checker.Monad
-import Plume.TypeChecker.Constraints.Definition
 import Plume.TypeChecker.Constraints.Solver
-import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
+import Plume.Syntax.Common.Type (getGenericName)
+import Plume.TypeChecker.Constraints.Unification (compressPaths)
 
 synthDecl :: Infer -> Infer
 synthDecl
   infer
   (Pre.EDeclaration isMut generics (Annotation name ty) expr body) = do
-    convertedGenerics :: [TyVar] <- mapM convert generics
+    convertedGenerics :: [PlumeType] <- mapM convert generics
     convertedTy :: PlumeType <- convert ty
 
     -- Mutable variables should not have generics as this is unsound
@@ -27,7 +26,7 @@ synthDecl
     -- then it should be an update and the update type should have the same 
     -- type as the variable
     searchEnv @"typeEnv" name >>= \case
-      Just (Forall _ (TMut t)) -> convertedTy `unifiesTo` t
+      Just (TMut t) -> convertedTy `unifiesWith` t
       Just _ -> throw $ CompilerError "Variable already declared"
       _ -> pure ()
 
@@ -35,7 +34,7 @@ synthDecl
     -- that indicates if the variable is mutable
     (declFun, isMut') <-
       searchEnv @"typeEnv" name >>= \case
-        Just (Forall _ (TMut _)) -> return (Post.EMutUpdate, True)
+        Just (TMut _) -> return (Post.EMutUpdate, True)
         Nothing ->
           return $
             if isMut
@@ -43,48 +42,38 @@ synthDecl
               else (Post.EDeclaration, isMut)
         _ -> throw $ CompilerError "Variable already declared"
 
+    let mut = if isMut' then TMut else id
+
     -- Creating the type of the variable based on mutability and adding it
     -- to the environment
-    let convertedTy' = if isMut' then TMut convertedTy else convertedTy
-    let scheme = Forall convertedGenerics convertedTy'
+    let convertedTy' = mut convertedTy
+    let scheme = convertedTy'
     insertEnv @"typeEnv" name scheme
 
-    ((exprTy, expr'), s1) <- case convertedGenerics of
+    enterLevel
+    (exprTy, expr') <- case convertedGenerics of
       -- If the variable is not generic, we can just infer the expression
-      [] -> do
-        (exprTy, b) <- extractFromArray (local id $ infer expr)
-        let exprTy' = if isMut' then TMut exprTy else exprTy
-        exprTy' `unifiesTo` convertedTy'
-        pure ((exprTy', b), mempty)
+      [] -> extractFromArray (local id $ infer expr)
+        -- let exprTy' = mut exprTy
+        -- exprTy' `unifiesTo` convertedTy'
+        -- pure (exprTy', b)
       
       -- If the variable is generic but not mutable, we can infer
-      _ | not isMut -> do
-        -- Fetching local constraints from inference of the expression
-        ((exprTy, b), cs') <-
-          local id $ getLocalConstraints $ extractFromArray $ infer expr
-
-        -- Solving the constraints to get rid of the generic types
-        c1 <- createConstraint (exprTy :~: convertedTy')
-        let cs'' = cs'.tyConstraints <> [c1]
-        writeIORef cyclicCounter 0
-        let constraint = MkConstraints cs'' cs'.extConstraints cs'.substitution
-        s1 <- solveConstraints constraint
-        updateSubst s1
-        pure ((exprTy, b), s1)
+      _ | not isMut -> extractFromArray $ infer expr
 
       _ -> throw $ CompilerError "Generic mutable variables are not supported"
 
+    let exprTy' = mut exprTy
+    exprTy' `unifiesWith` convertedTy'
+
+    exitLevel
+
     -- Creating a new scheme for the variable based on the substitution
-    let newScheme = Forall (apply s1 convertedGenerics) (apply s1 exprTy)
+    newScheme <- liftIO $ compressPaths exprTy'
     insertEnv @"typeEnv" name newScheme
 
     -- Removing the generic types from the environment
-    mapM_
-      ( \case
-          Pre.GVar v -> deleteEnv @"genericsEnv" v
-          _ -> pure ()
-      )
-      generics
+    mapM_ (deleteEnv @"genericsEnv" . getGenericName) generics
 
     -- Infer the body of the declaration
     b <- maybeM body (local id . extractFromArray . infer)

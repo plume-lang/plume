@@ -1,5 +1,6 @@
 #!/bin/sh
 cd benchmark || exit
+../bin/plumec ../example/closure.plm
 rustc index.rs -C opt-level=3 -o index-rs
 javac Main.java
 # gcc -O3 benchmark/index.c -o index-c

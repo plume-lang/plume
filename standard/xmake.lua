@@ -3,7 +3,7 @@ add_requires("libcurl")
 
 target("plume-natives")
   set_kind("shared")
-  add_packages("libcurl", {public = true})
+  add_packages("libcurl")
 
   add_files("ffi/**.c")
   add_includedirs("../runtime/include")

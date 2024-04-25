@@ -4,6 +4,7 @@ module Plume.TypeChecker.Checker where
 
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Translation.Generics hiding (Error (..), withPosition)
+import Plume.TypeChecker.Monad.Free
 import Plume.TypeChecker.Checker.Application
 import Plume.TypeChecker.Checker.Closure
 import Plume.TypeChecker.Checker.Condition
@@ -13,7 +14,6 @@ import Plume.TypeChecker.Checker.Extension
 import Plume.TypeChecker.Checker.Native
 import Plume.TypeChecker.Checker.Switch
 import Plume.TypeChecker.Constraints.Solver
-import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.TLIR qualified as Post
 
@@ -49,7 +49,6 @@ synthesize (Pre.EVariable name) = do
             then do
               ty <- fresh
               futureFunTy <- fresh
-              doesExtend ty name futureFunTy
               pure (futureFunTy, [Post.EExtVariable name futureFunTy ty])
             else throw $ UnboundVariable name
 synthesize (Pre.ELiteral lit) =
@@ -57,7 +56,7 @@ synthesize (Pre.ELiteral lit) =
 synthesize (Pre.EUnMut e) = do
   tv <- fresh
   (ty, e') <- extractFromArray $ synthesize e
-  ty `unifiesTo` TMut tv
+  ty `unifiesWith` TMut tv
   pure (tv, [Post.EUnMut e'])
 synthesize (Pre.EBlock exprs) = local id $ do
   (tys, exprs') <-
@@ -68,13 +67,13 @@ synthesize (Pre.EBlock exprs) = local id $ do
   retTy <- gets returnType
   case tys of
     [x] -> do
-      forM_ retTy $ unifiesTo x
+      forM_ retTy $ unifiesWith x
       pure (x, [Post.EBlock exprs'])
     _ -> return (fromMaybe TUnit retTy, [Post.EBlock exprs'])
 synthesize (Pre.EReturn expr) = do
   (ty, expr') <- extractFromArray $ synthesize expr
   returnTy <- gets returnType
-  forM_ returnTy $ unifiesTo ty
+  forM_ returnTy $ unifiesWith ty
   pure (ty, [Post.EReturn expr'])
 synthesize (Pre.EList xs) = do
   tv <- fresh
@@ -82,7 +81,7 @@ synthesize (Pre.EList xs) = do
     mapAndUnzipM
       (local id . localPosition . extractFromArray . synthesize)
       xs
-  forM_ tys $ unifiesTo tv
+  forM_ tys $ unifiesWith tv
   pure (TList tv, [Post.EList xs'])
 -- | Calling synthesis modules
 synthesize app@(Pre.EApplication {}) = synthApp synthesize app
@@ -100,9 +99,7 @@ synthesize e = throw . CompilerError $ "Not implemented: " <> show e
 synthesizeMany :: [Pre.Expression] -> Checker [Post.Expression]
 synthesizeMany xs = do
   xs' <- concatMapM (fmap snd . localPosition . synthesize) xs
-  cs <- gets constraints
-  s1 <- solveConstraints cs
-  pure (apply s1 xs')
+  liftIO $ mapM free xs'
 
 runSynthesize :: [Pre.Expression] -> IO (Either PlumeError [Post.Expression])
 runSynthesize = runChecker . synthesizeMany

@@ -109,6 +109,10 @@ encodeInstruction (CallLocal i j) =
   encodeInstr 37 >> encodeInteger i >> encodeInteger j >> encodeNull
 encodeInstruction (MakeAndStoreLambda i j k) =
   encodeInstr 38 >> encodeInteger i >> encodeInteger j >> encodeInteger k
+encodeInstruction Mul =
+  encodeInstr 39 >> replicateNull 3
+encodeInstruction (MulConst i) =
+  encodeInstr 40 >> encodeInteger i >> replicateNull 2
 
 encodeText :: Text -> Put
 encodeText w = do
@@ -129,15 +133,15 @@ encodeMetaData FunctionMetaData {arity, address, localsSpace} = do
   encodeInteger localsSpace
 
 encodeProgram :: Program -> Put
-encodeProgram Program {instructions, constants, nativeLibraries} = do
-  encodeInteger $ length constants
-  mapM_ encodeConstant constants
+encodeProgram Program {pInstructions, pConstants, pNativeLibraries} = do
+  encodeInteger $ length pConstants
+  mapM_ encodeConstant pConstants
 
-  encodeInteger $ length nativeLibraries
-  mapM_ encodeNative nativeLibraries
+  encodeInteger $ length pNativeLibraries
+  mapM_ encodeNative pNativeLibraries
 
-  encodeInteger $ length instructions
-  mapM_ encodeInstruction instructions
+  encodeInteger $ length pInstructions
+  mapM_ encodeInstruction pInstructions
 
 encodeNative :: (FilePath, Int) -> Put
 encodeNative (path, idx) = do

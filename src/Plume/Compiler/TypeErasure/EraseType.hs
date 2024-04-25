@@ -5,7 +5,6 @@ module Plume.Compiler.TypeErasure.EraseType where
 
 import Data.Bitraversable
 import Data.List qualified as List
-import Data.Map qualified as Map
 import GHC.IO
 import Plume.Compiler.TypeErasure.DynamicDispatch.BundleExtensions
 import Plume.Compiler.TypeErasure.Syntax qualified as Post
@@ -13,13 +12,13 @@ import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Concrete.Expression qualified as Pre (TypeConstructor (..))
 import Plume.TypeChecker.Constraints.Solver (isNotTVar)
-import Plume.TypeChecker.Constraints.Unification (mgu)
+import Plume.TypeChecker.Constraints.Unification (doesUnifyWith)
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.TLIR qualified as Pre
 
 {-# NOINLINE dispatched #-}
-dispatched :: IORef (Map (PlumeType, Text) Text)
-dispatched = unsafePerformIO $ newIORef Map.empty
+dispatched :: IORef [((PlumeType, Text), Text)]
+dispatched = unsafePerformIO $ newIORef mempty
 
 {-# NOINLINE program #-}
 program
@@ -55,7 +54,7 @@ eraseType (Pre.EExtensionDeclaration name _ arg (Pre.EClosure args _ b) : xs) = 
   let name' = name <> "::" <> createName arg.annotationValue
   modifyIORef
     dispatched
-    (Map.insert (arg.annotationValue, name) name')
+    (((arg.annotationValue, name), name') :)
   let b' = insertReturnStmt b
   fun <-
     Post.UPFunction name' (arg' : map (.annotationName) args) <$> eraseStatement b'
@@ -179,21 +178,23 @@ eraseExpr (Pre.EClosure args _ body) = do
       (map (\(Annotation n _) -> n) args)
       (Post.USExpr b)
 eraseExpr (Pre.EExtVariable x fun t) = do
-  case t of
-    TypeVar _ -> case fun of
-      (t' : _) :->: _ | isNotTVar t' -> Post.UEVar <$> getName t'
-      _ ->
-        error $
+  let err = error $
           "Invalid function type for extension variable: "
             <> x
             <> " with type"
             <> show fun
+  case t of
+    TypeVar _ -> case fun of
+      (t' : _) :->: _ -> do
+        b <- isNotTVar t'
+        if b then Post.UEVar <$> getName t' else err
+      _ -> err
     _ -> Post.UEVar <$> getName t
  where
   getName :: PlumeType -> IO Text
   getName ty = do
     m <- readIORef dispatched
-    case findWithKey (\(t', n) -> n == x && isRight (mgu ty t')) m of
+    findWithKeyM (\(t', n) -> (n == x &&) <$> ty `doesUnifyWith` t') m >>= \case
       Just (_, n) -> return n
       Nothing -> error $ "Extension not found: " <> show x <> " for type " <> show ty
 eraseExpr (Pre.ELocated e _) = eraseExpr e
@@ -220,8 +221,15 @@ erase xs = do
   void $ eraseType xs
   readIORef program
 
-findWithKey :: (k -> Bool) -> Map k a -> Maybe (k, a)
-findWithKey f = List.find (f . fst) . Map.toList
+findWithKey :: (k -> Bool) -> [(k, a)] -> Maybe (k, a)
+findWithKey f = List.find (f . fst)
+
+findWithKeyM :: Monad m => (k -> m Bool) -> [(k, a)] -> m (Maybe (k, a))
+findWithKeyM f = foldr go (pure Nothing)
+ where
+  go (k, a) acc = do
+    b <- f k
+    if b then return $ Just (k, a) else acc
 
 decompose :: [a] -> ([a], Maybe a)
 decompose [] = ([], Nothing)
