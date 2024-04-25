@@ -51,6 +51,11 @@ void print_helper(Value v) {
       printf("<unknown>");
       break;
     }
+
+    case TYPE_FUNCTION: case TYPE_FUNCENV: case TYPE_CLOSURE: {
+      printf("<function>");
+      break;
+    }
   }
 }
 
