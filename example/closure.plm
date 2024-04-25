@@ -1,7 +1,9 @@
+native "std:native" print_int(x: int): int
+
 fn facto (n: int): int =>
   switch n {
     case 0 => 1
     case ? => n * facto(n - 1)
   }
 
-@println(facto(20))
+print_int(facto(12))
