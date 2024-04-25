@@ -25,10 +25,11 @@ jobs:
         with:
           submodules: true
       
-      - name: Install CLang
+      - name: Install CLang on Windows and Ubuntu
         uses: KyleMayes/install-llvm-action@v2
+        if: startsWith(matrix.os, 'windows') || startsWith(matrix.os, 'ubuntu')
         with:
-          version: "15.0"
+          version: "17.0"
         
       - uses: xmake-io/github-action-setup-xmake@v1
         with:
