@@ -13,6 +13,7 @@ rtti :: PlumeType -> RTTIResult
 rtti (TypeApp t xs) = Item (rtti t) (map rtti xs)
 rtti (TypeVar _) = Nil
 rtti (TypeId n) = Single n
+rtti (TypeQuantified _) = Nil
 
 createCondition
   :: TypedExpression PlumeType -> RTTIResult -> [TypedExpression PlumeType]

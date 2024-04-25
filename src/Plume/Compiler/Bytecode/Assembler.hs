@@ -6,93 +6,22 @@ import Data.IntMap qualified as IMap
 import Data.List qualified as List
 import Data.Map qualified as Map
 import Data.Text qualified as Text
-import GHC.IO
-import GHC.Records
 import Plume.Compiler.Bytecode.Syntax qualified as BC
 import Plume.Compiler.Desugaring.Syntax qualified as Pre
 import Plume.Compiler.ClosureConversion.Syntax (Update(..))
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Translation.Generics
 import System.FilePath
-
-class Free a where
-  free :: a -> [Text]
-
-instance (Free a) => Free [a] where
-  free = foldMap free
-
-instance Free Pre.DesugaredExpr where
-  free (Pre.DEVar x) = [x]
-  free (Pre.DEApplication f args) = [f] <> foldMap free args
-  free (Pre.DEList es) = foldMap free es
-  free (Pre.DEProperty e _) = free e
-  free (Pre.DEIf e1 e2 e3) = free e1 <> free e2 <> free e3
-  free (Pre.DETypeOf e) = free e
-  free (Pre.DEIsConstructor e _) = free e
-  free (Pre.DEEqualsTo e1 e2) = free e1 <> free e2
-  free (Pre.DEAnd e1 e2) = free e1 <> free e2
-  free (Pre.DEDictionary es) = foldMap free es
-  free _ = mempty
-
-instance Free Update where
-  free (UVariable x) = [x]
-  free (UProperty e _) = free e
-
-instance Free Pre.DesugaredStatement where
-  free (Pre.DSExpr e) = free e
-  free (Pre.DSReturn e) = free e
-  free (Pre.DSDeclaration n e) = [n] <> free e
-  free (Pre.DSMutDeclaration n e) = [n] <> free e
-  free (Pre.DSMutUpdate n e) = free n <> free e
-
-instance Free Pre.DesugaredProgram where
-  free (Pre.DPFunction name _ _) = List.singleton name
-  free (Pre.DPStatement s) = free s
-  free (Pre.DPNativeFunction {}) = mempty
-  free (Pre.DPDeclaration n _) = List.singleton n
-  free (Pre.DPMutDeclaration n _) = List.singleton n
-  free (Pre.DPMutUpdate n _) = free n
-
-data AssemblerState = AssemblerState
-  { constants :: Map Literal Int
-  , nativeFunctions :: Map Text (Int, Int, Int)
-  , metadata :: IntMap BC.FunctionMetaData
-  , currentSize :: Int
-  , locals :: Map Text Int
-  , globals :: Map Text Int
-  , nativeLibraries :: [(FilePath, [Text])]
-  , cwd :: FilePath
-  }
-  deriving (Show, Eq)
-
-deriveHasField ''AssemblerState
-
-{-# NOINLINE assemblerState #-}
-assemblerState :: IORef AssemblerState
-assemblerState =
-  unsafePerformIO $
-    newIORef $
-      AssemblerState mempty mempty mempty 0 mempty mempty mempty mempty
-
-assembleLit :: Literal -> IO Int
-assembleLit l = do
-  AssemblerState {constants} <- readIORef assemblerState
-  case Map.lookup l constants of
-    Just i' -> pure i'
-    Nothing -> do
-      modifyIORef' assemblerState $ \s ->
-        s {constants = Map.insert l (Map.size constants) constants}
-      let idx = Map.size constants
-      pure idx
+import Plume.Compiler.Bytecode.Arithmetic (compileFunction)
 
 assembleCondition :: Pre.DesugaredExpr -> IO ([BC.Instruction], Int -> BC.Instruction)
 assembleCondition (Pre.DEEqualsTo e1 (Pre.DELiteral l@(LInt _))) = do
   e1' <- assemble e1
-  l' <- assembleLit l
+  l' <- BC.assembleLit l
   pure (e1', \i -> BC.IJumpElseRelCmpConstant i BC.EqualTo l')
 assembleCondition (Pre.DEEqualsTo e1 (Pre.DELiteral l)) = do
   e1' <- assemble e1
-  l' <- assembleLit l
+  l' <- BC.assembleLit l
   pure (e1', \i -> BC.JumpElseRelCmpConstant i BC.EqualTo l')
 assembleCondition (Pre.DEEqualsTo e1 e2) = do
   e1' <- assemble e1
@@ -100,7 +29,7 @@ assembleCondition (Pre.DEEqualsTo e1 e2) = do
   pure (e1' ++ e2', (`BC.JumpElseRelCmp` BC.EqualTo))
 assembleCondition (Pre.DEGreaterThan e1 e2) = do
   e1' <- assemble e1
-  e2' <- assembleLit (LInt $ toInteger e2)
+  e2' <- BC.assembleLit (LInt $ toInteger e2)
   pure (e1', \i -> BC.IJumpElseRelCmpConstant i BC.GreaterThan e2')
 assembleCondition (Pre.DEAnd e1 e2) = do
   e1' <- assemble e1
@@ -133,7 +62,7 @@ assembleCondition e = do
 assemble :: Pre.DesugaredExpr -> IO [BC.Instruction]
 assemble Pre.DESpecial = pure [BC.Special]
 assemble (Pre.DEVar n) = do
-  AssemblerState {locals, globals, nativeFunctions} <- readIORef assemblerState
+  BC.AssemblerState {BC.locals, BC.globals, BC.nativeFunctions} <- readIORef BC.assemblerState
   case Map.lookup n locals of
     Just i -> pure [BC.LoadLocal i]
     Nothing -> case Map.lookup n globals of
@@ -145,41 +74,13 @@ assemble (Pre.DEIndex e1 e2) = do
   e1' <- assemble e1
   e2' <- assemble e2
   pure $ e1' ++ e2' ++ [BC.GetIndex]
-assemble (Pre.DEApplication "add_int" [x, Pre.DELiteral l]) = do
-  x' <- assemble x
-  l' <- assembleLit l
-  pure $ x' ++ [BC.AddConst l']
-assemble (Pre.DEApplication "sub_int" [x, Pre.DELiteral l]) = do
-  x' <- assemble x
-  l' <- assembleLit l
-  pure $ x' ++ [BC.SubConst l']
-assemble (Pre.DEApplication "add_int" [x, y]) = do
-  x' <- assemble x
-  y' <- assemble y
-  pure $ x' ++ y' ++ [BC.Add]
-assemble (Pre.DEApplication "sub_int" [x, y]) = do
-  x' <- assemble x
-  y' <- assemble y
-  pure $ x' ++ y' ++ [BC.Sub]
 assemble (Pre.DEApplication "<=::int" [x, y]) = do
   x' <- assemble x
   y' <- assemble y
   pure $ x' ++ y' ++ [BC.Compare BC.LessThanOrEqualTo]
-assemble (Pre.DEApplication f args) = do
-  AssemblerState {nativeFunctions, locals, globals} <-
-    readIORef assemblerState
-  args' <- concat <$> mapM assemble args
-  pure $
-    args' ++ case Map.lookup f globals of
-      Just i -> [BC.CallGlobal i (length args)]
-      Nothing -> case Map.lookup f locals of
-        Just i -> [BC.CallLocal i (length args)]
-        Nothing -> case Map.lookup f nativeFunctions of
-          Just (funLibIdx, name, libAddr) -> do
-            [BC.LoadNative name libAddr funLibIdx, BC.Call (length args)]
-          _ -> error $ "Function not found: " <> show f
+assemble app@(Pre.DEApplication {}) = compileFunction assemble app
 assemble (Pre.DELiteral l) = do
-  l' <- assembleLit l
+  l' <- BC.assembleLit l
   pure [BC.LoadConstant l']
 assemble (Pre.DEList es) = do
   es' <- concat <$> mapM assemble es
@@ -232,14 +133,14 @@ assemble (Pre.DEListLength e) = do
 assembleDecl :: Bool -> Text -> Pre.DesugaredExpr -> IO [BC.Instruction]
 assembleDecl isMut n e = do
   e' <- assemble e
-  AssemblerState {locals, globals} <- readIORef assemblerState
+  BC.AssemblerState {BC.locals, BC.globals} <- readIORef BC.assemblerState
 
   let mut = [BC.MakeMutable | isMut]
 
   case Map.lookup n locals of
     Just i -> do
-      modifyIORef' assemblerState $ \s ->
-        s {locals = Map.insert n i locals}
+      modifyIORef' BC.assemblerState $ \s ->
+        s {BC.locals = Map.insert n i locals}
       pure $ e' ++ mut ++ [BC.StoreLocal i]
     Nothing -> case Map.lookup n globals of
       Just i -> pure $ e' ++ mut ++ [BC.StoreGlobal i]
@@ -248,7 +149,7 @@ assembleDecl isMut n e = do
 assembleStmt :: Pre.DesugaredStatement -> IO [BC.Instruction]
 assembleStmt (Pre.DSExpr e) = assemble e
 assembleStmt (Pre.DSReturn (Pre.DELiteral l)) = do
-  e' <- assembleLit l
+  e' <- BC.assembleLit l
   pure [BC.ReturnConst e']
 assembleStmt (Pre.DSReturn e) = do
   e' <- assemble e
@@ -266,16 +167,16 @@ getUpdateVariable (UProperty e _) = getUpdateVariable e
 
 assembleProgram :: Pre.DesugaredProgram -> IO [BC.Instruction]
 assembleProgram (Pre.DPFunction n args stmts) = do
-  AssemblerState {nativeFunctions, globals} <- readIORef assemblerState
+  BC.AssemblerState {BC.nativeFunctions, BC.globals} <- readIORef BC.assemblerState
   case Map.lookup n globals of
     Just i -> do
       let freed =
-            List.nub (free stmts)
+            List.nub (BC.free stmts)
               List.\\ (Map.keys nativeFunctions <> Map.keys globals <> args)
 
-      modifyIORef' assemblerState $ \s ->
+      modifyIORef' BC.assemblerState $ \s ->
         s
-          { metadata =
+          { BC.metadata =
               IMap.insert
                 i
                 ( BC.FunctionMetaData
@@ -285,13 +186,13 @@ assembleProgram (Pre.DPFunction n args stmts) = do
                     (Map.fromList $ zip [0 ..] (args <> freed))
                 )
                 s.metadata
-          , locals = Map.fromList $ zip (args <> freed) [0 ..]
-          , globals = Map.insert n i globals
+          , BC.locals = Map.fromList $ zip (args <> freed) [0 ..]
+          , BC.globals = Map.insert n i globals
           }
       res <- concatMapM assembleStmt stmts
 
-      modifyIORef' assemblerState $ \s ->
-        s {locals = mempty, currentSize = s.currentSize + length res}
+      modifyIORef' BC.assemblerState $ \s ->
+        s {BC.locals = mempty, BC.currentSize = s.currentSize + length res}
 
       return
         ( BC.MakeAndStoreLambda i (length res) (length (args <> freed))
@@ -300,7 +201,7 @@ assembleProgram (Pre.DPFunction n args stmts) = do
     Nothing -> error $ "Function not declared: " <> show n
 assembleProgram (Pre.DPDeclaration n e) = do
   e' <- assemble e
-  AssemblerState {globals} <- readIORef assemblerState
+  BC.AssemblerState {BC.globals} <- readIORef BC.assemblerState
   case Map.lookup n globals of
     Just i -> do
       let res = e' ++ [BC.StoreGlobal i]
@@ -308,7 +209,7 @@ assembleProgram (Pre.DPDeclaration n e) = do
     Nothing -> error $ "Global variable not found: " <> show n
 assembleProgram (Pre.DPMutDeclaration n e) = do
   e' <- assemble e
-  AssemblerState {globals} <- readIORef assemblerState
+  BC.AssemblerState {BC.globals} <- readIORef BC.assemblerState
   case Map.lookup n globals of
     Just i -> do
       let res = e' ++ [BC.MakeMutable, BC.StoreGlobal i]
@@ -320,16 +221,16 @@ assembleProgram (Pre.DPMutUpdate n e) = do
   pure $ e' ++ up ++ [BC.Update]
 assembleProgram (Pre.DPStatement stmt) = assembleStmt stmt
 assembleProgram (Pre.DPNativeFunction fp n _) = do
-  AssemblerState {nativeFunctions, constants, nativeLibraries, cwd} <-
-    readIORef assemblerState
+  BC.AssemblerState {BC.nativeFunctions, BC.constants, BC.nativeLibraries, BC.cwd} <-
+    readIORef BC.assemblerState
   case Map.lookup n nativeFunctions of
     Just _ -> error "Native function already declared"
     Nothing -> do
       i <- case Map.lookup (LString n) constants of
         Just i' -> pure i'
         Nothing -> do
-          modifyIORef' assemblerState $ \s ->
-            s {constants = Map.insert (LString n) (Map.size constants) constants}
+          modifyIORef' BC.assemblerState $ \s ->
+            s {BC.constants = Map.insert (LString n) (Map.size constants) constants}
           pure $ Map.size constants
       let path = cwd </> toString fp
       let libIdx = case elemIndexAcc nativeLibraries path 0 of
@@ -341,14 +242,14 @@ assembleProgram (Pre.DPNativeFunction fp n _) = do
         Just l -> pure $ length l
         Nothing -> pure 0
 
-      modifyIORef' assemblerState $ \s ->
+      modifyIORef' BC.assemblerState $ \s ->
         s
-          { nativeFunctions =
+          { BC.nativeFunctions =
               Map.insert
                 n
                 (funLibIdx, i, libIdx)
                 nativeFunctions
-          , nativeLibraries = insertWith (<> [n]) nativeLibraries path
+          , BC.nativeLibraries = insertWith (<> [n]) nativeLibraries path
           }
       pure []
 
@@ -360,7 +261,7 @@ getNativeFunctions = mapMaybe getNativeFunction
 
 assembleUpdate :: Update -> IO [BC.Instruction]
 assembleUpdate (UVariable n) = do
-  AssemblerState {locals, globals} <- readIORef assemblerState
+  BC.AssemblerState {BC.locals, BC.globals} <- readIORef BC.assemblerState
   case Map.lookup n locals of
     Just i -> pure [BC.LoadLocal i]
     Nothing -> case Map.lookup n globals of
@@ -370,15 +271,15 @@ assembleUpdate (UProperty e p) = do
   e' <- assembleUpdate e
   pure $ e' ++ [BC.ListGet p]
 
-runAssembler :: [Pre.DesugaredProgram] -> IO ([BC.Instruction], AssemblerState)
+runAssembler :: [Pre.DesugaredProgram] -> IO ([BC.Instruction], BC.AssemblerState)
 runAssembler xs = do
-  let freed = List.nub (free xs) List.\\ getNativeFunctions xs
-  modifyIORef' assemblerState $ \s ->
+  let freed = List.nub (BC.free xs) List.\\ getNativeFunctions xs
+  modifyIORef' BC.assemblerState $ \s ->
     s
-      { globals = Map.fromList $ zip freed [0 ..]
+      { BC.globals = Map.fromList $ zip freed [0 ..]
       }
   is <- concatMapM assembleProgram xs
-  s <- readIORef assemblerState
+  s <- readIORef BC.assemblerState
   pure (is, s)
 
 containsReturn :: [BC.Instruction] -> Bool
@@ -403,7 +304,7 @@ convertMetadata = IMap.elems
 
 assembleBytecode :: FilePath -> [Pre.DesugaredProgram] -> IO BC.Program
 assembleBytecode fp xs = do
-  modifyIORef' assemblerState $ \s -> s {cwd = fp}
+  modifyIORef' BC.assemblerState $ \s -> s {BC.cwd = fp}
   (is, s) <- runAssembler xs
   let constants = assembleConstants s.constants
   let libs = map (second length) s.nativeLibraries
