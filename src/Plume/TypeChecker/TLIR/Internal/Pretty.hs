@@ -112,7 +112,7 @@ prettyExpr (ESwitch e ps) =
  where
   prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "=>" <+> prettyExpr e'
 prettyExpr (EReturn e) = anCol Blue "return" <+> prettyExpr e
-prettyExpr (ENativeFunction fp n (args :->: ret)) =
+prettyExpr (ENativeFunction fp n (args :->: ret) _) =
   anCol Blue "native"
     <+> pretty fp
     <+> pretty n

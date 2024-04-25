@@ -3,6 +3,7 @@ module Plume.Compiler.Desugaring.Syntax where
 import Plume.Compiler.ClosureConversion.Free
 import Plume.Compiler.ClosureConversion.Syntax (Update(..))
 import Plume.Syntax.Common.Literal
+import Plume.Syntax.Abstract.Expression (IsStandard)
 
 data DesugaredExpr
   = DEVar Text
@@ -36,7 +37,7 @@ data DesugaredProgram
   = DPFunction Text [Text] [DesugaredStatement]
   | DPStatement DesugaredStatement
   | DPDeclaration Text DesugaredExpr
-  | DPNativeFunction Text Text Int
+  | DPNativeFunction Text Text Int IsStandard
   | DPMutDeclaration Text DesugaredExpr
   | DPMutUpdate Update DesugaredExpr
   deriving (Eq, Show, Ord)

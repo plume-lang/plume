@@ -222,10 +222,10 @@ closeProgram (Pre.UPFunction name args e) = do
   modifyIORef' functions (M.insert name (length args))
   (stmts, e') <- closeStatement e
   pure $ stmts ++ [Post.CPFunction name args e']
-closeProgram (Pre.UPNativeFunction fp name arity) = do
+closeProgram (Pre.UPNativeFunction fp name arity st) = do
   modifyIORef' reserved (S.insert name)
   modifyIORef' functions (M.insert name arity)
-  pure [Post.CPNativeFunction fp name arity]
+  pure [Post.CPNativeFunction fp name arity st]
 closeProgram (Pre.UPStatement (Pre.USDeclaration n e)) = do
   modifyIORef' reserved (<> S.singleton n)
   (stmts, e') <- closeExpression e

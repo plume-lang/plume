@@ -4,6 +4,7 @@ import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Concrete.Expression (Position, TypeConstructor)
 import Plume.TypeChecker.TLIR.Modules.Pattern
+import Plume.Syntax.Abstract.Expression (IsStandard)
 
 -- | A more precise AST for the type checker, embedding the type information
 -- | in the expressions
@@ -44,5 +45,5 @@ data TypedExpression t
   | ELocated (TypedExpression t) Position
   | ESwitch (TypedExpression t) [(TypedPattern t, TypedExpression t)]
   | EReturn (TypedExpression t)
-  | ENativeFunction Text Text t
+  | ENativeFunction Text Text t IsStandard
   deriving (Show, Eq)

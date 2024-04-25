@@ -43,10 +43,10 @@ eraseType (Pre.EDeclaration (Annotation name _) (Pre.EClosure args _ body) Nothi
   let fun = Post.UPFunction name args' b'
   modifyIORef' program (<> [fun])
   eraseType xs
-eraseType (Pre.ENativeFunction fp n (args :->: _) : xs) = do
+eraseType (Pre.ENativeFunction fp n (args :->: _) st : xs) = do
   modifyIORef'
     program
-    (<> [Post.UPNativeFunction fp n (length args)])
+    (<> [Post.UPNativeFunction fp n (length args) st])
   eraseType xs
 eraseType (Pre.ELocated e _ : xs) = eraseType (e : xs)
 eraseType (Pre.EExtensionDeclaration name _ arg (Pre.EClosure args _ b) : xs) = do

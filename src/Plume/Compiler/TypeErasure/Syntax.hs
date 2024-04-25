@@ -1,6 +1,7 @@
 module Plume.Compiler.TypeErasure.Syntax where
 
 import Plume.Syntax.Common.Literal
+import Plume.Syntax.Abstract.Expression (IsStandard)
 
 data UntypedExpr
   = UEVar Text
@@ -42,7 +43,7 @@ data UntypedStatement
 data UntypedProgram
   = UPFunction Text [Text] UntypedStatement
   | UPStatement UntypedStatement
-  | UPNativeFunction Text Text Int
+  | UPNativeFunction Text Text Int IsStandard
   | UPDeclaration Text UntypedExpr
   | UPMutDeclaration Text UntypedExpr
   | UPMutUpdate Text UntypedExpr

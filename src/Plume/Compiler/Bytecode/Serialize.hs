@@ -7,6 +7,7 @@ import Data.ByteString.Lazy qualified as BSL
 import Data.Text.Encoding (encodeUtf8)
 import Plume.Compiler.Bytecode.Syntax
 import Prelude hiding (encodeUtf8)
+import Plume.Syntax.Abstract.Expression (IsStandard)
 
 encodeInteger :: (Integral a) => a -> Put
 encodeInteger = putInt32le . fromIntegral
@@ -143,9 +144,10 @@ encodeProgram Program {pInstructions, pConstants, pNativeLibraries} = do
   encodeInteger $ length pInstructions
   mapM_ encodeInstruction pInstructions
 
-encodeNative :: (FilePath, Int) -> Put
-encodeNative (path, idx) = do
+encodeNative :: ((FilePath, IsStandard), Int) -> Put
+encodeNative ((path, isStandard), idx) = do
   encodeText $ fromString path
+  encodeInteger $ fromEnum isStandard
   encodeInteger idx
 
 serialize :: Program -> IO BSL.ByteString

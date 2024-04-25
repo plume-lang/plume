@@ -77,7 +77,7 @@ prettyExpr (ETypeExtension gens ann ems) =
       <+> parens (ansiPretty ann)
       <+> line
     <> indent 2 (vsep (map prettyExtMember ems))
-prettyExpr (ENativeFunction fp n gens (args :->: ret)) =
+prettyExpr (ENativeFunction fp n gens (args :->: ret) _) =
   anCol Blue "native"
     <+> anCol Green (pretty fp)
     <+> pretty n

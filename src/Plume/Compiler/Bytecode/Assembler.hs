@@ -11,7 +11,6 @@ import Plume.Compiler.Desugaring.Syntax qualified as Pre
 import Plume.Compiler.ClosureConversion.Syntax (Update(..))
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Translation.Generics
-import System.FilePath
 import Plume.Compiler.Bytecode.Arithmetic (compileFunction)
 
 assembleCondition :: Pre.DesugaredExpr -> IO ([BC.Instruction], Int -> BC.Instruction)
@@ -220,8 +219,8 @@ assembleProgram (Pre.DPMutUpdate n e) = do
   up <- assembleUpdate n
   pure $ e' ++ up ++ [BC.Update]
 assembleProgram (Pre.DPStatement stmt) = assembleStmt stmt
-assembleProgram (Pre.DPNativeFunction fp n _) = do
-  BC.AssemblerState {BC.nativeFunctions, BC.constants, BC.nativeLibraries, BC.cwd} <-
+assembleProgram (Pre.DPNativeFunction fp n _ st) = do
+  BC.AssemblerState {BC.nativeFunctions, BC.constants, BC.nativeLibraries} <-
     readIORef BC.assemblerState
   case Map.lookup n nativeFunctions of
     Just _ -> error "Native function already declared"
@@ -232,12 +231,12 @@ assembleProgram (Pre.DPNativeFunction fp n _) = do
           modifyIORef' BC.assemblerState $ \s ->
             s {BC.constants = Map.insert (LString n) (Map.size constants) constants}
           pure $ Map.size constants
-      let path = cwd </> toString fp
-      let libIdx = case elemIndexAcc nativeLibraries path 0 of
+      let path = toString fp
+      let libIdx = case elemIndexAcc nativeLibraries (path, st) 0 of
             Just i' -> i'
             Nothing -> length nativeLibraries
 
-      let lib = List.lookup path nativeLibraries
+      let lib = List.lookup (path, st) nativeLibraries
       funLibIdx <- case lib of
         Just l -> pure $ length l
         Nothing -> pure 0
@@ -249,14 +248,14 @@ assembleProgram (Pre.DPNativeFunction fp n _) = do
                 n
                 (funLibIdx, i, libIdx)
                 nativeFunctions
-          , BC.nativeLibraries = insertWith (<> [n]) nativeLibraries path
+          , BC.nativeLibraries = insertWith (<> [n]) nativeLibraries (path, st)
           }
       pure []
 
 getNativeFunctions :: [Pre.DesugaredProgram] -> [Text]
 getNativeFunctions = mapMaybe getNativeFunction
  where
-  getNativeFunction (Pre.DPNativeFunction _ n _) = Just n
+  getNativeFunction (Pre.DPNativeFunction _ n _ _) = Just n
   getNativeFunction _ = Nothing
 
 assembleUpdate :: Update -> IO [BC.Instruction]

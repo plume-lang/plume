@@ -70,8 +70,8 @@ substitute (name, expr) (AST.ETypeExtension g ann ems)
   | name `S.notMember` ftv ann =
       AST.ETypeExtension g ann (map (substituteExt (name, expr)) ems)
   | otherwise = AST.ETypeExtension g ann ems
-substitute _ (AST.ENativeFunction fp n gens t) =
-  AST.ENativeFunction fp n gens t
+substitute _ (AST.ENativeFunction fp n gens t st) =
+  AST.ENativeFunction fp n gens t st
 substitute _ (AST.EGenericProperty g n ts t) =
   AST.EGenericProperty g n ts t
 substitute e (AST.EList es) = AST.EList (map (substitute e) es)
