@@ -152,10 +152,11 @@ removeDeadCode s (DPStatement stmt : rest) =
 removeDeadCode s (DPDeclaration n e : rest) =
   let e' = maybeToList $ removeDeadCodeExpr s e
       rest' = removeDeadCode (S.insert n s) rest
-      freeVars = freeProgList rest'
-   in if n `S.member` freeVars
-        then (DPDeclaration n <$> e') <> rest'
-        else rest'
+  --  freeVars = freeProgList rest'
+  --  in if n `S.member` freeVars
+  --       then (DPDeclaration n <$> e') <> rest'
+  --       else rest'
+      in (DPDeclaration n <$> e') <> rest'
 removeDeadCode s (DPNativeFunction fp n arity st : rest) =
   let rest' = removeDeadCode (S.insert n s) rest
       freeVars = freeProgList rest'
@@ -165,10 +166,11 @@ removeDeadCode s (DPNativeFunction fp n arity st : rest) =
 removeDeadCode s (DPMutDeclaration n e : rest) =
   let e' = maybeToList $ removeDeadCodeExpr s e
       rest' = removeDeadCode (S.insert n s) rest
-      freeVars = freeProgList rest'
-   in if n `S.member` freeVars
-        then (DPMutDeclaration n <$> e') <> rest'
-        else rest'
+  --  freeVars = freeProgList rest'
+  --  in if n `S.member` freeVars
+  --       then (DPMutDeclaration n <$> e') <> rest'
+  --       else rest'
+      in (DPMutDeclaration n <$> e') <> rest'
 removeDeadCode s (DPMutUpdate n e : rest) =
   let e' = maybeToList $ removeDeadCodeExpr s e
       n' = free n
