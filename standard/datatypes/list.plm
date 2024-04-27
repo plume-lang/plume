@@ -148,12 +148,14 @@ extend<A> (c: [A]) {
   fn zip<B>(other: [B]): [(A, B)] => switch (c, other) {
     case ([], []) => []
     case ([x, ..xs], [y, ..ys]) => [(x, y)] + xs.zip(ys)
+    case ? => []
   }
 
   // Same as zip function but with a function that combines the elements.
   fn zip_with<B, C>(other: [B], f: fn(A, B): C): [C] => switch (c, other) {
     case ([], []) => []
     case ([x, ..xs], [y, ..ys]) => [f(x, y)] + xs.zip_with(ys, f)
+    case ? => []
   }
 
   fn show(showH: fn(A): str): str =>
