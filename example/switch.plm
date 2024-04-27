@@ -1,0 +1,16 @@
+switch Some(Some(6)) {
+  case Some(Some(x)) => println("Zero")
+  case Some(None) => println("One")
+  case None => println("One")
+  case ? => println("useless")
+}
+
+switch Some(Some(6)) {
+  case Some(Some(x)) => println("Zero")
+  case ? => println("useless")
+}
+
+switch Some(Some(6)) {
+  case Some(Some(x)) => println("Zero")
+  case Some(None) => println("One")
+}
