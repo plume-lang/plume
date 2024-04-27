@@ -52,7 +52,7 @@ void print_helper(Value v) {
       break;
     }
 
-    case TYPE_FUNCTION: case TYPE_FUNCENV: case TYPE_CLOSURE: {
+    case TYPE_FUNCTION: case TYPE_FUNCENV: {
       printf("<function>");
       break;
     }

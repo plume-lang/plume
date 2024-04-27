@@ -99,7 +99,7 @@ Value to_string(int arg_n, Module* mod, Value* args) {
     case TYPE_SPECIAL: {
       return MAKE_STRING("<special>", 9);
     }
-    case TYPE_FUNCTION: case TYPE_FUNCENV: case TYPE_CLOSURE: {
+    case TYPE_FUNCTION: case TYPE_FUNCENV: {
       return MAKE_STRING("<function>", 10);
     }
     case TYPE_UNKNOWN: {
