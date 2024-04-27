@@ -7,6 +7,7 @@ module System.IO.Pretty (
   ppBuilding,
   parseError,
   printErrorFromString,
+  printWarningFromString,
 ) where
 
 import Data.Text.IO
@@ -59,6 +60,27 @@ printErrorFromString content (error', msg, (p1, p2)) step = do
   let beautifulExample = D.err
         Nothing
         error'
+        [ (pos', D.This step) ]
+        (maybeToList msg)
+
+  -- Create the diagnostic 
+  let diagnostic  = D.addFile D.def file' x'
+  let diagnostic' = D.addReport diagnostic beautifulExample
+
+  -- Print with unicode characters, colors and the default style
+  D.printDiagnostic stdout True True 4 D.defaultStyle diagnostic'
+
+printWarningFromString :: Maybe Text -> (String, Maybe String, Position) -> String -> IO ()
+printWarningFromString content (warning', msg, (p1, p2)) step = do
+  let p1' = (unPos p1.sourceLine, unPos p1.sourceColumn)
+  let p2' = (unPos p2.sourceLine, unPos p2.sourceColumn)
+  let file' = p1.sourceName
+  b <- doesFileExist file'
+  x' <- toString <$> if b then readFile file' else return $ Mb.fromJust content
+  let pos' = D.Position p1' p2' p1.sourceName
+  let beautifulExample = D.warn
+        Nothing
+        warning'
         [ (pos', D.This step) ]
         (maybeToList msg)
 
