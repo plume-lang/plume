@@ -136,11 +136,11 @@ instance ANSIPretty Pattern where ansiPretty = prettyPat
 prettyPat :: Pattern -> Doc AnsiStyle
 prettyPat (PVariable v t) = pretty v <> colon <+> prettyTy t
 prettyPat (PLiteral l) = prettyLit l
-prettyPat (PConstructor p1 p2) =
+prettyPat (PConstructor p1 _ p2) =
   pretty p1 <+> parens (hsep $ punctuate comma $ map prettyPat p2)
-prettyPat PWildcard = anCol Blue "_"
+prettyPat (PWildcard _) = anCol Blue "?"
 prettyPat (PSpecialVar v t) = anCol Red (pretty v) <> colon <+> prettyTy t
-prettyPat (PList ps sl) =
+prettyPat (PList _ ps sl) =
   brackets
     ( hsep $
         punctuate comma $

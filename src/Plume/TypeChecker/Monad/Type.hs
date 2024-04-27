@@ -28,12 +28,15 @@ instance Show PlumeType where
   show (TypeVar ref) = do
     let v = unsafePerformIO $ readIORef ref
     case v of
-      Link t -> "link(" <> show t <> ")"
-      Unbound q l -> "U" <> toString q <> "-" <> show l
+      Link t -> show t
+      Unbound q l -> toString q <> "-" <> show l
   show (TypeQuantified q) = "@" <> toString q
+  show (TypeApp (TypeId "cons") [x, _]) = "[" <> show x <> "]"
+  show (TypeApp (TypeId "nil") _) = "[]"
+  show (TypeApp (TypeId "tuple") ts) = "(" <> intercalate ", " (map show ts) <> ")"
   show (args :->: ret) = "(" <> show args <> " -> " <> show ret <> ")"
   show (TypeId t) = toString t
-  show (TypeApp t ts) = show t <> " " <> show ts  
+  show (TypeApp t ts) = show t <> "<" <> intercalate ", " (map show ts) <> ">"
 
 -- | A type scheme is a way to quantify over types in a type system.
 -- | It is used to represent polymorphic types in the type system.

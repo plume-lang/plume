@@ -220,10 +220,10 @@ eraseExpr (Pre.EType {}) = compilerError "Type isn't an expression"
 erasePattern :: Pre.TypedPattern PlumeType -> IO Post.UntypedPattern
 erasePattern (Pre.PVariable x _) = pure $ Post.UPVariable x
 erasePattern (Pre.PLiteral l) = pure $ Post.UPLiteral l
-erasePattern (Pre.PConstructor n ps) = Post.UPConstructor n <$> mapM erasePattern ps
-erasePattern Pre.PWildcard = pure Post.UPWildcard
+erasePattern (Pre.PConstructor n _ ps) = Post.UPConstructor n <$> mapM erasePattern ps
+erasePattern (Pre.PWildcard _) = pure Post.UPWildcard
 erasePattern (Pre.PSpecialVar x _) = pure $ Post.UPSpecialVariable x
-erasePattern (Pre.PList ps t) =
+erasePattern (Pre.PList _ ps t) =
   Post.UPList <$> mapM erasePattern ps <*> maybeM t erasePattern
 
 erase :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]

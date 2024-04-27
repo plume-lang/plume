@@ -5,8 +5,8 @@ import Plume.Syntax.Common.Literal
 data TypedPattern t
   = PVariable Text t
   | PLiteral Literal
-  | PConstructor Text [TypedPattern t]
+  | PConstructor Text t [TypedPattern t]
   | PSpecialVar Text t
-  | PWildcard
-  | PList [TypedPattern t] (Maybe (TypedPattern t))
+  | PWildcard t
+  | PList t [TypedPattern t] (Maybe (TypedPattern t))
   deriving (Eq, Show)

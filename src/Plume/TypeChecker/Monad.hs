@@ -472,6 +472,14 @@ interpretError (p, DeclarationReturn st) =
     , p
     )
     "while performing typechecking"
+interpretError (p, ExhaustivenessError hints) =
+  printErrorFromString
+    mempty
+    ( "Non-exhaustive pattern match"
+    , Just (if null hints then "All possible cases must be covered in the switch expression" else hints)
+    , p
+    )
+    "while performing typechecking"
 
 capitalize :: Text -> Text
 capitalize = T.toTitle . T.toLower

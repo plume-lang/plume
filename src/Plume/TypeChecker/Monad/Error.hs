@@ -37,6 +37,7 @@ data TypeError
   | CompilerError Text
   | NoReturnFound PlumeType
   | DeclarationReturn Text
+  | ExhaustivenessError String
   deriving (Eq, Show)
 
 -- THROWABLE INSTANCES FOR TYPE ERROR
@@ -74,6 +75,7 @@ instance Throwable TypeError where
     "Native function " <> showError (n, s) <> " already defined"
   showError (NoReturnFound t) = "No return found for type " <> showError t
   showError DeclarationReturn {} = "Declaration return"
+  showError ExhaustivenessError {} = "Exhaustiveness error"
 
 instance Throwable a => Throwable (Text, a) where
   showError (n, e) = n <> ": " <> showError e

@@ -19,11 +19,11 @@ freeTypeConstructor (TConstructor name xs) = do
 
 freePattern :: Pattern -> IO Pattern
 freePattern (PVariable name t) = PVariable name <$> compressPaths t
-freePattern (PConstructor name xs) = PConstructor name <$> mapM freePattern xs
+freePattern (PConstructor name t xs) = PConstructor name <$> compressPaths t <*> mapM freePattern xs
 freePattern (PSpecialVar name t) = PSpecialVar name <$> compressPaths t
-freePattern (PList xs sl) = PList <$> mapM freePattern xs <*> traverse freePattern sl
+freePattern (PList t xs sl) = PList <$> compressPaths t <*> mapM freePattern xs <*> traverse freePattern sl
 freePattern (PLiteral l) = pure $ PLiteral l
-freePattern PWildcard = pure PWildcard
+freePattern (PWildcard t) = PWildcard <$> compressPaths t
 
 free :: Expression -> IO Expression
 free (EVariable name t) = do

@@ -12,8 +12,23 @@ import Plume.TypeChecker.TLIR qualified as Post
 
 -- | Metadata for the data types
 {-# NOINLINE datatypes #-}
-datatypes :: IORef (Map Text (Map Text Int))
-datatypes = unsafePerformIO $ newIORef mempty
+datatypes :: IORef (Map Text (Map Text PlumeType))
+datatypes = unsafePerformIO $ newIORef (M.fromList [
+    ("boolean", boolean)
+  , ("list", list)
+  ])
+
+boolean :: Map Text PlumeType
+boolean = M.fromList [("true", TBool), ("false", TBool)]
+
+tA :: PlumeType
+tA = TypeQuantified "A"
+
+list :: Map Text PlumeType
+list = M.fromList [
+    ("nil", TList tA)
+  , ("cons", [tA, TList tA] :->: TList tA)
+  ]
 
 synthDataType :: Infer
 synthDataType (Pre.EType (Annotation name generics) cons) = do
@@ -40,12 +55,12 @@ synthDataType _ = throw $ CompilerError "Only data types are supported"
 synthCons
   :: ([TyVar], PlumeType)
   -> TypeConstructor Pre.PlumeType
-  -> Checker (TypeConstructor PlumeType, Map Text Int)
+  -> Checker (TypeConstructor PlumeType, Map Text PlumeType)
 synthCons (_, header) (TVariable name) = do
   let scheme = header
   insertEnv @"datatypeEnv" name scheme
 
-  let dataType = M.singleton name 0
+  let dataType = M.singleton name scheme
 
   pure (TVariable name, dataType)
 synthCons (_, header) (TConstructor name args) = do
@@ -54,6 +69,6 @@ synthCons (_, header) (TConstructor name args) = do
   let scheme = ty
   insertEnv @"datatypeEnv" name scheme
 
-  let dataType = M.singleton name (length args)
+  let dataType = M.singleton name scheme
 
   pure (TConstructor name args', dataType)
