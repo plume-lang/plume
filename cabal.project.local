@@ -1,3 +1,6 @@
 ignore-project: False
+tests: True
+benchmarks: True
+documentation: False
 package diagnose
   flags: +megaparsec-compat

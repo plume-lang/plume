@@ -43,7 +43,7 @@ jobs:
           xmake --version --root
 
       - name: Update xmake repository
-        run: xmake repo --update
+        run: xmake repo --update --root
     
       - name: Set up GHC ${{ matrix.ghc-version }}
         uses: haskell-actions/setup@v2
