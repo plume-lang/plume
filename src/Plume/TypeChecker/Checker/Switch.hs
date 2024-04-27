@@ -48,7 +48,8 @@ synthSwitch infer (Pre.ESwitch scrutinee cases) = local id $ do
           _ -> "Consider adding missing cases for " <> showSpace uncovered
     throw (ExhaustivenessError msg)
 
-  checkRedudancy t (reverse $ map fst cases')
+  -- TODO: Implement a check for redundancy that would work
+  -- checkRedudancy t (map fst cases')
 
   pure (exprTy, [Post.ESwitch scrutinee' cases'])
 synthSwitch _ _ = throw $ CompilerError "Only switches are supported"
@@ -58,25 +59,53 @@ allPatsExcept xs x = filter (/= x) xs
 
 checkRedudancy :: PlumeType -> [Post.Pattern] -> Checker ()
 checkRedudancy _ [] = pure ()
-checkRedudancy t (x:xs) = do
-  patSp <- project x
-  others <- mapM project xs
+checkRedudancy _ xs = do
+  void $ foldlM (\acc p -> do
+    pat <- project p
+    whenM (pat `isRedundantIn` acc) $ do
+      pos <- fetchPosition
+      let pat' = prettyToString (prettyPat p)
+      liftIO $ printWarningFromString
+        mempty
+        ( "Pattern " <> pat' <> " is redundant"
+        , Nothing
+        , pos
+        )
+        "while performing typechecking"
+    (:[]) <$> simplify (UnionSpace (acc <> [pat]))) [] xs
 
-  othersCover <- simplify =<< (TypeSpace t `subtractSpaceWith` UnionSpace others)
-  patSpCover <- simplify =<< (TypeSpace t `subtractSpaceWith` patSp)
-
-  when (othersCover == EmptySpace && patSpCover == EmptySpace) $ do
-    p <- fetchPosition
-    let pat' = prettyToString (prettyPat x)
-    liftIO $ printWarningFromString
-      mempty
-      ( "Pattern " <> pat' <> " is redundant"
-      , Nothing
-      , p
-      )
-      "while performing typechecking"
-
-  checkRedudancy t xs
+isRedundantIn :: Space -> [Space] -> Checker Bool
+isRedundantIn (VariablePoint _ _) (VariablePoint _ _:_) = pure True
+isRedundantIn sp@(VariablePoint x _) (ConstructorSpace _ _ _ : ys)
+  | x /= "?" = sp `isRedundantIn` ys
+  | otherwise = pure True
+isRedundantIn sp@(VariablePoint x _) (TypeSpace _ : ys)
+  | x /= "?" = sp `isRedundantIn` ys
+  | otherwise = pure True
+isRedundantIn sp@(VariablePoint _ _) (ConstantPoint _ _ : ys) = sp `isRedundantIn` ys
+isRedundantIn sp@(ConstantPoint c _) (ConstantPoint c' _ : ys)
+  | c == c' = pure True
+  | otherwise = sp `isRedundantIn` ys
+isRedundantIn (ConstantPoint _ _) (VariablePoint _ _ : _) = pure True
+isRedundantIn (ConstructorSpace k _ ss) (ConstructorSpace k' _ ss' : ys)
+  | k == k' = do
+    b <- anyM (\(x, y) -> x `isRedundantIn` [y]) (zip ss ss')
+    if b then pure True
+    else isRedundantIn (UnionSpace ss) ys
+  | otherwise = isRedundantIn (UnionSpace ss) ys
+isRedundantIn (ConstructorSpace _ _ _) (VariablePoint _ _ : _) = pure True
+isRedundantIn sp@(ConstructorSpace _ _ _) (TypeSpace _ : ys) = sp `isRedundantIn` ys
+isRedundantIn sp@(ConstructorSpace _ _ _) (ConstantPoint _ _ : ys) = sp `isRedundantIn` ys
+isRedundantIn (TypeSpace _) (TypeSpace _ : _) = pure True
+isRedundantIn (TypeSpace _) (VariablePoint "?" _ : _) = pure True
+isRedundantIn (TypeSpace _) (VariablePoint _ _ : _) = pure True
+isRedundantIn sp@(TypeSpace _) (ConstantPoint _ _ : ys) = sp `isRedundantIn` ys
+isRedundantIn (UnionSpace ss) ys = do
+  b <- anyM (flip isRedundantIn ys) ss
+  if b then pure True
+  else pure False
+isRedundantIn sp (_:ys) = sp `isRedundantIn` ys
+isRedundantIn _ [] = pure False
 
 synthCase
   :: Infer
@@ -183,6 +212,66 @@ data Constant
   = Literal Literal
   | EnumVar Text
   deriving (Eq, Show)
+
+
+unionWith :: Space -> Space -> Checker Space
+unionWith EmptySpace s = pure s
+unionWith s EmptySpace = pure s
+unionWith (TypeSpace t1) (TypeSpace t2) = do
+  b1 <- liftIO $ doesUnifyWith t1 t2
+  if b1 then pure (TypeSpace t1)
+  else pure (UnionSpace [TypeSpace t1, TypeSpace t2])
+unionWith (UnionSpace xs) (UnionSpace ys) = pure (UnionSpace (xs <> ys))
+unionWith (UnionSpace xs) y = UnionSpace <$> mapM (`unionWith` y) xs
+unionWith x (UnionSpace ys) = UnionSpace <$> mapM (unionWith x) ys
+unionWith (ConstructorSpace t1 tys1 xs) (ConstructorSpace t2 tys2 ys) = do
+  let b1 = t1 == t2
+  let b2 = tys1 == tys2
+  if b1 && b2 then do
+    zs <- zipWithM unionWith xs ys
+    pure (ConstructorSpace t1 tys1 zs)
+  else pure (UnionSpace [ConstructorSpace t1 tys1 xs, ConstructorSpace t2 tys2 ys])
+unionWith (TypeSpace t) (ConstructorSpace k tys xs) = do
+  b1 <- k `isInstanceOf` t
+  if b1 then pure (ConstructorSpace k tys xs)
+  else pure (UnionSpace [TypeSpace t, ConstructorSpace k tys xs])
+unionWith (ConstructorSpace k tys xs) (TypeSpace t) = do
+  b1 <- k `isInstanceOf` t
+  if b1 then pure (ConstructorSpace k tys xs)
+  else pure (UnionSpace [TypeSpace t, ConstructorSpace k tys xs])
+unionWith (ConstantPoint c t) (ConstantPoint c' t') = do
+  b1 <- liftIO $ doesUnifyWith t t'
+  if b1 && c == c' then pure (ConstantPoint c t)
+  else pure (UnionSpace [ConstantPoint c t, ConstantPoint c' t'])
+unionWith (ConstantPoint c t) (TypeSpace t') = do
+  b1 <- liftIO $ doesUnifyWith t t'
+  if b1 then pure (ConstantPoint c t)
+  else pure (UnionSpace [ConstantPoint c t, TypeSpace t'])
+unionWith (TypeSpace t) (ConstantPoint c t') = do
+  b1 <- liftIO $ doesUnifyWith t t'
+  if b1 then pure (ConstantPoint c t')
+  else pure (UnionSpace [TypeSpace t, ConstantPoint c t'])
+unionWith (VariablePoint x t) (VariablePoint y t') = do
+  b1 <- liftIO $ doesUnifyWith t t'
+  if x == y && b1 then pure (VariablePoint x t)
+  else pure (UnionSpace [VariablePoint x t, VariablePoint y t'])
+unionWith (VariablePoint x t) (TypeSpace t') = do
+  b1 <- liftIO $ doesUnifyWith t t'
+  if b1 then pure (VariablePoint x t)
+  else pure (UnionSpace [VariablePoint x t, TypeSpace t'])
+unionWith (TypeSpace t) (VariablePoint x t') = do
+  b1 <- liftIO $ doesUnifyWith t t'
+  if b1 then pure (VariablePoint x t')
+  else pure (UnionSpace [TypeSpace t, VariablePoint x t'])
+unionWith (VariablePoint x t) (ConstructorSpace k tys xs) = do
+  b1 <- k `isInstanceOf` t
+  if b1 then pure (ConstructorSpace k tys xs)
+  else pure (UnionSpace [VariablePoint x t, ConstructorSpace k tys xs])
+unionWith (ConstructorSpace k tys xs) (VariablePoint x t) = do
+  b1 <- k `isInstanceOf` t
+  if b1 then pure (ConstructorSpace k tys xs)
+  else pure (UnionSpace [VariablePoint x t, ConstructorSpace k tys xs])
+unionWith x y = pure (UnionSpace [x, y])
 
 isRedundant :: Space -> [Space] -> Checker Bool
 isRedundant x xs = 
