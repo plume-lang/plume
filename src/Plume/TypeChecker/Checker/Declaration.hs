@@ -66,7 +66,7 @@ synthDecl
       _ -> throw $ CompilerError "Generic mutable variables are not supported"
 
     let exprTy' = mut exprTy
-    exprTy' `unifiesWith` convertedTy'
+    convertedTy' `unifiesWith` exprTy'
 
     exitLevel
 

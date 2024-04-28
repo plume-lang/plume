@@ -76,7 +76,7 @@ checkRedudancy _ xs = do
 
 isRedundantIn :: Space -> [Space] -> Checker Bool
 isRedundantIn (VariablePoint _ _) (VariablePoint _ _:_) = pure True
-isRedundantIn sp@(VariablePoint x _) (ConstructorSpace _ _ _ : ys)
+isRedundantIn sp@(VariablePoint x _) (ConstructorSpace {} : ys)
   | x /= "?" = sp `isRedundantIn` ys
   | otherwise = pure True
 isRedundantIn sp@(VariablePoint x _) (TypeSpace _ : ys)
@@ -93,15 +93,15 @@ isRedundantIn (ConstructorSpace k _ ss) (ConstructorSpace k' _ ss' : ys)
     if b then pure True
     else isRedundantIn (UnionSpace ss) ys
   | otherwise = isRedundantIn (UnionSpace ss) ys
-isRedundantIn (ConstructorSpace _ _ _) (VariablePoint _ _ : _) = pure True
-isRedundantIn sp@(ConstructorSpace _ _ _) (TypeSpace _ : ys) = sp `isRedundantIn` ys
-isRedundantIn sp@(ConstructorSpace _ _ _) (ConstantPoint _ _ : ys) = sp `isRedundantIn` ys
+isRedundantIn (ConstructorSpace {}) (VariablePoint _ _ : _) = pure True
+isRedundantIn sp@(ConstructorSpace {}) (TypeSpace _ : ys) = sp `isRedundantIn` ys
+isRedundantIn sp@(ConstructorSpace {}) (ConstantPoint _ _ : ys) = sp `isRedundantIn` ys
 isRedundantIn (TypeSpace _) (TypeSpace _ : _) = pure True
 isRedundantIn (TypeSpace _) (VariablePoint "?" _ : _) = pure True
 isRedundantIn (TypeSpace _) (VariablePoint _ _ : _) = pure True
 isRedundantIn sp@(TypeSpace _) (ConstantPoint _ _ : ys) = sp `isRedundantIn` ys
 isRedundantIn (UnionSpace ss) ys = do
-  b <- anyM (flip isRedundantIn ys) ss
+  b <- anyM (`isRedundantIn` ys) ss
   if b then pure True
   else pure False
 isRedundantIn sp (_:ys) = sp `isRedundantIn` ys

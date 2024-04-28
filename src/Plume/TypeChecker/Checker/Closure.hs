@@ -25,7 +25,7 @@ synthClosure infer (Pre.EClosure args ret body) = local id $ do
         infer body
 
   -- Unifying specified return type with the inferred return type
-  retTy `unifiesWith` convertedRet
+  convertedRet `unifiesWith` retTy
 
   when (Post.isBlock body' && not (Post.containsReturn body')) $ 
     throw (NoReturnFound retTy)

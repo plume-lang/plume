@@ -364,9 +364,9 @@ interpretError :: PlumeError -> IO ()
 interpretError (p, UnificationFail t1 t2) =
   printErrorFromString
     mempty
-    ( "Expected type " <> prettyToString (prettyTy t2)
+    ( "Expected type " <> prettyToString (prettyTy t1)
         <> " but received type "
-        <> prettyToString (prettyTy t1)
+        <> prettyToString (prettyTy t2)
     , Nothing
     , p
     )
