@@ -21,13 +21,16 @@ import System.Directory
 import System.FilePath
 import Prelude hiding (putStrLn, readFile)
 import System.IO.Pretty
+import Main.Utf8
 
 fromEither :: a -> Either b a -> a
 fromEither _ (Right a) = a
 fromEither a _ = a
 
+
 main :: IO ()
-main = do
+main = withUtf8 $ do
+  putStrLn "SAFE IO λ"
   file_input <- maybeAt 0 <$> getArgs
   env <- lookupEnv "PLUME_PATH"
 

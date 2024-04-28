@@ -150,7 +150,8 @@ executable plume
         plume,
         relude,
         filepath,
-        directory
+        directory,
+        with-utf8
 
     mixins:
         base hiding (Prelude),
