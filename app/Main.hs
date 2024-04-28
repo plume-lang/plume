@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE CPP #-}
 
 module Main where
 
@@ -21,7 +22,28 @@ import System.Directory
 import System.FilePath
 import Prelude hiding (putStrLn, readFile)
 import System.IO.Pretty
-import Main.Utf8
+#if defined(mingw32_HOST_OS)
+import System.IO (hPutStrLn, hSetEncoding, stdout, utf8)
+import System.Win32.Console (getConsoleOutputCP, setConsoleOutputCP)
+
+setEncoding :: IO a -> IO a
+setEncoding a = do
+  cp <- getConsoleOutputCP
+  setConsoleOutputCP 65001
+  hSetEncoding stdout utf8
+  hSetEncoding stderr utf8
+  hSetEncoding stdin utf8
+
+  res <- a
+
+  setConsoleOutputCP cp
+
+  pure res
+  
+#else
+setEncoding :: IO a -> IO a
+setEncoding = id
+#endif
 
 fromEither :: a -> Either b a -> a
 fromEither _ (Right a) = a
@@ -29,8 +51,7 @@ fromEither a _ = a
 
 
 main :: IO ()
-main = withUtf8 $ do
-  putStrLn "SAFE IO λ"
+main = setEncoding $ do
   file_input <- maybeAt 0 <$> getArgs
   env <- lookupEnv "PLUME_PATH"
 

@@ -150,8 +150,10 @@ executable plume
         plume,
         relude,
         filepath,
-        directory,
-        with-utf8
+        directory
+
+    if os(mingw32)
+      build-depends: Win32
 
     mixins:
         base hiding (Prelude),
