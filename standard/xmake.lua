@@ -1,4 +1,4 @@
-add_rules("mode.debug", "mode.release", "mode.profile")
+add_rules("mode.release")
 add_requires("libcurl", { system = false })
 
 target("plume-natives")
