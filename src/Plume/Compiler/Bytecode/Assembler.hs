@@ -64,7 +64,9 @@ assemble Pre.DESpecial = pure [BC.Special]
 assemble (Pre.DEVar n) = do
   BC.AssemblerState {BC.locals, BC.globals, BC.nativeFunctions} <- readIORef BC.assemblerState
   case Map.lookup n locals of
-    Just i -> pure [BC.LoadLocal i]
+    Just i -> do
+      let negIdx = negate (Map.size locals) + i
+      pure [BC.LoadLocal negIdx]
     Nothing -> case Map.lookup n globals of
       Just i -> pure [BC.LoadGlobal i]
       Nothing -> case Map.lookup n nativeFunctions of
@@ -141,7 +143,8 @@ assembleDecl isMut n e = do
     Just i -> do
       modifyIORef' BC.assemblerState $ \s ->
         s {BC.locals = Map.insert n i locals}
-      pure $ e' ++ mut ++ [BC.StoreLocal i]
+      let negIdx = negate (Map.size locals) + i
+      pure $ e' ++ mut ++ [BC.StoreLocal negIdx]
     Nothing -> case Map.lookup n globals of
       Just i -> pure $ e' ++ mut ++ [BC.StoreGlobal i]
       Nothing -> error $ "Variable not found: " <> show n
@@ -263,7 +266,9 @@ assembleUpdate :: Update -> IO [BC.Instruction]
 assembleUpdate (UVariable n) = do
   BC.AssemblerState {BC.locals, BC.globals} <- readIORef BC.assemblerState
   case Map.lookup n locals of
-    Just i -> pure [BC.LoadLocal i]
+    Just i -> do
+      let negIdx = negate (Map.size locals) + i
+      pure [BC.LoadLocal negIdx]
     Nothing -> case Map.lookup n globals of
       Just i -> pure [BC.LoadGlobal i]
       Nothing -> error $ "Variable not found: " <> show n
