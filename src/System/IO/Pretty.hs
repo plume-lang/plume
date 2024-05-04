@@ -47,7 +47,9 @@ parseError :: ParsingError -> FilePath -> FileContent -> IO ()
 parseError err' fp fc = do
   let diag :: D.Diagnostic String = D.errorDiagnosticFromBundle Nothing "Parse error on input" Nothing err'
       diag' = D.addFile diag fp (toString fc)
-    in D.printDiagnostic stderr True True 4 D.defaultStyle diag'
+    in do
+      D.printDiagnostic stdout True True 4 D.defaultStyle diag'
+      exitFailure
 
 printErrorFromString :: Maybe Text -> (String, Maybe String, Position) -> String -> IO ()
 printErrorFromString content (error', msg, (p1, p2)) step = do
@@ -68,7 +70,8 @@ printErrorFromString content (error', msg, (p1, p2)) step = do
   let diagnostic' = D.addReport diagnostic beautifulExample
 
   -- Print with unicode characters, colors and the default style
-  D.printDiagnostic stderr True True 4 D.defaultStyle diagnostic'
+  D.printDiagnostic stdout True True 4 D.defaultStyle diagnostic'
+  exitFailure
 
 printWarningFromString :: Maybe Text -> (String, Maybe String, Position) -> String -> IO ()
 printWarningFromString content (warning', msg, (p1, p2)) step = do
