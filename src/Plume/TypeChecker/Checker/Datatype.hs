@@ -12,27 +12,40 @@ import Plume.TypeChecker.TLIR qualified as Post
 
 -- | Metadata for the data types
 {-# NOINLINE datatypes #-}
-datatypes :: IORef (Map Text (Map Text PlumeType))
-datatypes = unsafePerformIO $ newIORef (M.fromList [
-    ("boolean", boolean)
-  , ("list", list)
-  ])
+datatypes :: IORef (Map Text (Map Text PlumeScheme))
+datatypes =
+  unsafePerformIO $
+    newIORef
+      ( M.fromList
+          [ ("boolean", boolean),
+            ("list", list)
+          ]
+      )
 
-boolean :: Map Text PlumeType
-boolean = M.fromList [("true", TBool), ("false", TBool)]
+boolean :: Map Text PlumeScheme
+boolean = M.fromList [("true", Forall [] $ [] :=>: TBool), ("false", Forall [] $ [] :=>: TBool)]
 
 tA :: PlumeType
 tA = TypeQuantified "A"
 
-list :: Map Text PlumeType
-list = M.fromList [
-    ("nil", TList tA)
-  , ("cons", [tA, TList tA] :->: TList tA)
-  ]
+list :: Map Text PlumeScheme
+list =
+  M.fromList
+    [ ("nil", Forall ["A"] $ [] :=>: TList tA),
+      ("cons", Forall ["A"] $ [] :=>: ([tA, TList tA] :->: TList tA))
+    ]
 
 synthDataType :: Infer
 synthDataType (Pre.EType (Annotation name generics) cons) = do
   convertedGenerics :: [PlumeType] <- mapM convert generics
+
+  let isGeneric (TypeQuantified _) = True
+      isGeneric _ = False
+
+      getQVar (TypeQuantified name') = name'
+      getQVar _ = error "This should not happen"
+
+  let generics' = if all isGeneric convertedGenerics then map getQVar convertedGenerics else []
 
   -- Creating the header of the data type: if there are no generics
   -- the header is just the type name, otherwise it becomes a type
@@ -43,30 +56,32 @@ synthDataType (Pre.EType (Annotation name generics) cons) = do
           else TypeApp (TypeId name) convertedGenerics
 
   -- Synthesizing the constructors of the data type
-  (cons', m) <- mapAndUnzipM (synthCons ([], header)) cons
+  (cons', m) <- mapAndUnzipM (synthCons generics' ([], header)) cons
 
   -- Inserting the data type in the metadata
   modifyIORef datatypes (M.insert name (M.unions m))
 
-  return (TUnit, [Post.EType name cons'])
+  return (TUnit, [], pure $ Post.EType name cons')
 synthDataType _ = throw $ CompilerError "Only data types are supported"
 
 -- | Used to generate the type constructors of a data type
-synthCons
-  :: ([TyVar], PlumeType)
-  -> TypeConstructor Pre.PlumeType
-  -> Checker (TypeConstructor PlumeType, Map Text PlumeType)
-synthCons (_, header) (TVariable name) = do
-  let scheme = header
+synthCons ::
+  (MonadChecker m) =>
+  [QuVar] ->
+  ([TyVar], PlumeType) ->
+  TypeConstructor Pre.PlumeType ->
+  m (TypeConstructor PlumeType, Map Text PlumeScheme)
+synthCons qvars (_, header) (TVariable name) = do
+  let scheme = Forall qvars $ [] :=>: header
   insertEnv @"datatypeEnv" name scheme
 
   let dataType = M.singleton name scheme
 
   pure (TVariable name, dataType)
-synthCons (_, header) (TConstructor name args) = do
+synthCons qvars (_, header) (TConstructor name args) = do
   args' <- mapM convert args
   let ty = args' :->: header
-  let scheme = ty
+  let scheme = Forall qvars $ [] :=>: ty
   insertEnv @"datatypeEnv" name scheme
 
   let dataType = M.singleton name scheme
