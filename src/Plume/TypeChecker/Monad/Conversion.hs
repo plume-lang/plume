@@ -12,7 +12,25 @@ import Plume.TypeChecker.Monad.Type qualified as Post
 -- | It could be used for other conversions as well, but it is currently mainly
 -- | used to convert types and data-types that contains types.
 class a `ConvertsTo` b where
-  convert :: a -> Checker b
+  convert :: (MonadChecker m) => a -> m b
+
+instance Pre.PlumeGeneric `ConvertsTo` [Post.PlumeQualifier] where
+  convert (Pre.GVar v) = do
+    searchEnv @"datatypeEnv" v >>= \case
+      Just _ ->
+        throw $ CompilerError "Generic type variable shadowing datatype"
+      Nothing -> do
+        let ty = Post.TypeQuantified v
+        insertEnv @"genericsEnv" v ty
+        pure [Post.IsQVar v]
+  convert (Pre.GExtends name tcs) = do
+    searchEnv @"datatypeEnv" name >>= \case
+      Just _ ->
+        throw $ CompilerError "Generic type variable shadowing datatype"
+      Nothing -> do
+        let ty = Post.TypeQuantified name
+        insertEnv @"genericsEnv" name ty
+        pure (map (Post.IsIn ty) tcs)
 
 instance Pre.PlumeType `ConvertsTo` Post.PlumeType where
   convert (Pre.TId n) = do
