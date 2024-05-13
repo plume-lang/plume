@@ -29,7 +29,6 @@ prettyTy (TTuple ts) = parens (hsep . punctuate comma $ map prettyTy ts)
 prettyTy (TList t) = brackets (prettyTy t)
 prettyTy (TypeApp t ts) = prettyTy t <> parens (hsep . punctuate comma $ map prettyTy ts)
 prettyTy (TypeQuantified n) = anItalic (pretty n)
-prettyTy (TypeInstance n ts) = "@" <> anItalic (pretty n) <> parens (hsep . punctuate comma $ map prettyTy ts)
 
 instance ANSIPretty PlumeType where ansiPretty = prettyTy
 
@@ -47,7 +46,7 @@ prettyExpr (EType name ts) =
 prettyExpr (EApplication e es) =
   prettyExpr e
     <> parens (hsep . punctuate comma $ map prettyExpr es)
-prettyExpr (EVariable v t) = anItalic (pretty v) {-<> colon <+> prettyTy t-}
+prettyExpr (EVariable v _) = anItalic (pretty v) {-<> colon <+> prettyTy t-}
 prettyExpr (EExtVariable n t _) = parens (anCol Red (pretty n) <> ":" <+> prettyTy t)
 prettyExpr (ELiteral l) = prettyLit l
 prettyExpr (EEqualsType e t) = anCol Blue "typeof" <+> prettyExpr e <+> "==" <+> pretty t
@@ -74,7 +73,7 @@ prettyExpr (EMutDeclaration a e1' e2') =
         )
   where
     arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
-prettyExpr (EInstanceVariable v t) = anCol Red (pretty v) {-<> colon <+> prettyTy t-}
+prettyExpr (EInstanceVariable v _) = anCol Red (pretty v) {-<> colon <+> prettyTy t-}
 prettyExpr (EMutUpdate a e1' e2') =
   anCol Blue "mut"
     <+> arg a

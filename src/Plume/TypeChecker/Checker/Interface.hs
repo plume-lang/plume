@@ -32,7 +32,7 @@ synthInterface _ (Pre.EInterface (Annotation name [ty]) generics methods) = do
   let mappedMethods = Map.fromList $ sort (map fst methods') `zip` [(0 :: Int) ..]
   modifyIORef' classMapIndex $ Map.union mappedMethods
 
-  let instTy = TypeInstance name [ty']
+  let instTy = TypeApp (TypeId name) [ty']
   let genTy = ([instTy] :->:)
   let getIdx n = fromMaybe (-1) (Map.lookup n mappedMethods)
   let genFuns =

@@ -23,7 +23,6 @@ data PlumeType
   | TypeQuantified QuVar
   | TypeId Text
   | TypeApp PlumeType [PlumeType]
-  | TypeInstance Text [PlumeType]
   deriving (Eq)
 
 data Assumption a = Text :>: a
@@ -42,7 +41,6 @@ instance Show PlumeType where
   show (args :->: ret) = "(" <> show args <> " -> " <> show ret <> ")"
   show (TypeId t) = toString t
   show (TypeApp t ts) = show t <> "<" <> intercalate ", " (map show ts) <> ">"
-  show (TypeInstance t ts) = "@" <> toString t <> "<" <> intercalate ", " (map show ts) <> ">"
 
 -- | A type scheme is a way to quantify over types in a type system.
 -- | It is used to represent polymorphic types in the type system.

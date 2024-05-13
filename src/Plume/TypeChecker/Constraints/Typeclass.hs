@@ -99,7 +99,6 @@ normalize (Forall qs t) = Forall qs $ normqual t
     normtype (TypeId a) = TypeId a
     normtype (TypeApp a b) = TypeApp (normtype a) (map normtype b)
     normtype (TypeVar c) = TypeVar c
-    normtype (TypeInstance {}) = error "Typeclass instance in normalized type"
     normtype (TypeQuantified a) = TypeQuantified a
 
 matchMut :: (MonadChecker m) => PlumeType -> PlumeType -> m ()
@@ -229,4 +228,3 @@ createInstName (TypeApp x xs) = createInstName x <> "_" <> buildArray xs
     buildArray [] = ""
 createInstName (TypeVar _) = "tvar"
 createInstName (TypeQuantified _) = "tvar"
-createInstName (TypeInstance _ _) = error "Impossible"
