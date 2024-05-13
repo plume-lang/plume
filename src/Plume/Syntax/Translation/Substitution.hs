@@ -66,14 +66,15 @@ substitute (name, expr) (AST.ESwitch e ps) =
     | name `S.notMember` ftv p = (p, substitute (name, expr) e')
     | otherwise = (p, e')
 substitute (name, expr) (AST.EReturn e) = AST.EReturn (substitute (name, expr) e)
-substitute (name, expr) (AST.ETypeExtension g ann ems)
-  | name `S.notMember` ftv ann =
-      AST.ETypeExtension g ann (map (substituteExt (name, expr)) ems)
-  | otherwise = AST.ETypeExtension g ann ems
+substitute (name, expr) (AST.ETypeExtension g ann (Just var) ems)
+  | name /= var =
+      AST.ETypeExtension g ann (Just var) (map (substituteExt (name, expr)) ems)
+  | otherwise = AST.ETypeExtension g ann (Just var) ems
+substitute (name, expr) (AST.ETypeExtension g ann Nothing ems) =
+  AST.ETypeExtension g ann Nothing (map (substituteExt (name, expr)) ems)
 substitute _ (AST.ENativeFunction fp n gens t st) =
   AST.ENativeFunction fp n gens t st
-substitute _ (AST.EGenericProperty g n ts t) =
-  AST.EGenericProperty g n ts t
+substitute _ (AST.EInterface ann gs ms) = AST.EInterface ann gs ms
 substitute e (AST.EList es) = AST.EList (map (substitute e) es)
 substitute _ (AST.EType ann ts) = AST.EType ann ts
 

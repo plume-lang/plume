@@ -109,7 +109,12 @@ tType =
 -- | But in the future, this may be extended to support other type constraints
 -- | such as type extension constraints
 parseGeneric :: Parser PlumeGeneric
-parseGeneric = GVar <$> identifier
+parseGeneric = do
+  name <- identifier
+  extension <- optional (reserved "extends" *> identifier)
+  case extension of
+    Just exts -> return (GExtends name [exts])
+    Nothing -> return (GVar name)
 
 -- | Parse a type constructor
 -- | A type constructor is a sort of function that takes types as arguments

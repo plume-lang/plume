@@ -32,6 +32,9 @@ data PlumeGeneric
   | GExtends Text [Text]
   deriving (Eq, Show)
 
+data PlumeScheme = MkScheme [PlumeGeneric] PlumeType
+  deriving (Eq, Show)
+
 getGenericName :: PlumeGeneric -> Text
 getGenericName (GVar name) = name
 getGenericName (GExtends name _) = name

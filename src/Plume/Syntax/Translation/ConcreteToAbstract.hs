@@ -147,10 +147,10 @@ concreteToAbstract (CST.EListIndex e i) = do
   e' <- shouldBeAlone <$> concreteToAbstract e
   i' <- shouldBeAlone <$> concreteToAbstract i
   transRet $ AST.EApplication (AST.EVariable "get_index") <$> sequence [e', i']
-concreteToAbstract (CST.ETypeExtension g ann ems) = do
+concreteToAbstract (CST.ETypeExtension g ann var ems) = do
   ems' <-
     fmap flat . sequence <$> mapM concreteToAbstractExtensionMember ems
-  transRet $ AST.ETypeExtension g ann <$> ems'
+  transRet $ AST.ETypeExtension g ann var <$> ems'
 concreteToAbstract (CST.ENativeFunction fp n gens t) = do
   -- Native function resolution is kind the same as require resolution
   -- except we do not parse everything. But we need to resolve the path 
@@ -158,16 +158,16 @@ concreteToAbstract (CST.ENativeFunction fp n gens t) = do
   let strModName = fromString $ toString fp -<.> sharedLibExt
   let (isStd, path) = if "std:" `T.isPrefixOf` fp then (True, T.drop 4 strModName) else (False, strModName)
   transRet . Right $ AST.ENativeFunction path n gens t isStd
-concreteToAbstract (CST.EGenericProperty g n ts t) =
-  transRet . Right $ AST.EGenericProperty g n ts t
 concreteToAbstract (CST.EList es) = do
   -- Lists can be composed of spread elements, so we need to flatten
   -- the list of expressions into a single expression.
   es' <-
     fmap flat . sequence <$> mapM concreteToAbstract es
   transRet $ AST.EList <$> es'
-concreteToAbstract (CST.EType ann ts) = do
+concreteToAbstract (CST.EType ann ts) =
   bireturn . Single $ AST.EType ann ts
+concreteToAbstract (CST.EInterface ann gs ms) =
+  bireturn . Single $ AST.EInterface ann gs ms
 
 -- | Translate a concrete extension member to an abstract extension member
 concreteToAbstractExtensionMember

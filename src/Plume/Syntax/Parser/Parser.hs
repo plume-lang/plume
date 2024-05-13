@@ -489,6 +489,31 @@ tRequire = do
   void $ L.reserved "require"
   (: []) . CST.ERequire <$> Lit.stringLiteral
 
+-- | Parses an interface declaration
+-- | An interface declaration is a statement that is used to declare a 
+-- | Haskell-like typeclass.
+-- |
+-- | SYNTAX:
+-- |  - interface<generics> (name: ty) { 
+-- |      fn name<generics>(arg1: ty, arg2: ty, ...): retTy
+-- |      ... 
+-- |    }
+tInterface :: P.Parser [CST.Expression]
+tInterface = do
+  void $ L.reserved "interface"
+  gens <- P.option [] $ L.angles $ Typ.parseGeneric `P.sepBy` L.comma
+  annot <- Cmm.Annotation <$> L.identifier <*> L.angles (Typ.tType `P.sepBy` L.comma)
+  members <- L.braces (P.many iFun)
+  return [CST.EInterface annot gens members]
+  where 
+    iFun = do
+      void $ L.reserved "fn"
+      name <- L.identifier
+      gens <- P.option [] $ L.angles $ Typ.parseGeneric `P.sepBy` L.comma
+      args <- L.parens $ typeAnnot' `P.sepBy` L.comma
+      retTy <- P.option Cmm.TUnit $ L.symbol ":" *> Typ.tType
+      return $ Cmm.Annotation name (Cmm.MkScheme gens (args Cmm.:->: retTy))
+
 -- | Parses a native statement
 -- | A native statement is a statement that is used to import a native module.
 -- | A native module is a module that is written in another language and is
@@ -572,9 +597,12 @@ tExtension :: P.Parser [CST.Expression]
 tExtension = do
   void $ L.reserved "extend"
   gens <- P.option [] $ L.angles (Typ.parseGeneric `P.sepBy` L.comma)
-  ty <- L.parens ((Cmm.:@:) <$> L.identifier <*> (L.symbol ":" *> Typ.tType))
+  
+  tc <- Cmm.Annotation <$> L.identifier <*> L.angles (Typ.tType `P.sepBy1` L.comma)
+  
+  var <- P.optional $ L.reserved "with" *> L.identifier
   members <- L.braces (P.many eExtensionMember)
-  return [CST.ETypeExtension gens ty members]
+  return [CST.ETypeExtension gens tc var members]
 
 -- | Parses a type declaration
 -- | A type declaration is a statement that is used to declare a new
@@ -631,6 +659,7 @@ parseToplevel =
   eLocatedMany $
     P.choice
       [ tNative
+      , tInterface
       , tRequire
       , tType
       , tCustomOperator

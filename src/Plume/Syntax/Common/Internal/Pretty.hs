@@ -5,6 +5,8 @@ import Plume.Syntax.Internal.Pretty.ANSI
 import Prettyprinter.Render.Terminal
 import Prelude hiding (intercalate)
 
+instance ANSIPretty PlumeScheme where ansiPretty = prettySch
+
 instance ANSIPretty Pattern where ansiPretty = prettyPat
 
 instance ANSIPretty Literal where ansiPretty = prettyLit
@@ -50,6 +52,9 @@ prettyLit (LFloat f) = anCol Yellow $ pretty f
 prettyLit (LString s) = anCol Green . dquotes $ pretty s
 prettyLit (LBool b) = anBold $ anCol Blue (if b then "true" else "false")
 prettyLit (LChar c) = anCol Green . squotes $ pretty c
+
+prettySch :: PlumeScheme -> Doc AnsiStyle
+prettySch (MkScheme gs t) = angles (hsep (punctuate comma (map ansiPretty gs))) <+> "->" <+> ansiPretty t
 
 prettyTy :: PlumeType -> Doc AnsiStyle
 prettyTy (TId n) = anCol Magenta $ pretty n

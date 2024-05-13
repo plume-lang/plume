@@ -106,9 +106,13 @@ data ConcreteExpression t
   | ESwitch
       (ConcreteExpression t)
       [(Pattern, ConcreteExpression t)]
+  | EInterface {
+      interfaceType :: Annotation [t],
+      interfaceGenerics :: [PlumeGeneric],
+      interfaceMembers :: [Annotation PlumeScheme]
+    }
   | EReturn (ConcreteExpression t)
-  | EGenericProperty [PlumeGeneric] Text [t] t
-  | ETypeExtension [PlumeGeneric] (Annotation t) [ExtensionMember t]
+  | ETypeExtension [PlumeGeneric] (Annotation [t]) (Maybe Text) [ExtensionMember t]
   | ENativeFunction Text Text [Text] t
   deriving (Show)
 
@@ -162,9 +166,8 @@ instance Eq t => Eq (ConcreteExpression t) where
   EMacroApplication x xs == EMacroApplication x' xs' = x == x' && xs == xs'
   ESwitch x xs == ESwitch x' xs' = x == x' && xs == xs'
   EReturn x == EReturn y = x == y
-  EGenericProperty xs x ys y == EGenericProperty xs' x' ys' y' =
-    xs == xs' && x == x' && ys == ys' && y == y'
-  ETypeExtension xs x ys == ETypeExtension xs' x' ys' = xs == xs' && x == x' && ys == ys'
+  EInterface x xs ys == EInterface x' xs' ys' = x == x' && xs == xs' && ys == ys'
+  ETypeExtension xs x t ys == ETypeExtension xs' x' t' ys' = xs == xs' && x == x' && ys == ys' && t == t'
   ENativeFunction x y xs z == ENativeFunction x' y' xs' z' = x == x' && y == y' && xs == xs' && z == z'
   ELocated x _ == ELocated y _ = x == y
   ELocated x _ == y = x == y
