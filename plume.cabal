@@ -70,10 +70,12 @@ library
         Plume.TypeChecker.Checker.Datatype
         Plume.TypeChecker.Checker.Switch
         Plume.TypeChecker.Checker.Native
+        Plume.TypeChecker.Checker.Interface
         
         Plume.TypeChecker.Constraints.Definition
         Plume.TypeChecker.Constraints.Unification
         Plume.TypeChecker.Constraints.Solver
+        Plume.TypeChecker.Constraints.Typeclass
 
         Plume.Compiler.ClosureConversion.Syntax
         Plume.Compiler.ClosureConversion.Free
