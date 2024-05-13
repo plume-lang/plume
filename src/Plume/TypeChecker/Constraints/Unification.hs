@@ -12,6 +12,19 @@ doesUnifyWith t t' = do
   t2 <- compressPaths t'
   doesUnifyWithH t1 t2
 
+doesQualUnifiesWith :: PlumeQualifier -> PlumeQualifier -> IO Bool
+doesQualUnifiesWith (IsIn t n) (IsIn t' n') | n == n' = do
+  t1 <- compressPaths t
+  t2 <- compressPaths t'
+  doesUnifyWithH t1 t2
+doesQualUnifiesWith _ _ = pure False
+
+doesUnifyWithScheme :: PlumeType -> PlumeScheme -> IO Bool
+doesUnifyWithScheme t (Forall _ (_ :=>: t')) = do
+  t1 <- compressPaths t
+  t2 <- compressPaths t'
+  doesUnifyWithH t1 t2
+
 doesUnifyWithH :: PlumeType -> PlumeType -> IO Bool
 doesUnifyWithH t1 t2 | t1 == t2 = pure True
 doesUnifyWithH (TypeVar tv) t = do
@@ -26,6 +39,7 @@ doesUnifyWithH t (TypeVar tv) = do
     Unbound _ _ -> pure True
 doesUnifyWithH (TypeApp t1 t1') (TypeApp t2 t2') =
   and <$> zipWithM doesUnifyWith (t1:t1') (t2:t2')
+doesUnifyWithH (TypeQuantified q1) (TypeQuantified q2) = pure (q1 == q2)
 doesUnifyWithH (TypeQuantified q1) t = not <$> doesOccurQ q1 t
 doesUnifyWithH t (TypeQuantified q2) = not <$> doesOccurQ q2 t
 doesUnifyWithH _ _ = pure False
@@ -50,7 +64,7 @@ doesOccurQ _ _ = pure False
 --   pushConstraint @"tyConstraints" (p, t1 :~: t2)
 
 -- | Creating a constraint from a type constraint
-createConstraint :: TypeConstraint -> Checker PlumeConstraint
+createConstraint :: MonadChecker m => TypeConstraint -> m PlumeConstraint
 createConstraint c = do
   p <- fetchPosition
   pure (p, c)
@@ -76,7 +90,10 @@ doesOccur tv (TypeApp t1 t2) = do
   traverse_ (doesOccur tv) t2
 doesOccur _ _ = pure ()
 
-mgu :: PlumeType -> PlumeType -> Checker ()
+mguSch :: MonadChecker m => PlumeType -> PlumeScheme -> m ()
+mguSch t (Forall _ (_ :=>: t')) = mgu t t'
+
+mgu :: MonadChecker m => PlumeType -> PlumeType -> m ()
 mgu t t' = do
   t1 <- liftIO $ compressPaths t
   t2 <- liftIO $ compressPaths t'
@@ -98,6 +115,10 @@ mgu t t' = do
         zipWithM_ mgu t1b t2b
       (TypeId n, TypeId n') | n == n' -> pure ()
       _ -> throw (UnificationFail t1 t2)
+
+compressQual :: PlumeQualifier -> IO PlumeQualifier
+compressQual (IsIn t n) = IsIn <$> compressPaths t <*> pure n
+compressQual q = pure q
 
 compressPaths :: PlumeType -> IO PlumeType
 compressPaths (TypeVar tv) = do
