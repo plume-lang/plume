@@ -1,21 +1,22 @@
-mut string: str = "Hello"
+native "std:native" println(x: str): int
 
-extend<A> (c: mut A) {
-  value: A = *c
+interface<A> show<A> {
+  fn show(a: A): str
 }
 
-infix 3 +=
-
-extend (c: mut str) {
-  fn (+=) (s: str): unit {
-    c = *c + s
-    return unit
+extend show<str> {
+  fn show(a: str): str {
+    return "eheh"
   }
-
 }
 
-println(string.value)
+extend<A> show<[A]> {
+  fn show(a: [A]): str => switch a {
+    case [] => "[]"
+    case [x, ..xs] => xs.show()
+  }
+}
 
-string += " World!"
+t = [["test"]].show()
 
-println(string.value)
+println(t)
