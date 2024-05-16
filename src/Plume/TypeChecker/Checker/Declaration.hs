@@ -26,7 +26,7 @@ synthDecl
     convertedGenerics :: [PlumeQualifier] <- concatMapM convert generics
     convertedTy :: PlumeType <- convert ty
 
-    let qvars = filter (/= "") $ map (\case IsQVar n -> n; _ -> "") convertedGenerics
+    let qvars = getQVars convertedGenerics
 
     -- Mutable variables should not have generics as this is unsound
     when (isMut && not (null convertedGenerics)) $ do
@@ -116,7 +116,7 @@ synthDecl
     exitLevel
 
     -- Creating a new scheme for the variable based on the substitution
-    newScheme <- liftIO $ compressPaths closTy
+    newScheme <- liftIO $ compressPaths t
     insertEnv @"typeEnv" name (Forall qvars $ convertedGenerics :=>: newScheme)
 
     -- Removing the generic types from the environment
@@ -128,5 +128,5 @@ synthDecl
     let body' = mapM thd3 b
     let psb = maybe [] snd3 b
 
-    pure (retTy, psb, declFun (Annotation name exprTy) clos <$> body')
+    pure (retTy, psb, declFun (Annotation name closTy) clos <$> body')
 synthDecl _ _ = throw $ CompilerError "Only declarations are supported"
