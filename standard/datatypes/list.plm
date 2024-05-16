@@ -9,155 +9,29 @@ native "std:native" {
   ffi_slice_list<A>(x: [A], start: int, end: int): [A]
 }
 
-extend<A> (c: [A]) {
-  // Some primitive list operations for fetching elements and 
-  // slicing the list.
-  fn get_index(i: int): Option<A> => ffi_get_index(c, i)
-  fn slice(start: int, end: int): [A] => ffi_slice_list(c, start, end)
+interface<T> traversable<T> {
+  fn map<A, B>(self: T<A>, f: fn(A): B): T<B>
+  fn length<A>(self: T<A>): int
+}
 
-  // Returns the length of the list by a summation of 1 for each element.
-  fn len(): int => switch c {
+extend traversable<list> {
+  fn map<A, B>(self: list<A>, f: fn(A): B): list<B> => switch self {
+    case [] => []
+    case [x, ..xs] => xs.map(f).list_append(f(x))
+  }
+
+  fn length<A>(self: list<A>): int => switch self {
     case [] => 0
-    case [?, ..xs] => 1 + len(xs)
+    case [?, ..xs] => 1 + xs.length()
   }
+}
 
-  // Overloading the + operator to concat two lists.
-  fn (+) (other: [A]): [A] => list_concat(c, other)
-  fn concat(other: [A]): [A] => c + other
+fn showListHelper<A extends show>(ls: list<A>): str => switch ls {
+  case [] => ""
+  case [x] => x.show()
+  case [x, ..xs] => x.show() + ", " + showListHelper(xs)
+}
 
-  // Some more list operations that permit obtaining some of the elements
-  // of the list.
-  // The head function returns the first element of the list.
-  // The tail function returns the list without the first element.
-  // The last function returns the last element of the list.
-  // The init function returns the list without the last element.
-  fn head(): Option<A> => c.get_index(0)
-  fn tail(): [A] => c.slice(1, len(c))
-  fn last(): Option<A> => c.get_index(len(c) - 1)
-  fn init(): [A] => c.slice(0, len(c) - 1)
-
-  // Destruct functions take advantage of the head, tail, last
-  // and init functions
-  fn destruct(): (Option<A>, [A]) => (c.head(), c.tail())
-  fn destruct_last(): ([A], Option<A>) => (c.init(), c.last())
-  fn destruct_head(): (Option<A>, [A]) => c.destruct()
-
-  // As same as the mathematical definition of a set
-  fn singleton(x: A): [A] => [x]
-  fn null(): bool => len(c) == 0
-
-  // Map function applies a function to each element of the list.
-  fn map<B>(f: fn(A): B): [B] => switch c {
-    case [] => []
-    case [x, ..xs] => [f(x)] + xs.map(f)
-  }
-
-  // Monadic binding function over the list.
-  fn and_then<B>(f: fn(A): [B]): [B] => 
-    switch c {
-      case [] => []
-      case [x, ..xs] => f(x) + xs.and_then(f)
-    }
-
-  // Reverse function just reverse the list.
-  fn reverse(): [A] => switch c {
-    case [] => []
-    case [x, ..xs] => xs.reverse() + [x]
-  }
-
-  // Intersperse function inserts an element between each element
-  // of the list.
-  fn intersperse(x: A): [A] => switch c {
-    case [] => []
-    case [y] => [y]
-    case [y, ..ys] => [y, x].list_concat(ys.intersperse(x))
-  }
-  
-  // Reduce function is a folding function that applies a function
-  // to each element of the list and an accumulator.
-  fn reduce<B>(f: fn(B, A): B, init: B): B => switch c {
-    case [] => init
-    case [x, ..xs] => xs.reduce(f, f(init, x))
-  }
-
-  // concat_map function applies a function to each element of the list
-  // and then concatenates the results.
-  fn concat_map<B>(f: fn(A): [B]): [B] => switch c {
-    case [] => []
-    case [x, ..xs] => f(x) + xs.concat_map(f)
-  }
-
-  // Might read `any` and `all` as natural sentences: 
-  // "Is there any element that satisfies the condition?"
-  // "Do all elements satisfy the condition?"
-  fn any(f: fn(A): bool): bool => switch c {
-    case [] => false
-    case [x, ..xs] => f(x) or xs.any(f)
-  }
-  fn all(f: fn(A): bool): bool => switch c {
-    case [] => true
-    case [x, ..xs] => f(x) and xs.all(f)
-  }
-
-  // Take and drop functions are used to take or drop a number of elements
-  // from the beginning of the list. It's similar to the slice function.
-  fn take(n: int): [A] => switch n {
-    case 0 => []
-    case ? => switch c {
-      case [] => []
-      case [x, ..xs] => [x] + xs.take(n - 1)
-    }
-  }
-  fn drop(n: int): [A] => switch n {
-    case 0 => c
-    case ? => switch c {
-      case [] => []
-      case [x, ..xs] => xs.drop(n - 1)
-    }
-  }
-
-  // Take_while and drop_while functions are used to take or drop elements
-  // from the beginning of the list while a condition is satisfied.
-  fn take_while(f: fn(A): bool): [A] => switch c {
-    case [] => []
-    case [x, ..xs] => switch f(x) {
-      case true => [x] + xs.take_while(f)
-      case false => []
-    }
-  }
-  fn drop_while(f: fn(A): bool): [A] => switch c {
-    case [] => []
-    case [x, ..xs] => switch f(x) {
-      case true => xs.drop_while(f)
-      case false => c
-    }
-  }
-  fn split_at(n: int): ([A], [A]) => (c.take(n), c.drop(n))
-  
-  // Filtering like in the map function, but only elements that satisfy
-  // the condition are kept.
-  fn filter(f: fn(A): bool): [A] => switch c {
-    case [] => []
-    case [x, ..xs] => switch f(x) {
-      case true => [x] + xs.filter(f)
-      case false => xs.filter(f)
-    }
-  }
-  
-  // Zip operation is used to combine two lists into a list of tuples.
-  fn zip<B>(other: [B]): [(A, B)] => switch (c, other) {
-    case ([], []) => []
-    case ([x, ..xs], [y, ..ys]) => [(x, y)] + xs.zip(ys)
-    case ? => []
-  }
-
-  // Same as zip function but with a function that combines the elements.
-  fn zip_with<B, C>(other: [B], f: fn(A, B): C): [C] => switch (c, other) {
-    case ([], []) => []
-    case ([x, ..xs], [y, ..ys]) => [f(x, y)] + xs.zip_with(ys, f)
-    case ? => []
-  }
-
-  fn show(showH: fn(A): str): str =>
-    "[" + c.map(showH).reduce(fn (x, y) => x + ", " + y, "") + "]"
+extend<A extends show> show<list<A>> {
+  fn show(self: list<A>): str => "[" + showListHelper(self) + "]"
 }

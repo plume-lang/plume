@@ -32,6 +32,7 @@ get_index_str
 char_to_string
 str_slice
 ffi_slice_list
+int_to_str
 
 print
 println

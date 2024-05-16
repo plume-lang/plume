@@ -8,11 +8,10 @@ require "datatypes/char"
 
 type unit { unit }
 
-extend (c: unit) {
+extend show<unit> {
   fn show(): str => "()"
 }
 
-extend<A> (c: mut A) {
-  fn show(showWith: fn(A): str): str =>
-    "mut " + c->showWith()
+extend<A extends show> show<mut A> {
+  fn show(c: mut A): str => "mut " + c->show()
 }

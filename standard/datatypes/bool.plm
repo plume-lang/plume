@@ -1,6 +1,9 @@
-extend (c: bool) {
-  fn and(d: bool): bool => if c { d } else { false }
-  fn or(d: bool): bool => if c { true } else { d }
+extend boolean_algebra<bool> {
+  fn and(a: bool, b: bool): bool => if a { b } else { false }
+  fn or(a: bool, b: bool): bool => if a { true } else { b }
+  fn not(a: bool): bool => if a { false } else { true }
+}
 
-  fn not(): bool => if c { false } else { true }
+extend show<bool> {
+  fn show(self: bool): str => if self { "true" } else { "false" }
 }

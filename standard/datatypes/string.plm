@@ -3,33 +3,33 @@ require "bool"
 native "std:native" {
   add_str(x: str, y: str): str
   mul_str(x: str, y: int): str
-  to_string<A>(x: A): str
   string_length(x: str): int
   eq_string(x: str, y: str): bool
   get_index_str(x: str, i: int): Option<char>
   str_slice(x: str, start: int, end: int): str
 }
 
-extend (c: str) {
-  fn (+) (d: str) => add_str(c, d)
-  fn (*) (d: int) => mul_str(c, d)
-  fn concat(d: str) => c + d
-  fn (==) (d: str) => eq_string(c, d)
-
-  fn show() => "\"" + c + "\""
-  fn len() => string_length(c)
-
-  fn get_index(i: int): Option<char> => get_index_str(c, i)
-  fn slice(start: int, end: int): str => str_slice(c, start, end)
+extend numeric<str> {
+  fn (+) (x: str, y: str) => add_str(x, y)
+  fn (*) (x: str, y: str) => x
+  fn (-) (x: str, y: str) => x
 }
-  
-extend (c: [str]) {
-  // Inserting a `sep`arator between each element of the list
-  // and concatenating the result into a single string.
-  fn join(sep: str) =>
-    switch c {
-      case [] => ""
-      case [x] => x
-      case [x, ..xs] => x + sep + xs.join(sep)
-    }
+
+extend equality<str> {
+  fn (==) (x: str, y: str) => eq_string(x, y)
 }
+
+extend show<str> {
+  fn show(x: str) => "\"" + x + "\""
+}
+
+// Inserting a `sep`arator between each element of the list
+// and concatenating the result into a single string.
+fn join(c: [str], sep: str) =>
+  switch c {
+    case [] => ""
+    case [x] => x
+    case [x, ..xs] => x + sep + xs.join(sep)
+  }
+
+
