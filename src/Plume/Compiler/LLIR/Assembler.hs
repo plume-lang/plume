@@ -185,22 +185,16 @@ instance Assemble Pre.DesugaredExpr where
   assemble (Pre.DEDictionary dict) = assemble (Pre.DEList (IntMap.elems dict))
 
   assemble (Pre.DEIf cond then' else') = do
-    let doesThenReturn = doesReturn then'
-        doesElseReturn = doesReturn else'
-
     cond' <- assemble cond
     then'' <- concatMapM assemble then'
     else'' <- concatMapM assemble else'
 
-    let thenJumpAddr = length then'' + if doesThenReturn then 2 else 1
-        thenBranch   = LLIR.instr (LLIR.JumpElseRel thenJumpAddr)
+    let doesElseReturn = doesReturn else''
+        thenJumpAddr   = length then'' + if doesElseReturn then 1 else 0
+        thenBranch     = LLIR.instr (LLIR.JumpElseRel thenJumpAddr)
 
-        elseJumpAddr = if doesElseReturn then length else'' else length else'' + 1
-        elseBranch   = [LLIR.Instruction (LLIR.JumpRel elseJumpAddr) | not doesElseReturn]
-
-    -- print else''
-
-    -- print (cond' <> thenBranch <> then'' <> elseBranch <> else'')
+        elseJumpAddr   = if doesElseReturn then length else'' else length else'' + 1
+        elseBranch     = [LLIR.Instruction (LLIR.JumpRel elseJumpAddr) | not doesElseReturn]
 
     pure (cond' <> thenBranch <> then'' <> elseBranch <> else'')
 
@@ -247,12 +241,15 @@ instance Assemble Pre.Update where
     u' <- assemble u
     pure (u' <> [LLIR.Instruction (LLIR.ListGet i)])
 
-isReturn :: Pre.DesugaredStatement -> Bool
-isReturn (Pre.DSReturn _) = True
+isReturn :: LLIR.Instruction -> Bool
+isReturn LLIR.Return = True
+isReturn (LLIR.ReturnConst _) = True
 isReturn _ = False
 
-doesReturn :: [Pre.DesugaredStatement] -> Bool
-doesReturn = any isReturn
+doesReturn :: [LLIR.Segment] -> Bool
+doesReturn (LLIR.Instruction x:_) | isReturn x = True
+doesReturn (_:xs) = doesReturn xs
+doesReturn [] = False
 
 runLLIRAssembler :: (Assemble a, LLIR.Free a, LLIR.Name a) => a -> IO LLIR.Program
 runLLIRAssembler xs = do
