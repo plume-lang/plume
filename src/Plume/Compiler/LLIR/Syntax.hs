@@ -1,8 +1,14 @@
 module Plume.Compiler.LLIR.Syntax where
 
 import GHC.Show 
+import GHC.Records
 import Prelude hiding (show)
 import System.IO.Color
+import Plume.Compiler.Desugaring.Syntax qualified as Pre
+import Plume.Syntax.Abstract (IsStandard)
+import Plume.Syntax.Common qualified as Cmm
+
+type NeededLocalSpace = Int
 
 data Instruction 
   = LoadLocal Text
@@ -19,7 +25,7 @@ data Instruction
   | LoadNative Text
   | MakeList Int
   | ListGet Int
-  | Call Text
+  | Call Int
   | CallGlobal Text Int | CallLocal Text Int
   | JumpElseRel Int
   | JumpElseRelCmp Int Comparator
@@ -36,9 +42,33 @@ data Instruction
   deriving (Eq)
 
 data Segment
-  = Function Text [Text] [Instruction]
+  = Function Text [Text] NeededLocalSpace LocalSpace [Instruction]
   | Instruction Instruction
   deriving (Eq)
+
+type NameAddress = Int
+type LibraryAddress = Int
+type FunctionIndex = Int
+type LocalSpace = [(Text, Int)]
+
+data NativeFunction = NativeFunction
+  { nativeAddressName :: NameAddress
+  , nativeFunctionIndex :: FunctionIndex
+  , nativeFunctionLibrary :: LibraryAddress
+  } deriving (Show, Eq)
+
+data NativeLibrary = MkNativeLibrary 
+  { nativeLibraryPath :: Pre.LibraryPath
+  , nativeAddressLibrary :: LibraryAddress
+  , nativeIsStandard :: IsStandard
+  , nativeFunctions :: Natives
+  } deriving (Show, Eq)
+
+type Natives = Map Text NativeFunction
+
+type Libraries = Map Pre.LibraryPath NativeLibrary
+
+type Program = ([Segment], Libraries, [Cmm.Literal])
 
 showConstant :: Int -> String
 showConstant n = decorate ("#" <> show n) (Yellow, NoColor, Null)
@@ -62,15 +92,15 @@ instance Show Instruction where
   show (LoadNative name) = "load native " <> decorate (toString name) (Green, NoColor, Bold)
   show (MakeList n) = "make list " <> show n
   show (ListGet n) = "index " <> show n
-  show (Call name) = "call " <> decorate (toString name) (Cyan, NoColor, Bold) 
-  show (CallGlobal name n) = "call " <> decorate (toString name) (Cyan, NoColor, Bold) <> " with " <> show n <> " arguments"
-  show (CallLocal name n) = "call " <> decorate (toString name) (Cyan, NoColor, Bold) <> " with " <> show n <> " arguments"
-  show (JumpElseRel n) = "jump if not " <> show n
-  show (JumpElseRelCmp n c) = "jump if not " <> show c <> " " <> show n
-  show (JumpElseRelCmpConstant n c m) = "jump if not " <> show c <> " " <> show n <> " " <> showConstant m
-  show (IJumpElseRelCmp n c) = "jump if " <> show c <> " " <> show n
-  show (IJumpElseRelCmpConstant n c m) = "jump if " <> show c <> " " <> show n <> " " <> showConstant m
-  show (JumpRel n) = "jump " <> show n
+  show (Call arity) = "call with " <> show arity <> " arguments"
+  show (CallGlobal name n) = "call " <> decorate (toString name) (Red, NoColor, Bold) <> " with " <> show n <> " arguments"
+  show (CallLocal name n) = "call " <> decorate (toString name) (NoColor, NoColor, Bold) <> " with " <> show n <> " arguments"
+  show (JumpElseRel n) = "jump by " <> show n <> " if false"
+  show (JumpElseRelCmp n c) = "jump by " <> show c <> " if " <> show n <> " is false"
+  show (JumpElseRelCmpConstant n c m) = "jump by " <> show c <> " if " <> show n <> " " <> showConstant m <> " is false"
+  show (IJumpElseRelCmp n c) = "jump by " <> show c <> " if " <> show n <> " is true"
+  show (IJumpElseRelCmpConstant n c m) = "jump by " <> show c <> " if " <> show n <> " " <> showConstant m <> " is false"
+  show (JumpRel n) = "jump by " <> show n
   show MakeMutable = "make mutable"
   show UnMut = "unmut"
   show GetIndex = "get index"
@@ -81,14 +111,12 @@ instance Show Instruction where
 
 
 instance Show Segment where
-  show (Function name args body) = name' <> "(" <> args' <> ")" <> ":\n" <> body'
+  show (Function name args _ _ body) = name' <> "(" <> args' <> ")" <> ":\n" <> body'
     where args' = let args'' = map (flip decorate (Black, NoColor, Null) . toString) args
                   in intercalate ", " args''
           name' = decorate (toString name) (NoColor, NoColor, Bold)
           body' = intercalate "\n" (map (toString . ("  " <>) . show) body)
   show (Instruction i) = show i
-
-type Program = [Segment]
 
 data Comparator
   = LessThan
@@ -110,17 +138,23 @@ instance Show Comparator where
   show AndCmp = "&&"
   show OrCmp = "||"
 
-storeGlobal :: Text -> Program
+storeGlobal :: Text -> [Segment]
 storeGlobal name = [Instruction (StoreGlobal name)]
 
-loadGlobal :: Text -> Program
+loadGlobal :: Text -> [Segment]
 loadGlobal name = [Instruction (LoadGlobal name)]
 
-storeLocal :: Text -> Program
+storeLocal :: Text -> [Segment]
 storeLocal name = [Instruction (StoreLocal name)]
 
-loadLocal :: Text -> Program
+loadLocal :: Text -> [Segment]
 loadLocal name = [Instruction (LoadLocal name)]
 
-loadConstant :: Int -> Program
+loadConstant :: Int -> [Segment]
 loadConstant n = [Instruction (LoadConstant n)]
+
+instr :: Instruction -> [Segment]
+instr = pure . Instruction
+
+deriveHasField ''NativeLibrary
+deriveHasField ''NativeFunction
