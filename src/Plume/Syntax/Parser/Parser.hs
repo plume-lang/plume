@@ -395,7 +395,7 @@ sDeclaration = do
 sFunction :: P.Parser CST.Expression
 sFunction = do
   void $ L.reserved "fn"
-  name <- L.identifier
+  name <- L.identifier <|> L.parens L.operator
   generics <- P.option [] $ L.angles $ Typ.parseGeneric `P.sepBy` L.comma
   args <- L.parens $ mutArg `P.sepBy` L.comma
   retTy <- P.optional $ L.symbol ":" *> Typ.tType
@@ -508,7 +508,7 @@ tInterface = do
   where 
     iFun = do
       void $ L.reserved "fn"
-      name <- L.identifier
+      name <- L.identifier <|> L.parens L.operator
       gens <- P.option [] $ L.angles $ Typ.parseGeneric `P.sepBy` L.comma
       args <- L.parens $ typeAnnot' `P.sepBy` L.comma
       retTy <- P.option Cmm.TUnit $ L.symbol ":" *> Typ.tType
