@@ -71,7 +71,7 @@ main = setEncoding $ do
 
       paths <- fromEither [] <$> parse getPaths file content
       let paths' = case env of
-            Just _ -> {-("std:prelude", Nothing) : -} paths
+            Just _ -> ("std:prelude", Nothing) : paths
             Nothing -> paths
 
       ppBuilding "Parsing file and dependencies..."
