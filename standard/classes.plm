@@ -1,0 +1,35 @@
+native "std:native" to_string<A>(x: A): str
+
+interface<A> show<A> {
+  fn show(a: A): str
+}
+
+interface<A> boolean_algebra<A> {
+  fn and(x: A, y: A): A
+  fn or(x: A, y: A): A
+  fn not(b: A): A
+}
+
+interface<A> to_str<A> {
+  fn to_str(a: A): str
+}
+
+interface<A> from_str<A> {
+  fn from_str(s: str): A
+}
+
+interface<A extends boolean_algebra> equality<A> {
+  fn (==)(a: A, b: A): bool
+}
+
+fn (!=)<A extends equality>(a: A, b: A): bool => not(a == b)
+
+interface<A> numeric<A> {
+  fn (+)(a: A, b: A): A
+  fn (*)(a: A, b: A): A
+  fn (-)(a: A, b: A): A
+}
+
+interface<A> ordering<A> {
+  fn (<)(a: A, b: A): bool
+}

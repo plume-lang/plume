@@ -1,41 +1,7 @@
 type tuple<A, B> { tuple(A, B) }
 
-extend<A, B> (c: tuple<A, B>) {
-  fn show(showA: fn(A): str, showB: fn(B): str): str => 
-    switch c {
-      case tuple(x, y) => "(" + showA(x) + ", " + showB(y) + ")"
-    }
-
-  // Some primitive operations over tuples
-  fn fst(): A => 
-    switch c {
-      case tuple(x, y) => x
-    }
-  fn snd(): B => 
-    switch c {
-      case tuple(x, y) => y
-    }
-  fn swap(): tuple<B, A> => 
-    switch c {
-      case tuple(x, y) => tuple(y, x)
-    }
-
-  // Some bifunctor and functor mappings functions
-  // Used to map over the elements of the tuple
-  fn map<C, D>(f: fn(A): C, g: fn(B): D): tuple<C, D> => 
-    switch c {
-      case tuple(x, y) => tuple(f(x), g(y))
-    }
-  fn map_fst<C>(f: fn(A): C): tuple<C, B> => 
-    switch c {
-      case tuple(x, y) => tuple(f(x), y)
-    }
-  fn map_snd<D>(g: fn(B): D): tuple<A, D> => 
-    switch c {
-      case tuple(x, y) => tuple(x, g(y))
-    }
-  fn bimap<C, D>(f: fn(A): C, g: fn(B): D): tuple<C, D> => 
-    switch c {
-      case tuple(x, y) => tuple(f(x), f(y))
-    }
+extend<A extends show, B extends show> show<tuple<A, B>> {
+  fn show(t: tuple<A, B>): str => switch t {
+    case tuple(a, b) => "(" + show(a) + ", " + show(b) + ")"
+  }
 }
