@@ -1,7 +1,6 @@
-native "std:native" println(x: str): int
-
 fn test<A>(x: A): A {
-    return x
+  return x
 }
 
-println(test("test"))
+@println(test("test"))
+@println(test(1))

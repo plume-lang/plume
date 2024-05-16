@@ -1,36 +1,3 @@
-native "std:native" {
-  println(x: str): int
-  sub_int(x: int, y: int): int
-  mul_int(x: int, y: int): int
-  eq_int(x: int, y: int): bool
-  add_str(x: str, y: str): str
-  int_to_str(x: int): str
-}
-
-interface<A> show<A> {
-  fn show(a: A): str
-}
-
-extend show<int> {
-  fn show(a: int): str => int_to_str(a)
-}
-
-extend show<str> {
-  fn show(a: str): str => "\"".add_str(a).add_str("\"")
-}
-
-fn showHelper<A extends show>(a: [A]): str => switch a {
-  case [] => ""
-  case [x] => x.show()
-  case [x, ..xs] => x.show().add_str(", ".add_str(xs.showHelper()))
-}
-
-extend<A extends show> show<[A]> {
-  fn show(a: [A]): str => "[".add_str(a.showHelper()).add_str("]")
-}
-
-macro println(x) => println(x.show())
-
 @println(3)
 
 @println([1, 2, 3, 4, 5])
