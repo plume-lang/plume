@@ -97,12 +97,17 @@ library
         Plume.Compiler.SSA.DeadCode
         Plume.Compiler.SSA.Bundler
 
-        Plume.Compiler.Bytecode.Syntax
+        Plume.Compiler.LLIR.Syntax
+        Plume.Compiler.LLIR.Assembler
+        Plume.Compiler.LLIR.Free
+
         Plume.Compiler.Bytecode.Assembler
+        Plume.Compiler.Bytecode.Label
+        Plume.Compiler.Bytecode.Syntax
         Plume.Compiler.Bytecode.Serialize
-        Plume.Compiler.Bytecode.Arithmetic
 
         System.IO.Pretty
+        System.IO.Color
 
         Control.Monad.IO
         Control.Monad.Parser
