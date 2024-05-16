@@ -5,6 +5,7 @@ import Data.Binary.Put
 import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as BSL
 import Data.Text.Encoding (encodeUtf8)
+import Data.Map qualified as Map
 import Plume.Compiler.Bytecode.Syntax
 import Prelude hiding (encodeUtf8)
 import Plume.Syntax.Common.Literal (Literal(..))
@@ -127,14 +128,22 @@ encodeProgram (xs, libs, lits) = do
   encodeInteger $ length lits
   mapM_ encodeConstant lits
 
-  encodeInteger $ length libs
-  mapM_ encodeNative libs
+  let libs' = prepareLibs libs
+  encodeInteger $ length libs'
+  mapM_ encodeNative libs'
 
   encodeInteger $ length xs
   mapM_ encodeInstruction xs
 
-encodeNative :: NativeLibrary -> Put
-encodeNative (MkNativeLibrary path _ isStandard nats) = do
+prepareLibs :: Libraries -> [(Text, Bool, [Text])]
+prepareLibs m = do
+  let (_, ls) = sequence $ Map.toList m
+      ls'     = sortBy (compare `on` (\(MkNativeLibrary _ i _ _) -> i)) ls
+
+  map (\(MkNativeLibrary p _ s n) -> (p, s, Map.keys n)) ls'
+
+encodeNative :: (Text, Bool, [Text]) -> Put
+encodeNative (path, isStandard, nats) = do
   encodeText path
   encodeInteger $ fromEnum isStandard
   encodeInteger (length nats)
