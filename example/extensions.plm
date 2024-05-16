@@ -1,21 +1,5 @@
-mut string: str = "Hello"
+@println(3)
 
-extend<A> (c: mut A) {
-  value: A = *c
-}
+@println([1, 2, 3, 4, 5])
 
-infix 3 +=
-
-extend (c: mut str) {
-  fn (+=) (s: str): unit {
-    c = *c + s
-    return unit
-  }
-
-}
-
-println(string.value)
-
-string += " World!"
-
-println(string.value)
+@println("Hello, World!")

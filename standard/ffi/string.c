@@ -40,6 +40,20 @@ Value mul_str(int arg_n, Module* mod, Value* args) {
   return MAKE_STRING(new_str, str->length * GET_INT(args[1]));
 }
 
+Value int_to_str(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 1) THROW("Int_to_str expects 1 argument");
+  ASSERT(get_type(args[0]) == TYPE_INTEGER,
+         "Int_to_str expects an integer argument");
+
+  int x = GET_INT(args[0]);
+  int length = snprintf(NULL, 0, "%d", x);
+  char* str = malloc(length + 1);
+
+  snprintf(str, length + 1, "%d", x);
+
+  return MAKE_STRING(str, length + 1);
+}
+
 Value to_string(int arg_n, Module* mod, Value* args) {
   if (arg_n != 1) THROW("To_string expects 1 argument");
   switch (get_type(args[0])) {
@@ -53,7 +67,7 @@ Value to_string(int arg_n, Module* mod, Value* args) {
       return MAKE_STRING(new_str, sz);
     }
     case TYPE_INTEGER: {
-      size_t sz = snprintf(NULL, 0, "%d", (int32_t) args[0]);
+      size_t sz = snprintf(NULL, 0, "%d", (int32_t) GET_INT(args[0]));
       char* new_str = malloc((sz + 1) * sizeof(char));
       sprintf(new_str, "%d", (int32_t) args[0]);
       return MAKE_STRING(new_str, sz);

@@ -1,5 +1,5 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Main where
 
@@ -7,9 +7,11 @@ import Control.Monad.Exception
 import Control.Monad.Parser
 import Data.Either
 import Data.Text.IO hiding (putStr)
+import Plume.Compiler.LLIR.Assembler
 import Plume.Compiler.Bytecode.Assembler
 import Plume.Compiler.Bytecode.Serialize
-import Plume.Compiler.Bytecode.Syntax
+import Plume.Compiler.Bytecode.Syntax (Instruction)
+import Plume.Compiler.Bytecode.Label hiding (labelPool)
 import Plume.Compiler.ClosureConversion.Conversion
 import Plume.Compiler.Desugaring.Desugar
 import Plume.Compiler.SSA
@@ -20,8 +22,8 @@ import Plume.Syntax.Translation.ConcreteToAbstract
 import Plume.TypeChecker.Checker
 import System.Directory
 import System.FilePath
-import Prelude hiding (putStrLn, readFile)
 import System.IO.Pretty
+import Prelude hiding (putStrLn, readFile)
 #if defined(mingw32_HOST_OS)
 import System.IO (hPutStrLn, hSetEncoding, stdout, utf8)
 import System.Win32.Console (getConsoleOutputCP, setConsoleOutputCP)
@@ -39,7 +41,7 @@ setEncoding a = do
   setConsoleOutputCP cp
 
   pure res
-  
+
 #else
 setEncoding :: IO a -> IO a
 setEncoding = id
@@ -48,7 +50,6 @@ setEncoding = id
 fromEither :: a -> Either b a -> a
 fromEither _ (Right a) = a
 fromEither a _ = a
-
 
 main :: IO ()
 main = setEncoding $ do
@@ -82,18 +83,23 @@ main = setEncoding $ do
           runClosureConversion erased `with` \closed -> do
             desugared <- desugar closed
             let ssa = runSSA desugared
-            bytecode <- assembleBytecode dir ssa
-            sbc <- serialize bytecode
+            (bytecode, natives', constants) <- runLLIRAssembler ssa
+            let nativeFuns = getNativeFunctions natives'
+            (bytecode', labelPool) <- runUnlabelize bytecode
+
+            finalBytecode <- runBytecodeAssembler (labelPool, nativeFuns) bytecode'
+
+            sbc <- serialize (finalBytecode, natives', constants)
             let new_path = file -<.> "bin"
             writeFileLBS new_path sbc
             ppSuccess ("Bytecode written to " <> fromString new_path)
     Nothing -> ppFailure "No input file provided"
 
-printBytecode :: Program -> IO ()
+printBytecode :: [Instruction] -> IO ()
 printBytecode bytecode =
   mapM_
     ( \(i, instr) -> do
         putStr (show i <> ": ")
         print instr
     )
-    (zip [0 :: Int ..] $ pInstructions bytecode)
+    (zip [0 :: Int ..] bytecode)

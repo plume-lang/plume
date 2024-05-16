@@ -24,3 +24,6 @@ initialize = liftIO $ newIORef mempty
 
 runIOReader :: env -> IOReader env a -> IO a
 runIOReader = flip runReaderT
+
+withRef :: MonadIO m => IORef a -> (a -> b) -> m b
+withRef ref f = liftIO $ f <$> readIORef ref

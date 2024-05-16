@@ -15,7 +15,6 @@ import Plume.TypeChecker.Monad.Type
 -- |            to fill the blanks in the type inference process
 data TypeConstraint
   = PlumeType :~: PlumeType
-  | DoesExtend PlumeType Text PlumeType
   | Hole PlumeType
   deriving (Eq, Show)
 

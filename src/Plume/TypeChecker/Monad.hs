@@ -1,36 +1,47 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
-module Plume.TypeChecker.Monad (
-  module Monad,
-  runChecker,
-  Checker,
-  CheckerT(..),
-  throw,
-  throwRaw,
-  insertWith,
-  searchEnv,
-  insertEnv,
-  insertEnvWith,
-  deleteEnv,
-  deleteManyEnv,
-  replaceEnv,
-  fresh,
-  instantiate,
-  fetchPosition,
-  trackPosition,
-  withPosition,
-  localPosition,
-  maybeM,
-  extractFromArray,
-  enterLevel,
-  exitLevel,
-  removeLink,
-  removeExtLink,
-  removeNewEntries,
-  interpretError,
-) where
+module Plume.TypeChecker.Monad
+  ( module Monad,
+    MonadChecker,
+    Checker,
+    Placeholder,
+    Substitution,
+    liftPlaceholders,
+    throw,
+    throwRaw,
+    insertWith,
+    searchEnv,
+    insertEnv,
+    addClassInstance,
+    addClass,
+    insertEnvWith,
+    deleteEnv,
+    deleteManyEnv,
+    replaceEnv,
+    fresh,
+    instantiate,
+    instantiateWithSub,
+    instantiateFromName,
+    fetchPosition,
+    trackPosition,
+    withPosition,
+    localPosition,
+    getPosition,
+    maybeM,
+    extractFromArray,
+    enterLevel,
+    exitLevel,
+    removeLink,
+    removeNewEntries,
+    interpretError,
+    local,
+    gets,
+    tryOr,
+  )
+where
 
 import Control.Monad.Except
+import Control.Monad.Exception (IOThrowable (showErrorIO), compilerError)
 import Data.List qualified as L
 import Data.Map qualified as Map
 import Data.Text qualified as T
@@ -39,35 +50,48 @@ import Plume.Syntax.Concrete (Position)
 import Plume.TypeChecker.Monad.Error as Monad
 import Plume.TypeChecker.Monad.State as Monad
 import Plume.TypeChecker.Monad.Type as Monad
-import System.IO.Pretty (ppFailure, printErrorFromString)
+import Plume.TypeChecker.TLIR qualified as Typed
 import Plume.TypeChecker.TLIR.Internal.Pretty (prettyToString, prettyTy)
-import Control.Monad.Exception (IOThrowable (showErrorIO), compilerError)
+import System.IO.Pretty (ppFailure, printErrorFromString)
+import Prelude hiding (get, gets, local, modify, put)
 
 -- | Checker monad transformer, used to handle the type-checking process
 -- | with the ability to throw errors.
-newtype CheckerT m a
-  = MkChecker {runCheckerT :: ExceptT PlumeError m a}
+type MonadChecker m = (MonadIO m, MonadError PlumeError m)
 
-instance (Functor m) => Functor (CheckerT m) where
-  fmap f (MkChecker m) = MkChecker (fmap f m)
+type Checker a = forall m. (MonadChecker m) => m a
 
-instance (Monad m) => Applicative (CheckerT m) where
-  pure x = MkChecker (pure x)
-  MkChecker f <*> MkChecker x = MkChecker (f <*> x)
+tryOr :: (MonadChecker m) => m a -> m a -> m a
+tryOr a b = catchError a (const b)
 
-instance (Monad m) => Monad (CheckerT m) where
-  MkChecker m >>= f = MkChecker (m >>= runCheckerT . f)
+type Placeholder = ReaderT (PlumeQualifier -> Typed.Expression) IO
 
--- | Default checker alias for the IO monad
-type Checker = CheckerT IO
+modify :: (MonadChecker m) => (CheckState -> CheckState) -> m ()
+modify f = do
+  old <- get
+  put (f old)
 
-runChecker :: Checker a -> IO (Either PlumeError a)
-runChecker = runExceptT . runCheckerT
+get :: (MonadChecker m) => m CheckState
+get = readIORef checkState
+
+put :: (MonadChecker m) => CheckState -> m ()
+put = writeIORef checkState
+
+gets :: (MonadChecker m) => (CheckState -> a) -> m a
+gets f = f <$> get
+
+local :: (MonadChecker m) => (CheckState -> CheckState) -> m a -> m a
+local f action = do
+  old <- get
+  put (f old)
+  a <- action
+  put old
+  pure a
 
 -- | Throwing an error onto the error stack if a position is
 -- | found, otherwise print the error and exit the program.
-throw :: TypeError -> Checker a
-throw e = MkChecker $ do
+throw :: (MonadChecker m) => TypeError -> m a
+throw e = do
   pos <- readIORef checkState <&> positions
   case viaNonEmpty last pos of
     Nothing -> liftIO $ do
@@ -77,39 +101,17 @@ throw e = MkChecker $ do
 
 -- | Throwing a raw error (without fetching position) onto
 -- | the error stack.
-throwRaw :: PlumeError -> Checker a
-throwRaw e = MkChecker $ throwError e
-
--- MonadState, MonadIO and MonadReader instances for the Checker monad
-
-instance MonadState CheckState Checker where
-  get = MkChecker $ readIORef checkState
-  put s = MkChecker $ writeIORef checkState s
-
-instance MonadIO Checker where
-  liftIO = MkChecker . liftIO
-
-instance MonadReader CheckState Checker where
-  ask = get
-  local f action = do
-    s <- get
-    put (f s)
-    a <- action
-    modify $ \st ->
-      st
-        { environment = s.environment
-        , returnType = s.returnType
-        }
-    pure a
+throwRaw :: (MonadChecker m) => PlumeError -> m a
+throwRaw = throwError
 
 -- | Search for a key in a polymorphic record field
 -- | Equivalent to `Map.lookup` but for records.
-search
-  :: forall l k r a
-   . (HasField l r (Map k a), Ord k)
-  => k
-  -> r
-  -> Maybe a
+search ::
+  forall l k r a.
+  (HasField l r (Map k a), Ord k) =>
+  k ->
+  r ->
+  Maybe a
 search key record = do
   let env = getField @l record
   Map.lookup key env
@@ -117,25 +119,25 @@ search key record = do
 -- | Insert a key-value pair into a polymorphic record field
 -- | Equivalent to `Map.insert` but for records.
 -- | This function is completely pure and does not modify the record.
-insert
-  :: forall l k r a
-   . (HasField l r (Map k a), Ord k)
-  => k
-  -> a
-  -> r
-  -> r
+insert ::
+  forall l k r a.
+  (HasField l r (Map k a), Ord k) =>
+  k ->
+  a ->
+  r ->
+  r
 insert key value record = do
   let env = getField @l record
   setField @l record (Map.insert key value env)
 
 -- | Insert a key-value pair into a polymorphic record field
 -- | with a function to combine the new value with the existing one.
-insertWith
-  :: forall l a
-   . (HasField l CheckState a)
-  => (a -> a -> a)
-  -> a
-  -> Checker ()
+insertWith ::
+  forall l a m.
+  (HasField l CheckState a, MonadChecker m) =>
+  (a -> a -> a) ->
+  a ->
+  m ()
 insertWith f value = do
   modify $ \s -> setField @l s (f value (getField @l s))
 
@@ -160,11 +162,11 @@ insertWith f value = do
 -- | Equivalent to `Map.lookup` but for the environment.
 -- | This function does not require passing environment at all, it
 -- | fetches the environment from the state.
-searchEnv
-  :: forall l a
-   . (HasField l Environment (Map Text a))
-  => Text
-  -> Checker (Maybe a)
+searchEnv ::
+  forall l a m.
+  (HasField l Environment (Map Text a), MonadChecker m) =>
+  Text ->
+  m (Maybe a)
 searchEnv name = do
   env <- get <&> environment
   pure $ search @l name env
@@ -172,35 +174,55 @@ searchEnv name = do
 -- | Insert a key-value pair into the environment
 -- | Equivalent to `Map.insert` but for the environment.
 -- | This function modifies the environment in the state.
-insertEnv
-  :: forall l a
-   . (HasField l Environment (Map Text a))
-  => Text
-  -> a
-  -> Checker ()
+insertEnv ::
+  forall l a m.
+  (HasField l Environment (Map Text a), MonadChecker m) =>
+  Text ->
+  a ->
+  m ()
 insertEnv name value = do
   env <- get <&> environment
   let rec' = insert @l name value env
   modify $ \s -> setField @"environment" s rec'
 
+addClassInstance :: (MonadChecker m) => (PlumeQualifier, Instance Typed.Expression ()) -> m ()
+addClassInstance (q, i) = do
+  env <- get <&> environment
+  let (MkExtendEnv clsEnv) = getField @"extendEnv" env
+  let rec' = setField @"extendEnv" env (MkExtendEnv (update q clsEnv i))
+  modify $ \s -> setField @"environment" s rec'
+
+update :: (Eq a) => a -> [(a, b)] -> b -> [(a, b)]
+update key [] value = [(key, value)]
+update key ((k, v) : xs) value
+  | key == k = (key, value) : xs
+  | otherwise = (k, v) : update key xs value
+
+addClass :: (MonadChecker m) => Text -> Class -> m ()
+addClass name cls = do
+  env <- get <&> environment
+  let MkClassEnv clsEnv = getField @"classEnv" env
+  let rec' = setField @"classEnv" env (MkClassEnv (Map.insert name cls clsEnv))
+  modify $ \s -> setField @"environment" s rec'
+
 -- | Delete a key from the environment
 -- | Equivalent to `Map.delete` but for the environment.
 -- | This function modifies the environment in the state.
-deleteEnv
-  :: forall l a
-   . (HasField l Environment (Map Text a))
-  => Text
-  -> Checker ()
+deleteEnv ::
+  forall l a m.
+  (HasField l Environment (Map Text a), MonadChecker m) =>
+  Text ->
+  m ()
 deleteEnv name = do
   env <- get <&> environment
   let rec' = setField @l env (Map.delete name (getField @l env))
   modify $ \s -> setField @"environment" s rec'
 
-deleteManyEnv 
-  :: forall l a
-   . (HasField l Environment (Map Text a))
-  => [Text]
-  -> Checker ()
+deleteManyEnv ::
+  forall l a m.
+  (HasField l Environment (Map Text a), MonadChecker m) =>
+  [Text] ->
+  m ()
 deleteManyEnv names = do
   env <- get <&> environment
   let rec' = setField @l env (foldr Map.delete (getField @l env) names)
@@ -208,30 +230,30 @@ deleteManyEnv names = do
 
 -- | Replace the environment with a new one
 -- | This function modifies the environment in the state.
-replaceEnv
-  :: forall l a
-   . (HasField l Environment (Map Text a))
-  => Map Text a
-  -> Checker ()
+replaceEnv ::
+  forall l a m.
+  (HasField l Environment (Map Text a), MonadChecker m) =>
+  Map Text a ->
+  m ()
 replaceEnv value = do
   env <- get <&> environment
   modify $ \s -> setField @"environment" s (setField @l env value)
 
 -- | Inserting new values in a polymorphic record field with a function
 -- | to combine the new value with the existing one.
-insertEnvWith
-  :: forall l a
-   . (HasField l Environment (Map Text a))
-  => (Map Text a -> Map Text a -> Map Text a)
-  -> Map Text a
-  -> Checker ()
+insertEnvWith ::
+  forall l a m.
+  (HasField l Environment (Map Text a), MonadChecker m) =>
+  (Map Text a -> Map Text a -> Map Text a) ->
+  Map Text a ->
+  m ()
 insertEnvWith f value = do
   env <- get <&> environment
   let env' = getField @l env
   modify $ \s ->
     setField @"environment" s (setField @l env (f value env'))
 
-genSymbol :: Checker Text
+genSymbol :: (MonadChecker m) => m Text
 genSymbol = do
   s <- readIORef currentSymbol
   writeIORef currentSymbol (s + 1)
@@ -239,14 +261,14 @@ genSymbol = do
     then pure $ T.singleton (chr (s + 97))
     else pure $ "t" <> show s
 
-enterLevel :: Checker ()
+enterLevel :: (MonadChecker m) => m ()
 enterLevel = modifyIORef' currentLevel (+ 1)
 
-exitLevel :: Checker ()
+exitLevel :: (MonadChecker m) => m ()
 exitLevel = modifyIORef' currentLevel (\x -> x - 1)
-  
+
 -- | Generate a fresh type variable
-fresh :: Checker PlumeType
+fresh :: (MonadChecker m) => m PlumeType
 fresh = do
   s <- genSymbol
   lvl <- readIORef currentLevel
@@ -255,16 +277,43 @@ fresh = do
 
 type Substitution = Map Text PlumeType
 
+liftPlaceholders ::
+  Text ->
+  PlumeType ->
+  [PlumeQualifier] ->
+  Placeholder Typed.Expression
+liftPlaceholders name ty ps = do
+  f <- ask
+  let dicts = fmap f ps
+  pure $ case length dicts of
+    0 -> Typed.EVariable name ty
+    _ | null dicts -> Typed.EInstanceVariable name ty
+    _ -> Typed.EApplication (Typed.EInstanceVariable name ty) dicts
+
+instantiateFromName :: (MonadChecker m) => Text -> PlumeScheme -> m (PlumeType, [PlumeQualifier], Placeholder Typed.Expression)
+instantiateFromName name sch = do
+  (ty, qs) <- instantiate sch
+  let r = liftPlaceholders name ty qs
+  pure (ty, qs, r)
+
+instantiate :: (MonadChecker m) => PlumeScheme -> m (PlumeType, [PlumeQualifier])
+instantiate t = do
+  (ty, qs, _) <- instantiateWithSub mempty t
+  pure (ty, qs)
+
 -- | instantiation: replace schematic variables with fresh TVar
-instantiate :: PlumeType -> Checker PlumeType
-instantiate = fmap fst <$> go mempty
+instantiateWithSub :: (MonadChecker m) => Substitution -> PlumeScheme -> m (PlumeType, [PlumeQualifier], Substitution)
+instantiateWithSub s (Forall qvars (gens :=>: ty)) = do
+  sub <- Map.fromList <$> mapM (\x -> (x,) <$> fresh) qvars
+  let s' = Map.union sub s
+  (gens', s1) <- goGens s' gens
+  (res, s2) <- go s1 ty
+  pure (res, gens', s2)
   where
-    go :: Substitution -> PlumeType -> Checker (PlumeType, Substitution)
+    go :: (MonadChecker m) => Substitution -> PlumeType -> m (PlumeType, Substitution)
     go subst (TypeQuantified name) = case Map.lookup name subst of
       Just t -> pure (t, subst)
-      Nothing -> do
-        t <- fresh
-        pure (t, Map.insert name t subst)
+      Nothing -> pure (TypeQuantified name, subst)
     go subst (TypeApp t ts) = do
       (t', subst') <- go subst t
       (ts', subst'') <- goMany subst' ts
@@ -276,15 +325,23 @@ instantiate = fmap fst <$> go mempty
         Unbound _ _ -> pure (TypeVar ref, subst)
     go subst t = pure (t, subst)
 
-    goMany :: Substitution -> [PlumeType] -> Checker ([PlumeType], Substitution)
-    goMany subst (x:xs) = do
+    goMany :: (MonadChecker m) => Substitution -> [PlumeType] -> m ([PlumeType], Substitution)
+    goMany subst (x : xs) = do
       (x', subst') <- go subst x
       (xs', subst'') <- goMany subst' xs
-      pure (x':xs', subst'')
+      pure (x' : xs', subst'')
     goMany subst [] = pure ([], subst)
 
+    goGens :: (MonadChecker m) => Substitution -> [PlumeQualifier] -> m ([PlumeQualifier], Substitution)
+    goGens subst (IsIn name t : xs) = do
+      (name', subst') <- go subst name
+      (xs', subst'') <- goGens subst' xs
+      pure (IsIn name' t : xs', subst'')
+    goGens subst (_ : xs) = goGens subst xs
+    goGens subst [] = pure ([], subst)
+
 -- | Fetch the current position from the position stack
-fetchPosition :: Checker Position
+fetchPosition :: (MonadChecker m) => m Position
 fetchPosition = do
   pos <- get <&> positions
   case viaNonEmpty last pos of
@@ -293,13 +350,13 @@ fetchPosition = do
 
 -- | Track the current position in the position stack
 -- | Used to keep track of the position of the current expression
-trackPosition :: Position -> Checker a -> Checker a
+trackPosition :: (MonadChecker m) => Position -> m a -> m a
 trackPosition pos action = do
   modify $ \s -> s {positions = positions s ++ [pos]}
   action
 
 -- | Tracking the current position but only for the duration of the action
-withPosition :: Position -> Checker a -> Checker a
+withPosition :: (MonadChecker m) => Position -> m a -> m a
 withPosition pos action = do
   oldPos <- get <&> positions
   modify $ \s -> s {positions = positions s ++ [pos]}
@@ -309,12 +366,18 @@ withPosition pos action = do
 
 -- | Localizing the nested positions of the action and then
 -- | restoring the old positions after the action is done
-localPosition :: Checker a -> Checker a
+localPosition :: (MonadChecker m) => m a -> m a
 localPosition action = do
   oldPos <- get <&> positions
   a <- action
   modify $ \s -> s {positions = oldPos}
   pure a
+
+getPosition :: (MonadChecker m) => m a -> m (Position, a)
+getPosition action = do
+  a <- action
+  pos <- fetchPosition
+  pure (pos, a)
 
 -- | A monadic version of the `maybe` function
 -- | If the maybe value is `Just`, apply the function to the value
@@ -325,21 +388,21 @@ maybeM Nothing _ = pure Nothing
 
 -- | Extract a single element from a list
 -- | Throw an error if the list does not contain a single element
-extractFromArray :: Checker (b, [a]) -> Checker (b, a)
+extractFromArray :: (MonadChecker m) => m (b, [a], c) -> m (b, a, c)
 extractFromArray ls = do
-  (t, xs) <- ls
+  (t, xs, h) <- ls
   case xs of
-    [x] -> pure (t, x)
+    [x] -> pure (t, x, h)
     r ->
       throw $
         CompilerError $
           "Expected a single element, received: " <> show (length r)
 
--- | Remove new entries between the "old" `xs` list and the "new" `ys` list 
+-- | Remove new entries between the "old" `xs` list and the "new" `ys` list
 removeNewEntries :: (Eq a) => [a] -> [a] -> [a]
 removeNewEntries xs ys = xs L.\\ (xs L.\\ ys)
 
-removeLink :: PlumeType -> Checker PlumeType
+removeLink :: (MonadChecker m) => PlumeType -> m PlumeType
 removeLink (TypeVar ref) = do
   v <- readIORef ref
   case v of
@@ -351,12 +414,6 @@ removeLink (TypeApp t ts) = do
   pure $ TypeApp t' ts'
 removeLink t = pure t
 
-removeExtLink :: Extension -> Checker Extension
-removeExtLink (MkExtension name ty scheme) = do
-  ty' <- removeLink ty
-  scheme' <- removeLink scheme
-  pure $ MkExtension name ty' scheme'
-
 showTy :: PlumeType -> String
 showTy = prettyToString . prettyTy
 
@@ -364,33 +421,36 @@ interpretError :: PlumeError -> IO ()
 interpretError (p, UnificationFail t1 t2) =
   printErrorFromString
     mempty
-    ( "Expected type " <> prettyToString (prettyTy t1)
+    ( "Expected type "
+        <> prettyToString (prettyTy t1)
         <> " but received type "
-        <> prettyToString (prettyTy t2)
-    , Nothing
-    , p
+        <> prettyToString (prettyTy t2),
+      Nothing,
+      p
     )
     "while performing typechecking"
 interpretError (p, InfiniteType i t) =
   printErrorFromString
     mempty
-    ( "Infinite type " <> show i
+    ( "Infinite type "
+        <> show i
         <> " in type "
-        <> pp
-    , Just (show i <> " may occur in the type " <> pp)
-    , p
+        <> pp,
+      Just (show i <> " may occur in the type " <> pp),
+      p
     )
     "while performing typechecking"
-  where pp = prettyToString (prettyTy t)
+  where
+    pp = prettyToString (prettyTy t)
 interpretError (p, UnificationMismatch t t1' t2') =
   printErrorFromString
     mempty
-    ( getMissingError t1' t2'
-    , Nothing
-    , p
+    ( getMissingError t1' t2',
+      Nothing,
+      p
     )
     "while performing typechecking"
-  where 
+  where
     getMissingError ts1 ts2
       | null ts1 = "Type " <> showTy t <> " has no arguments, but should have" <> show (length ts2) <> " arguments"
       | length ts1 < length ts2 = "Expected more arguments, got " <> show (length ts1) <> " but expected " <> show (length ts2)
@@ -398,9 +458,9 @@ interpretError (p, UnificationMismatch t t1' t2') =
 interpretError (p, NoExtensionFound e t) =
   printErrorFromString
     mempty
-    ( "No extension named " <> show e <> " found for type " <> showTy t
-    , Nothing
-    , p
+    ( "No extension named " <> show e <> " found for type " <> showTy t,
+      Nothing,
+      p
     )
     "while performing typechecking"
 interpretError (p, MultipleExtensionsFound e ts t) =
@@ -411,75 +471,86 @@ interpretError (p, MultipleExtensionsFound e ts t) =
         <> " found for type "
         <> showTy t
         <> ": "
-        <> showList ts
-    , Nothing
-    , p
+        <> showList ts,
+      Nothing,
+      p
     )
     "while performing typechecking"
 interpretError (p, EmptyMatch) =
   printErrorFromString
     mempty
-    ( "Empty switch expression"
-    , Just "Switch expression must have at least one branch"
-    , p
+    ( "Empty switch expression",
+      Just "Switch expression must have at least one branch",
+      p
     )
     "while performing typechecking"
 interpretError (p, UnboundTypeVariable i) =
   printErrorFromString
     mempty
-    ( "Unbound type variable " <> show i
-    , Nothing
-    , p
+    ( "Unbound type variable " <> show i,
+      Nothing,
+      p
     )
     "while performing typechecking"
 interpretError (p, UnboundVariable v) =
   printErrorFromString
     mempty
-    ( "Unbound variable " <> show v
-    , Nothing
-    , p
+    ( "Unbound variable " <> show v,
+      Nothing,
+      p
     )
     "while performing typechecking"
 interpretError (p, CompilerError e) =
   printErrorFromString
     mempty
-    ( "Compiler error: " <> toString e
-    , Just "Please report this error to the Plume developers"
-    , p
+    ( "Compiler error: " <> toString e,
+      Just "Please report this error to the Plume developers",
+      p
     )
     "while performing typechecking"
 interpretError (p, DuplicateNative n s) =
   printErrorFromString
     mempty
-    ( "Native function " <> toString n <> " with signature " <> showTy s <> " already defined"
-    , Nothing
-    , p
+    ( "Native function " <> toString n <> " with signature " <> show s <> " already defined",
+      Nothing,
+      p
     )
     "while performing typechecking"
 interpretError (p, NoReturnFound t) =
   printErrorFromString
     mempty
-    ( "No return found in the expression for type " <> showTy t
-    , Just "Every function must have a return in its body"
-    , p
+    ( "No return found in the expression for type " <> showTy t,
+      Just "Every function must have a return in its body",
+      p
     )
     "while performing typechecking"
 interpretError (p, DeclarationReturn st) =
   printErrorFromString
     mempty
-    ( "Did not expect a return type in this expression"
-    , Just $ toString (capitalize st) <> " must not have a return type"
-    , p
+    ( "Did not expect a return type in this expression",
+      Just $ toString (capitalize st) <> " must not have a return type",
+      p
     )
     "while performing typechecking"
 interpretError (p, ExhaustivenessError hints) =
   printErrorFromString
     mempty
-    ( "Non-exhaustive pattern match"
-    , Just (if null hints then "All possible cases must be covered in the switch expression" else hints)
-    , p
+    ( "Non-exhaustive pattern match",
+      Just (if null hints then "All possible cases must be covered in the switch expression" else hints),
+      p
     )
     "while performing typechecking"
+interpretError (p, UnresolvedTypeVariable as) =
+  printErrorFromString
+    mempty
+    ( "Unresolved type variable(s): " <> showAssumps as,
+      Nothing,
+      p
+    )
+    "while performing typechecking"
+  where
+    showAssumps [] = ""
+    showAssumps (x :>: t : xs) = toString x <> " extends " <> showTy t <> ", " <> showAssumps xs
 
 capitalize :: Text -> Text
 capitalize = T.toTitle . T.toLower
@@ -487,7 +558,7 @@ capitalize = T.toTitle . T.toLower
 showList :: [PlumeType] -> String
 showList [] = ""
 showList [x] = " and " <> showTy x
-showList (x:xs) = showTy x <> ", " <> showList xs
+showList (x : xs) = showTy x <> ", " <> showList xs
 
 instance IOThrowable PlumeError where
   showErrorIO e = interpretError e >> exitFailure

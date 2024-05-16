@@ -2,82 +2,77 @@
 
 module Plume.TypeChecker.Checker where
 
+import Data.List qualified as List
 import Plume.Syntax.Abstract qualified as Pre
-import Plume.Syntax.Translation.Generics hiding (Error (..), withPosition)
-import Plume.TypeChecker.Monad.Free
+import Plume.Syntax.Translation.Generics (concatMapM)
 import Plume.TypeChecker.Checker.Application
 import Plume.TypeChecker.Checker.Closure
 import Plume.TypeChecker.Checker.Condition
 import Plume.TypeChecker.Checker.Datatype
 import Plume.TypeChecker.Checker.Declaration
 import Plume.TypeChecker.Checker.Extension
+import Plume.TypeChecker.Checker.Interface (synthInterface)
 import Plume.TypeChecker.Checker.Native
 import Plume.TypeChecker.Checker.Switch
 import Plume.TypeChecker.Constraints.Solver
+import Plume.TypeChecker.Constraints.Typeclass
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.TLIR qualified as Post
+import Prelude hiding (gets, local)
 
 withoutLocated :: Post.Expression -> Post.Expression
 withoutLocated (Post.ELocated expr _) = withoutLocated expr
 withoutLocated e = e
 
-synthesize :: Pre.Expression -> Checker (PlumeType, [Post.Expression])
+synthesize :: (MonadChecker m) => Pre.Expression -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression)
+
 -- | Some basic and primitive expressions
 synthesize (Pre.ELocated expr pos) = withPosition pos $ synthesize expr
 synthesize (Pre.EVariable name) = do
   -- Checking if the variable is a value
   searchEnv @"typeEnv" name >>= \case
-    Just scheme -> do
-      ty <- instantiate scheme
-      pure (ty, [Post.EVariable name ty])
+    Just scheme -> instantiateFromName name scheme
     Nothing ->
       -- Checking if the variable is a data-type constructor or variable
       searchEnv @"datatypeEnv" name >>= \case
         Just sch -> do
-          ty <- instantiate sch
-          pure (ty, [Post.EVariable name ty])
-        Nothing -> do
-          -- Checking if variable might be an extension
-          extExists <- doesExtensionExistM name
-          if extExists
-            then do
-              ty <- fresh
-              futureFunTy <- fresh
-              pure (futureFunTy, [Post.EExtVariable name futureFunTy ty])
-            else throw $ UnboundVariable name
-synthesize (Pre.ELiteral lit) =
-  pure $ (: []) . Post.ELiteral <$> typeOfLiteral lit
+          (ty, qs) <- instantiate sch
+          pure (ty, qs, pure (Post.EVariable name ty))
+        Nothing -> throw (UnboundVariable name)
+synthesize (Pre.ELiteral lit) = do
+  let (ty, lit') = typeOfLiteral lit
+  pure (ty, [], pure (Post.ELiteral lit'))
 synthesize (Pre.EUnMut e) = do
   tv <- fresh
-  (ty, e') <- extractFromArray $ synthesize e
+  (ty, ps, r) <- synthesize e
   ty `unifiesWith` TMut tv
-  pure (tv, [Post.EUnMut e'])
+  pure (tv, ps, Post.EUnMut <$> r)
 synthesize (Pre.EBlock exprs) = local id $ do
-  (tys, exprs') <-
-    mapAndUnzipM
-      (localPosition . extractFromArray . synthesize)
+  (tys, pss, exprs') <-
+    mapAndUnzip3M
+      (localPosition . synthesize)
       exprs
 
   retTy <- gets returnType
   case tys of
     [x] -> do
       forM_ retTy $ unifiesWith x
-      pure (x, [Post.EBlock exprs'])
-    _ -> return (fromMaybe TUnit retTy, [Post.EBlock exprs'])
+      pure (x, concat pss, Post.EBlock <$> sequence exprs')
+    _ -> return (fromMaybe TUnit retTy, concat pss, Post.EBlock <$> sequence exprs')
 synthesize (Pre.EReturn expr) = do
-  (ty, expr') <- extractFromArray $ synthesize expr
+  (ty, ps, expr') <- synthesize expr
   returnTy <- gets returnType
   forM_ returnTy $ unifiesWith ty
-  pure (ty, [Post.EReturn expr'])
+  pure (ty, ps, Post.EReturn <$> expr')
 synthesize (Pre.EList xs) = do
   tv <- fresh
-  (tys, xs') <-
-    mapAndUnzipM
-      (local id . localPosition . extractFromArray . synthesize)
+  (tys, pss, xs') <-
+    mapAndUnzip3M
+      (local id . localPosition . synthesize)
       xs
   forM_ tys $ unifiesWith tv
-  pure (TList tv, [Post.EList xs'])
--- | Calling synthesis modules
+  pure (TList tv, concat pss, Post.EList <$> sequence xs')
+-- \| Calling synthesis modules
 synthesize app@(Pre.EApplication {}) = synthApp synthesize app
 synthesize clos@(Pre.EClosure {}) = synthClosure synthesize clos
 synthesize decl@(Pre.EDeclaration {}) = synthDecl synthesize decl
@@ -85,15 +80,32 @@ synthesize cond@(Pre.EConditionBranch {}) = synthCond synthesize cond
 synthesize ext@(Pre.ETypeExtension {}) = synthExt synthesize ext
 synthesize ty@(Pre.EType {}) = synthDataType ty
 synthesize sw@(Pre.ESwitch {}) = synthSwitch synthesize sw
+synthesize int@(Pre.EInterface {}) = synthInterface synthesize int
 synthesize nat@(Pre.ENativeFunction {}) = synthNative nat
--- | This should never be called
-synthesize e = throw . CompilerError $ "Not implemented: " <> show e
+
+synthesizeToplevel :: (MonadChecker m) => Pre.Expression -> m (PlumeScheme, [Post.Expression])
+synthesizeToplevel (Pre.ELocated e pos) = withPosition pos $ synthesizeToplevel e
+synthesizeToplevel e = do
+  (pos, (ty, ps, h)) <- getPosition $ synthesize e
+  cenv <- gets (extendEnv . environment)
+  zs <- traverse (discharge cenv) ps
+
+  let (ps', m, as, _) = mconcat zs
+  (_, as') <- removeDuplicatesAssumps as
+  ps'' <- removeDuplicatesQuals ps'
+  let t'' = Forall [] $ List.nub ps'' :=>: ty
+  h' <- liftIO $ runReaderT h $ getExpr m
+
+  unless (null as') $ do
+    throwRaw (pos, UnresolvedTypeVariable as')
+
+  case h' of
+    Post.ESpreadable es -> pure (t'', es)
+    _ -> pure (t'', [h'])
 
 -- | Locally synthesize a list of expressions
-synthesizeMany :: [Pre.Expression] -> Checker [Post.Expression]
-synthesizeMany xs = do
-  xs' <- concatMapM (fmap snd . localPosition . synthesize) xs
-  liftIO $ mapM free xs'
+synthesizeMany :: (MonadChecker m) => [Pre.Expression] -> m [Post.Expression]
+synthesizeMany = concatMapM (fmap snd . localPosition . synthesizeToplevel)
 
-runSynthesize :: [Pre.Expression] -> IO (Either PlumeError [Post.Expression])
-runSynthesize = runChecker . synthesizeMany
+runSynthesize :: (MonadIO m) => [Pre.Expression] -> m (Either PlumeError [Post.Expression])
+runSynthesize = runExceptT . synthesizeMany

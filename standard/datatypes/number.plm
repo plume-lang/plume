@@ -28,52 +28,63 @@ require "bool"
 infix 3 ^
 infixr 2 !=
 
-extend (c: int) {
-  fn (*) (d: int) => mul_int(c, d)
-  fn (/) (d: int) => div_int(c, d)
-  fn (%) (d: int) => mod_int(c, d)
-  fn (-) (d: int) => sub_int(c, d)
-  fn (+) (d: int) => add_int(c, d)
-  fn (^) (d: int) => switch d {
-    case 0 => 1
-    case ? => c * (c ^ (d - 1))
-  }
-  fn negate(): int => 0 - c
-
-  fn (==) (d: int) => eq_int(c, d)
-  fn (!=) (d: int) => not (eq_int(c, d))
-  fn (<) (d: int) => lt_int(c, d)
-  fn (>) (d: int) => lt_int(d, c)
-  fn (<=) (d: int) => not (lt_int(d, c))
-  fn (>=) (d: int) => not (lt_int(c, d))
-  
-  fn to_float(): float => int_to_float(c)
-  fn show() => to_string(c)
+fn (/) (c: int, d: int) => div_int(c, d)
+fn (%) (c: int, d: int) => mod_int(c, d)
+fn (^) (c: int, d: int) => switch d {
+  case 0 => 1
+  case ? => c * (c ^ (d - 1))
 }
 
+extend numeric<int> {
+  fn (*) (c: int, d: int) => mul_int(c, d)
+  fn (+) (c: int, d: int) => add_int(c, d)
+  fn (-) (x: int, y: int) => sub_int(x, y)
+}
+
+extend show<int> {
+  fn show(c: int) => to_string(c)
+}
+
+extend to_str<int> {
+  fn to_str(c: int) => to_string(c)
+}
+
+extend equality<int> {
+  fn (==) (x: int, y: int) => eq_int(x, y)
+}
+
+extend ordering<int> {
+  fn (<) (x: int, y: int) => lt_int(x, y)
+}
 
 // Defining math functions
 
-extend (c: float) {
-  fn (*) (d: float) => mul_float(c, d)
-  fn (/) (d: float) => div_float(c, d)
-  fn (%) (d: float) => mod_float(c, d)
-  fn (-) (d: float) => sub_float(c, d)
-  fn (+) (d: float) => add_float(c, d)
-  fn (^) (d: float) => pow_float(c, d)
-  fn negate(): float => 0.0 - c
+// fn (/) (d: float) => div_float(c, d)
+// fn (%) (d: float) => mod_float(c, d)
+// fn (-) (d: float) => sub_float(c, d)
+// fn (^) (d: float) => pow_float(c, d)
 
-  fn (==) (d: float) => eq_float(c, d)
-  fn (!=) (d: float) => not eq_float(c, d)
-  fn (<) (d: float) => lt_float(c, d)
-  fn (>) (d: float) => lt_float(d, c)
-  fn (<=) (d: float) => not (lt_float(d, c))
-  fn (>=) (d: float) => not (lt_float(c, d))
+extend numeric<float> {
+  fn (*) (c: float, d: float) => mul_float(c, d)
+  fn (+) (c: float, d: float) => add_float(c, d)
+}
 
-  fn to_int(): int => float_to_int(c)
-  fn show() => to_string(c)
+extend equality<float> {
+  fn (==) (x: float, y: float) => eq_float(x, y)
+}
+
+extend ordering<float> {
+  fn (<) (x: float, y: float) => lt_float(x, y)
+}
+
+extend show<float> {
+  fn show(c: float) => to_string(c)
+}
+
+extend to_str<float> {
+  fn to_str(c: float) => to_string(c)
 }
 
 macro e = 2.718282
-fn expf(x: float): float => @e ^ x
-fn exp(x: int): float => expf(x.to_float())
+fn expf(x: float): float => pow_float(@e, x)
+fn exp(x: int): float => expf(x.int_to_float())

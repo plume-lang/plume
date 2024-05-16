@@ -11,6 +11,7 @@ import Plume.Syntax.Abstract.Expression (IsStandard)
 data TypedExpression t
   = EVariable Text t
   | EExtVariable Text t t
+  | EInstanceVariable Text t
   | ELiteral Literal
   | EList [TypedExpression t]
   | EApplication (TypedExpression t) [TypedExpression t]
@@ -18,6 +19,8 @@ data TypedExpression t
   | EAnd (TypedExpression t) (TypedExpression t)
   | EIndex (TypedExpression t) (TypedExpression t)
   | EType Text [TypeConstructor t]
+  | EInstanceDict Text t [TypedExpression t]
+  | EInstanceAccess (TypedExpression t) Int
   | EDeclaration
       (Annotation t)
       (TypedExpression t)
@@ -46,4 +49,5 @@ data TypedExpression t
   | ESwitch (TypedExpression t) [(TypedPattern t, TypedExpression t)]
   | EReturn (TypedExpression t)
   | ENativeFunction Text Text t IsStandard
+  | EEmpty | ESpreadable [TypedExpression t]
   deriving (Show, Eq)

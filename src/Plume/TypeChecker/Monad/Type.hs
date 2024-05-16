@@ -1,9 +1,10 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Plume.TypeChecker.Monad.Type where
 
-import GHC.Show
 import GHC.IO
+import GHC.Show
 import Prelude hiding (show)
 
 type Level = Int
@@ -24,13 +25,16 @@ data PlumeType
   | TypeApp PlumeType [PlumeType]
   deriving (Eq)
 
+data Assumption a = Text :>: a
+  deriving (Show, Eq)
+
 instance Show PlumeType where
   show (TypeVar ref) = do
     let v = unsafePerformIO $ readIORef ref
     case v of
-      Link t -> show t
+      Link t -> "#" <> show t
       Unbound q l -> toString q <> "-" <> show l
-  show (TypeQuantified q) = "@" <> toString q
+  show (TypeQuantified q) = toString q
   show (TypeApp (TypeId "cons") [x, _]) = "[" <> show x <> "]"
   show (TypeApp (TypeId "nil") _) = "[]"
   show (TypeApp (TypeId "tuple") ts) = "(" <> intercalate ", " (map show ts) <> ")"
@@ -40,7 +44,30 @@ instance Show PlumeType where
 
 -- | A type scheme is a way to quantify over types in a type system.
 -- | It is used to represent polymorphic types in the type system.
-type PlumeScheme = PlumeType
+data Qualified a = [PlumeQualifier] :=>: a
+  deriving (Eq, Show)
+
+type PlumeQualified = Qualified PlumeType
+
+data PlumeScheme = Forall [QuVar] PlumeQualified
+  deriving (Eq, Show)
+
+data PlumeQualifier
+  = IsIn PlumeType Text
+  | IsQVar QuVar
+  deriving (Eq, Show)
+
+getQVars :: [PlumeQualifier] -> [QuVar]
+getQVars [] = []
+getQVars (IsQVar q : qs) = q : getQVars qs
+getQVars (IsIn (TypeQuantified q) _ : qs) = q : getQVars qs
+getQVars (_ : qs) = getQVars qs
+
+removeQVars :: [PlumeQualifier] -> [PlumeQualifier]
+removeQVars = filter (\case IsQVar _ -> False; _ -> True)
+
+instance Functor Qualified where
+  fmap f (qs :=>: a) = qs :=>: f a
 
 -- TYPE SYNONYMS SHORTCUTS
 

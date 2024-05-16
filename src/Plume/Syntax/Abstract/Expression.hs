@@ -38,9 +38,9 @@ data AbstractExpression t
   | ELocated (AbstractExpression t) Position
   | ESwitch (AbstractExpression t) [(Pattern, AbstractExpression t)]
   | EReturn (AbstractExpression t)
-  | ETypeExtension [PlumeGeneric] (Annotation t) [ExtensionMember t]
+  | EInterface (Annotation [t]) [PlumeGeneric] [Annotation PlumeScheme]
+  | ETypeExtension [PlumeGeneric] (Annotation [t]) (Maybe Text) [ExtensionMember t]
   | ENativeFunction Text Text [Text] t IsStandard
-  | EGenericProperty [PlumeGeneric] Text [t] t
   deriving (Show)
 
 type IsStandard = Bool
@@ -66,12 +66,11 @@ instance (Eq t) => Eq (AbstractExpression t) where
   ELocated e1 _ == ELocated e2 _ = e1 == e2
   ESwitch e1 ps1 == ESwitch e2 ps2 = e1 == e2 && ps1 == ps2
   EReturn e1 == EReturn e2 = e1 == e2
-  ETypeExtension gs1 a1 ms1 == ETypeExtension gs2 a2 ms2 =
-    gs1 == gs2 && a1 == a2 && ms1 == ms2
+  ETypeExtension gs1 a1 t1 ms1 == ETypeExtension gs2 a2 t2 ms2 =
+    gs1 == gs2 && a1 == a2 && ms1 == ms2 && t1 == t2
   ENativeFunction n1 p1 as1 t1 st1 == ENativeFunction n2 p2 as2 t2 st2 =
     n1 == n2 && p1 == p2 && as1 == as2 && t1 == t2 && st1 == st2
-  EGenericProperty gs1 n1 ts1 t1 == EGenericProperty gs2 n2 ts2 t2 =
-    gs1 == gs2 && n1 == n2 && ts1 == ts2 && t1 == t2
+  EInterface a1 gs1 ms1 == EInterface a2 gs2 ms2 = a1 == a2 && gs1 == gs2 && ms1 == ms2
   _ == _ = False
 
 -- | An extension member is a member that is used to extend a type.

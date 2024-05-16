@@ -10,7 +10,7 @@ import Plume.TypeChecker.Monad as Monad
 import Plume.TypeChecker.TLIR qualified as Post
 import qualified Plume.Syntax.Common as Pre
 
-type Infer = Pre.Expression -> Checker (PlumeType, [Post.Expression])
+type Infer = forall m. MonadChecker m => Pre.Expression -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression)
 
 isAnnotated :: Pre.Expression -> Bool
 isAnnotated (Pre.EClosure args (Just _) _) = all (isJust . fst . Pre.annotationValue) args

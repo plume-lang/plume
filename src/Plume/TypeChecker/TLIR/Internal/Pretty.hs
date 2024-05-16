@@ -1,15 +1,15 @@
 module Plume.TypeChecker.TLIR.Internal.Pretty where
 
+import Control.Monad.Exception (compilerError)
 import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Internal.Pretty (prettyLit)
 import Plume.Syntax.Concrete.Expression (TypeConstructor (..))
 import Plume.Syntax.Internal.Pretty.ANSI
 import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR
+import Prettyprinter.Render.String (renderString)
 import Prettyprinter.Render.Terminal
 import Prelude hiding (intercalate)
-import Prettyprinter.Render.String (renderString)
-import Control.Monad.Exception (compilerError)
 
 instance ANSIPretty Expression where ansiPretty = prettyExpr
 
@@ -46,7 +46,7 @@ prettyExpr (EType name ts) =
 prettyExpr (EApplication e es) =
   prettyExpr e
     <> parens (hsep . punctuate comma $ map prettyExpr es)
-prettyExpr (EVariable v t) = anItalic (pretty v) <> colon <+> prettyTy t
+prettyExpr (EVariable v _) = anItalic (pretty v) {-<> colon <+> prettyTy t-}
 prettyExpr (EExtVariable n t _) = parens (anCol Red (pretty n) <> ":" <+> prettyTy t)
 prettyExpr (ELiteral l) = prettyLit l
 prettyExpr (EEqualsType e t) = anCol Blue "typeof" <+> prettyExpr e <+> "==" <+> pretty t
@@ -60,8 +60,8 @@ prettyExpr (EDeclaration a e1' e2') =
             Nothing -> ""
             Just e2'' -> anCol Blue "\nin" <+> prettyExpr e2''
         )
- where
-  arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
+  where
+    arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
 prettyExpr (EMutDeclaration a e1' e2') =
   anCol Blue "mut"
     <+> arg a
@@ -71,8 +71,9 @@ prettyExpr (EMutDeclaration a e1' e2') =
             Nothing -> ""
             Just e2'' -> anCol Blue "\nin" <+> prettyExpr e2''
         )
- where
-  arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
+  where
+    arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
+prettyExpr (EInstanceVariable v _) = anCol Red (pretty v) {-<> colon <+> prettyTy t-}
 prettyExpr (EMutUpdate a e1' e2') =
   anCol Blue "mut"
     <+> arg a
@@ -82,8 +83,8 @@ prettyExpr (EMutUpdate a e1' e2') =
             Nothing -> ""
             Just e2'' -> anCol Blue "\nin" <+> prettyExpr e2''
         )
- where
-  arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
+  where
+    arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
 prettyExpr (EUnMut e) = anBold "*" <> prettyExpr e
 prettyExpr (EConditionBranch e1' e2' e3') =
   anCol Blue "if"
@@ -97,12 +98,12 @@ prettyExpr (EClosure as t e) =
   ppArgs as t
     <+> "=>"
     <+> prettyExpr e
- where
-  ppArgs xs ret = parens (hsep . punctuate comma $ map arg xs) <> ppRet ret
+  where
+    ppArgs xs ret = parens (hsep . punctuate comma $ map arg xs) <> ppRet ret
 
-  ppRet t' = ":" <+> prettyTy t'
+    ppRet t' = ":" <+> prettyTy t'
 
-  arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
+    arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
 prettyExpr (EBlock es) =
   line' <> indent 2 (vsep (map prettyExpr es))
 prettyExpr (ELocated e _) = prettyExpr e
@@ -111,8 +112,8 @@ prettyExpr (ESwitch e ps) =
     <+> prettyExpr e
     <+> line
     <> indent 2 (vsep (map prettyCase ps))
- where
-  prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "=>" <+> prettyExpr e'
+  where
+    prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "=>" <+> prettyExpr e'
 prettyExpr (EReturn e) = anCol Blue "return" <+> prettyExpr e
 prettyExpr (ENativeFunction fp n (args :->: ret) _) =
   anCol Blue "native"
@@ -130,6 +131,15 @@ prettyExpr (EExtensionDeclaration name extTy args body) =
     <+> parens (ansiPretty args)
     <+> "="
     <+> prettyExpr body
+prettyExpr (EInstanceDict name args body) =
+  anCol Blue "instance"
+    <+> pretty name
+    <+> parens (ansiPretty args)
+    <+> "="
+    <+> vsep (map prettyExpr body)
+prettyExpr EEmpty = pretty ("EMPTY" :: Text)
+prettyExpr (EInstanceAccess e n) = prettyExpr e <> "." <> pretty n
+prettyExpr (ESpreadable es) = anCol Blue "..." <> prettyExpr (EList es)
 
 instance ANSIPretty Pattern where ansiPretty = prettyPat
 

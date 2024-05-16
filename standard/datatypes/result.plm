@@ -3,52 +3,9 @@ type Result<A, B> {
   Ok(B)
 }
 
-extend<A, B> (this: Result<A, B>) {
-  // Functor mapping over the Ok value
-  // Applying `f` to the Ok value if it exists
-  fn map<C>(f: fn(B): C): Result<A, C> =>
-    switch this {
-      case Error(a) => Error(a)
-      case Ok(b) => Ok(f(b))
-    }
-
-  fn show(showError: fn(A): str, showOk: fn(B): str): str =>
-    switch this {
-      case Error(a) => "Error(" + showError(a) + ")"
-      case Ok(b) => "Ok(" + showOk(b) + ")"
-    }
-  
-  // Monadic bind
-  // Applying `f` to the Ok value if it exists
-  fn and_then<C>(f: fn(B): Result<A, C>): Result<A, C> =>
-    switch this {
-      case Error(a) => Error(a)
-      case Ok(b) => f(b)
-    }
-
-  // Overloading the `or` operator
-  fn or(def: B): B =>
-    switch this {
-      case Error(?) => def
-      case Ok(b) => b
-    }
-
-  // `or` operator in a more lazy way
-  fn get_or_else(f: fn(A): B): B =>
-    switch this {
-      case Error(a) => f(a)
-      case Ok(b) => b
-    }
-  
-  fn is_error(): bool =>
-    switch this {
-      case Error(?) => true
-      case Ok(?) => false
-    }
-
-  fn is_ok(): bool =>
-    switch this {
-      case Error(?) => false
-      case Ok(?) => true
-    }
+extend<A extends show, B extends show> show<Result<A, B>> {
+  fn show(self: Result<A, B>): str => switch self {
+    case Error(a) => "Error: " + a.show()
+    case Ok(b) => "Ok: " + b.show()
+  }
 }

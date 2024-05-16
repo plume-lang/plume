@@ -38,6 +38,7 @@ data TypeError
   | NoReturnFound PlumeType
   | DeclarationReturn Text
   | ExhaustivenessError String
+  | UnresolvedTypeVariable [Assumption PlumeType]
   deriving (Eq, Show)
 
 -- THROWABLE INSTANCES FOR TYPE ERROR
@@ -50,6 +51,14 @@ instance Throwable TyVar where
 
 instance (Throwable a) => Throwable [a] where
   showError = T.intercalate ", " . map showError
+
+instance Throwable PlumeScheme where
+  showError (Forall qs (cs :=>: t)) = "∀" <> qs' <> showError cs <> " => " <> showError t
+    where qs' = T.intercalate ", " $ map showError qs
+
+instance Throwable PlumeQualifier where
+  showError (IsIn t1 t2) = show t1 <> " extends " <> show t2
+  showError (IsQVar t) = show t
 
 instance Throwable TypeError where
   showError (UnificationFail t1 t2) =
@@ -76,11 +85,18 @@ instance Throwable TypeError where
   showError (NoReturnFound t) = "No return found for type " <> showError t
   showError DeclarationReturn {} = "Declaration return"
   showError ExhaustivenessError {} = "Exhaustiveness error"
+  showError (UnresolvedTypeVariable as) =
+    "Unresolved type variable: " <> showError as
+
+instance Throwable a => Throwable (Assumption a) where
+  showError (n :>: a) = show n <> ": " <> showError a
 
 instance Throwable a => Throwable (Text, a) where
   showError (n, e) = n <> ": " <> showError e
 
 type PlumeError = (Position, TypeError)
+
+instance Exception TypeError
 
 instance Throwable PlumeError where
   showError (p, e) = showError p <> ": " <> showError e

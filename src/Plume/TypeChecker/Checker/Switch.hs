@@ -13,26 +13,23 @@ import Plume.TypeChecker.Constraints.Unification (doesUnifyWith)
 import Data.List (nub)
 import System.IO.Pretty (printWarningFromString)
 import Plume.TypeChecker.TLIR.Internal.Pretty (prettyToString, prettyPat)
+import Prelude hiding (local, gets)
 
 synthSwitch :: Infer -> Infer
 synthSwitch infer (Pre.ESwitch scrutinee cases) = local id $ do
   -- Infer the scrutinee and the cases
-  (t, scrutinee') <- extractFromArray $ infer scrutinee
-  (tys, cases') <- mapAndUnzipM (synthCase infer t) cases
+  (t, ps1, scrutinee') <- infer scrutinee
+  (tys, ps2, cases') <- mapAndUnzip3M (synthCase infer t) cases
   let (ts', expr) = unzip tys  
-
-  (ret, xs) <- case ts' of
-    [] -> throw EmptyMatch
-    (ret : xs) -> return (ret, xs)
   
   (exprTy, xs') <- case expr of
-    [] -> return (ret, [])
+    [] -> throw EmptyMatch
     (x : xs'') -> return (x, xs'')
 
-  -- Unify the return type with the type of the case expressions
-  forM_ xs $ unifiesWith ret
-
   -- Unify the scrutinee type with the type of the patterns
+  forM_ ts' $ unifiesWith t
+
+  -- Unify the return type with the type of the case expressions
   forM_ xs' $ unifiesWith exprTy
 
   patternSp <- case cases' of
@@ -51,8 +48,15 @@ synthSwitch infer (Pre.ESwitch scrutinee cases) = local id $ do
   -- TODO: Implement a check for redundancy that would work
   -- checkRedudancy t (map fst cases')
 
-  pure (exprTy, [Post.ESwitch scrutinee' cases'])
+  let cases'' = sequencePat cases'
+
+  pure (exprTy, concat (ps1 : ps2), Post.ESwitch <$> scrutinee' <*> sequence cases'')
 synthSwitch _ _ = throw $ CompilerError "Only switches are supported"
+
+sequencePat 
+  :: [(Post.Pattern, Placeholder Post.Expression)]
+  -> [Placeholder (Post.Pattern, Post.Expression)]
+sequencePat = map sequence
 
 allPatsExcept :: [Post.Pattern] -> Post.Pattern -> [Post.Pattern]
 allPatsExcept xs x = filter (/= x) xs
@@ -74,7 +78,7 @@ checkRedudancy _ xs = do
         "while performing typechecking"
     (:[]) <$> simplify (UnionSpace (acc <> [pat]))) [] xs
 
-isRedundantIn :: Space -> [Space] -> Checker Bool
+isRedundantIn :: MonadChecker m => Space -> [Space] -> m Bool
 isRedundantIn (VariablePoint _ _) (VariablePoint _ _:_) = pure True
 isRedundantIn sp@(VariablePoint x _) (ConstructorSpace {} : ys)
   | x /= "?" = sp `isRedundantIn` ys
@@ -108,18 +112,20 @@ isRedundantIn sp (_:ys) = sp `isRedundantIn` ys
 isRedundantIn _ [] = pure False
 
 synthCase
-  :: Infer
+  :: MonadChecker m
+  => Infer
   -> PlumeType
   -> (Pre.Pattern, Pre.Expression)
-  -> Checker ((PlumeType, PlumeType), (Post.Pattern, Post.Expression))
+  -> m ((PlumeType, PlumeType), [PlumeQualifier], (Post.Pattern, Placeholder Post.Expression))
 synthCase infer scrutTy (pat, expr) = local id $ do
   -- Synthesize the pattern and infer the expression
   (patTy, patExpr, patEnv) <- synthPattern pat
-  (exprTy, expr') <- local id . extractFromArray $ localEnv patEnv (infer expr)
 
   -- Pattern type should unify with the scrutinee type
   scrutTy `unifiesWith` patTy
-  pure ((patTy, exprTy), (patExpr, expr'))
+
+  (exprTy, ps, expr') <- local id $ localEnv patEnv (infer expr)
+  pure ((patTy, exprTy), ps, (patExpr, expr'))
 
 -- | Locally perform an action without changing the environment globally
 localEnv :: Map Text PlumeScheme -> Checker a -> Checker a
@@ -134,8 +140,9 @@ localEnv env action = do
 -- | like regular expressions, but also returning the environment created 
 -- | by the pattern (e.g. variables in the pattern).
 synthPattern
-  :: Pre.Pattern
-  -> Checker (PlumeType, Post.Pattern, Map Text PlumeScheme)
+  :: MonadChecker m
+  => Pre.Pattern
+  -> m (PlumeType, Post.Pattern, Map Text PlumeScheme)
 synthPattern Pre.PWildcard = do
   t <- fresh
   pure (t, Post.PWildcard t, mempty)
@@ -143,14 +150,14 @@ synthPattern (Pre.PVariable name) = do
   t <- searchEnv @"datatypeEnv" name
   case t of
     Just t' -> do
-      inst <- instantiate t'
+      (inst, _) <- instantiate t'
       return (inst, Post.PSpecialVar name inst, mempty)
     Nothing -> do
       ty <- fresh
       return
         ( ty
         , Post.PVariable name ty
-        , Map.singleton name ty
+        , Map.singleton name (Forall [] $ [] :=>: ty)
         )
 synthPattern (Pre.PLiteral l) = do
   let (ty, l') = typeOfLiteral l
@@ -159,7 +166,7 @@ synthPattern (Pre.PConstructor name pats) = do
   t <- searchEnv @"datatypeEnv" name
   case t of
     Just t' -> do
-      inst <- instantiate t'
+      (inst, _) <- instantiate t'
       ret <- fresh
       (patsTy, pats', env) <- mapAndUnzip3M synthPattern pats
       inst `unifiesWith` (patsTy :->: ret)
@@ -182,7 +189,7 @@ synthPattern (Pre.PSlice n) = do
   return
     ( TList tv
     , Post.PVariable n (TList tv)
-    , Map.singleton n (TList tv)
+    , Map.singleton n (Forall [] $ [] :=>: TList tv)
     )
 
 typeOfLiteral :: Literal -> (PlumeType, Literal)
@@ -214,7 +221,7 @@ data Constant
   deriving (Eq, Show)
 
 
-unionWith :: Space -> Space -> Checker Space
+unionWith :: MonadChecker m => Space -> Space -> m Space
 unionWith EmptySpace s = pure s
 unionWith s EmptySpace = pure s
 unionWith (TypeSpace t1) (TypeSpace t2) = do
@@ -273,7 +280,7 @@ unionWith (ConstructorSpace k tys xs) (VariablePoint x t) = do
   else pure (UnionSpace [VariablePoint x t, ConstructorSpace k tys xs])
 unionWith x y = pure (UnionSpace [x, y])
 
-isRedundant :: Space -> [Space] -> Checker Bool
+isRedundant :: MonadChecker m => Space -> [Space] -> m Bool
 isRedundant x xs = 
   (==EmptySpace) <$> (simplify =<< x `subtractSpaceWith` UnionSpace xs)
 
@@ -286,14 +293,14 @@ getCons (ConstructorSpace name tys _) = do
   case f of 
     Just (_, x) -> do
       let t = x Map.! name
-      inst <- instantiate t
+      (inst, _) <- instantiate t
       let args = getArguments inst
       zipWithM_ unifiesWith tys args
       return (getHeader inst)
     Nothing -> throw $ UnboundVariable name
 getCons _ = throw $ CompilerError "Invalid space"
 
-simplify :: Space -> Checker Space
+simplify :: MonadChecker m => Space -> m Space
 simplify (ConstructorSpace t tys xs) = do
   xs' <- mapM simplify xs
   pure $ if EmptySpace `elem` xs' 
@@ -360,7 +367,7 @@ decompose t@(TypeId name) | isNotPrimitiveType t = do
   m <- readIORef datatypes
   case Map.lookup name m of
     Just t' -> mapM (\(key, val) -> do
-        inst <- instantiate val
+        (inst, _) <- instantiate val
         let args = getArguments inst
         return $ ConstructorSpace key args (map TypeSpace args)
       ) (Map.toList t')
@@ -369,7 +376,7 @@ decompose t@(TypeApp (TypeId name) _) = do
   m <- readIORef datatypes
   case Map.lookup name m of
     Just t' -> mapM (\(key, val) -> do
-        inst <- instantiate val
+        (inst, _) <- instantiate val
         let args = getArguments inst
         let header = getHeader inst
         header `unifiesWith` t
@@ -382,10 +389,10 @@ getHeader :: PlumeType -> PlumeType
 getHeader (_ :->: t) = t
 getHeader t = t
 
-isSubspaceOf :: Space -> Space -> Checker Bool
+isSubspaceOf :: MonadChecker m=> Space -> Space -> m Bool
 isSubspaceOf a b = (==EmptySpace) <$> a `subtractSpaceWith` b
 
-intersectWith :: Space -> Space -> Checker Space
+intersectWith :: MonadChecker m => Space -> Space -> m Space
 intersectWith a b = case (a, b) of
   (EmptySpace, _) -> return EmptySpace
   (_, EmptySpace) -> return EmptySpace
@@ -474,7 +481,7 @@ intersectWith a b = case (a, b) of
       let un = UnionSpace sp
       a `intersectWith` un
 
-subtractSpaceWith :: Space -> Space -> Checker Space
+subtractSpaceWith :: MonadChecker m => Space -> Space -> m Space
 subtractSpaceWith a b = case (a, b) of
   (EmptySpace, _) -> return EmptySpace
   (_, EmptySpace) -> return a
@@ -566,7 +573,7 @@ subtractSpaceWith a b = case (a, b) of
       let un = UnionSpace sp
       a `subtractSpaceWith` un
 
-project :: Post.Pattern -> Checker Space
+project :: MonadChecker m => Post.Pattern -> m Space
 project (Post.PVariable x t) = return $ VariablePoint x t
 project (Post.PLiteral l) = do
   let (ty, l') = typeOfLiteral l
@@ -608,8 +615,8 @@ isInstanceOf "false" t = liftIO $ doesUnifyWith t TBool
 isInstanceOf name t1 = do
   t2 <- searchEnv @"datatypeEnv" name
   case t2 of
-    Just (_ :->: header) -> liftIO $ doesUnifyWith t1 header
-    Just header -> liftIO $ doesUnifyWith t1 header
+    Just (Forall _ (_ :=>: (_ :->: header))) -> liftIO $ doesUnifyWith t1 header
+    Just (Forall _ (_ :=>: header)) -> liftIO $ doesUnifyWith t1 header
     Nothing -> return False
 
 showSpace :: Space -> String

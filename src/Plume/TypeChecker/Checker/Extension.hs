@@ -2,265 +2,240 @@
 
 module Plume.TypeChecker.Checker.Extension where
 
+import Data.List (unzip4)
+import Data.List qualified as List
 import Data.Map qualified as Map
 import Plume.Syntax.Abstract qualified as Pre
+import GHC.IO hiding (liftIO)
+import Plume.Syntax.Common qualified as Cmm
 import Plume.Syntax.Common.Annotation
-import Plume.Syntax.Common.Type qualified as Pre
-import Plume.TypeChecker.Checker.Closure (createEnvFromAnnotations)
+import Plume.Syntax.Translation.Generics (concatMapM)
 import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Constraints.Solver
+import Plume.TypeChecker.Constraints.Typeclass
+import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.Monad.Conversion
+import Plume.TypeChecker.Monad.Free (substituteVar)
+import Plume.TypeChecker.Monad.Type qualified as Post
 import Plume.TypeChecker.TLIR qualified as Post
-import Plume.Syntax.Common.Type (getGenericName)
-import Plume.TypeChecker.Constraints.Unification (doesUnifyWith, compressPaths)
+import Prelude hiding (gets, local)
+
+
+firstM :: (Monad m) => (a -> m b) -> (a, c) -> m (b, c)
+firstM f (a, b) = do
+  a' <- f a
+  pure (a', b)
 
 type Converted = Either PlumeType PlumeType
+
+type VarSubst = Map Text Text
+
+unifyQual :: MonadChecker m => (Text, PlumeType) -> (Text, PlumeType) -> m VarSubst
+unifyQual (n1, t1) (n2, t2) = liftIO $ do
+  t1' <- compressPaths t1
+  t2' <- compressPaths t2
+  if t1' == t2'
+    then pure $ Map.singleton n1 n2
+    else pure mempty
+
+unify :: MonadChecker m => [(Text, PlumeType)] -> m VarSubst
+unify [] = pure mempty
+unify (x : xs) = do
+  s <- mapM (unifyQual x) xs
+  let s' = mconcat s
+  s'' <- unify xs
+  pure $ s' <> s''
+
+getVarName :: Post.Expression -> Text
+getVarName (Post.EVariable n _) = n
+getVarName _ = ""
+
+getVarType :: Post.Expression -> PlumeType
+getVarType (Post.EVariable _ t) = t
+getVarType _ = error "getVarType: Not a variable"
+
+getAllElements :: Post.Expression -> [Post.Expression]
+getAllElements (Post.EApplication f xs) = f : concatMap getAllElements xs
+getAllElements x = [x]
+
+isQualNotDefined :: PlumeQualifier -> [PlumeQualifier] -> Bool
+isQualNotDefined _ [] = True
+isQualNotDefined (IsIn t1 n1) ((IsIn t2 n2) : xs) 
+  | n1 == n2 && t1 == t2 = False
+  | otherwise = isQualNotDefined (IsIn t1 n1) xs
+isQualNotDefined t (_ : xs) = isQualNotDefined t xs
+
+keepAssumpWithName :: [Assumption PlumeType] -> [Text] -> [Assumption PlumeType]
+keepAssumpWithName [] _ = []
+keepAssumpWithName (x@(n :>: _) : xs) names
+  | n `elem` names = x : keepAssumpWithName xs names
+  | otherwise = keepAssumpWithName xs names
+
+getMapNames :: [(PlumeQualifier, Post.Expression)] -> [Text]
+getMapNames ((IsIn _ _, Post.EVariable n _) : xs) = n : getMapNames xs
+getMapNames (_ : xs) = getMapNames xs
+getMapNames [] = []
 
 synthExt :: Infer -> Infer
 synthExt
   infer
-  (Pre.ETypeExtension generics (Annotation extVar extTy) methods) = do
-    methods' <-
-      mapM
-        ( synthExtMember
-            infer
-            (extVar, extTy, generics)
-        )
-        methods
+  (Pre.ETypeExtension generics (Annotation tcName [tcTy]) _ methods) = do
+    -- Dealing with pre-types and building the qualified qualifiers
+    -- for the typeclass instance (used to indicate the instance form and its
+    -- superclasses)
+    gens' :: [Post.PlumeQualifier] <- concatMapM convert generics
 
-    pure (TUnit, methods')
+    let gens = removeQVars gens'
+    let qvars = getQVars gens'
+
+    ty <- convert tcTy
+    let instH = IsIn ty tcName
+    let pred' = gens :=>: instH
+
+    cls <- findClass tcName
+    case cls of
+      MkClass qs' quals methods' -> do
+
+        let finalMethods = fmap (\(Forall qs (quals' :=>: ty')) -> Forall (qs <> qs') $ (gens <> quals') :=>: ty') methods'
+
+        let quals' = case quals of xs :=>: t -> (xs <> gens) :=>: t
+
+        let preInst = MkInstance qvars quals' mempty finalMethods
+
+        addClassInstance (instH, void preInst)
+
+    -- Typechecking the instance methods
+    exprs <- mapM (extMemberToDeclaration infer) methods
+
+    cenv <- gets (extendEnv . environment)
+
+    -- Generating the required instance constraints arguments, for instance
+    -- show<[a]> requires show<a> to be in scope, resulting in adding show<a>
+    -- dictionary as a lambda argument to show<[a]>
+    --
+    -- Would compile to: show<[a]> = \show<a> -> methods..
+    res'' <- traverse (discharge cenv) gens
+    let (_, m1, ass, _) = unzip4 res''
+    m1' <- liftIO . mapM (firstM compressQual) . List.nub $ concat m1
+    let ass' = concat ass
+    let args' = map (\(n :>: t') -> n :@: t') ass'
+    let tys'' = map getAssumpVal ass'
+
+    res' <- forM exprs $ \(ty', ps, h, name) -> do
+      -- Generating the right local method constraints instances, for instance
+      -- if `test` method in `test<a>` class is of the form:
+      --   test :: show<a> => a -> int
+      -- then the show<a> constraint should be transformed into a dictionary
+      -- lambda argument `show<a>`, giving a method:
+      --   test :: show<a> -> a -> int
+      --
+      -- Instance superclases should not interfere with method-local instances
+      -- to avoid duplicate instances.
+      res' <- traverse (discharge cenv) ps
+      let (_ps, m2, as, _) = unzip4 res'
+      let ps' = concatMap removeQVars _ps
+
+      ps'' <- removeDuplicatesQuals ps'
+
+      let ty''@(_ :=>: t) = List.nub ps'' :=>: ty'
+
+      m' <- liftIO $ mapM (firstM compressQual) $ List.nub $ concat m2
+      let fstM1' = map fst m1'
+      let m'' = filter ((`isQualNotDefined` fstM1') . fst) m'
+
+      let names = getMapNames m''
+      let as' = keepAssumpWithName (concat as) names
+
+      (sub, as'') <- removeDuplicatesAssumps as'
+
+      let finalM = m'' <> m1'
+
+      let finalExprs = map (second getAllElements) finalM
+      let finalExprs' = concatMap (\(_, e) -> map (\case
+              Post.EVariable n t' -> (n, t')
+              _ -> error "Not a variable"
+            ) e) finalExprs
+
+      sub' <- unify finalExprs'
+
+      let sub'' = Map.toList sub' <> sub
+
+      h' <- liftIO $ runReaderT h $ getExpr finalM
+      let h'' = List.foldl substituteVar h' sub''
+
+      unless (null as'') $ throw (UnresolvedTypeVariable as'')
+
+      let args = map (\(n :>: t') -> n :@: t') as''
+      let tys' = map getAssumpVal as''
+
+      cTy' <- liftIO $ compressPaths ty'
+
+      let clos = if null args then h'' else Post.EClosure args cTy' h''
+      let closTy = if null args then t else tys' :->: t
+
+      return ((Map.singleton name (Forall qvars ty''), closTy), Map.singleton name clos)
+
+    let (quals, exprs') = unzip res'
+    let (funTys, _) = unzip quals
+
+    let dict = Map.unions exprs'
+    let dictFunTys = Map.unions funTys
+
+    let inst = MkInstance qvars pred' dict dictFunTys
+    let cls'' = (instH, void inst)
+    addClassInstance cls''
+
+    let name = tcName <> "_" <> createInstName ty
+    let methods' = Map.toList dict
+    let methods'' = sortBy (\(a, _) (b, _) -> compare a b) methods'
+
+    let tapp = TypeApp (TypeId tcName) [ty]
+    let funTy = if null args' then tapp else tys'' :->: ty
+    let instDict = Post.EInstanceDict tcName ty (map snd methods'')
+    let dictE = if null args' then instDict else Post.EClosure args' ty instDict
+
+    mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) generics
+
+    pure (TUnit, [], pure (Post.EDeclaration (Annotation name funTy) dictE Nothing))
+    where
+      getAssumpVal :: Assumption a -> a
+      getAssumpVal (_ :>: val) = val
 synthExt _ _ = throw $ CompilerError "Only type extensions are supported"
 
-synthExtMember
-  :: Infer
-  -> (Text, Pre.PlumeType, [Pre.PlumeGeneric])
-  -> Pre.ExtensionMem
-  -> Checker Post.Expression
--- Synthesize a fully annotated extension member. The difference is that we
--- don't need to do many inference steps, we can just infer the body and
--- check if the inferred type is the same as the annotated one.
---
--- Remember that infered types are always the final type, annotations just help
--- the user to write better and more readable code.
-synthExtMember 
-  infer (extVar, preExtTy, extGens) 
-  e@(Pre.ExtDeclaration gens ann c@(Pre.EClosure args ret body)) 
-  | isExtAnnotated e || isAnnotated c = do
-    let gens' = extGens <> gens
-    void (mapM convert gens' :: Checker [PlumeType])
+getExpr :: [(PlumeQualifier, Post.Expression)] -> PlumeQualifier -> Post.Expression
+getExpr xs p = do
+  let p' = unsafePerformIO $ compressQual p
+  case List.lookup p' xs of
+    Just x -> x
+    Nothing -> error $ "getExpr: " <> show p' <> " not found in " <> show xs
 
-    extTy <- convert preExtTy
-    convertedArgs <- convert args
-    convertedRet  <- convert ret
+extMemberToDeclaration :: (MonadChecker m) => Infer -> Pre.ExtensionMem -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression, Text)
+extMemberToDeclaration infer (Pre.ExtDeclaration gens (Annotation name ty) c) = do
+  _ :: [PlumeQualifier] <- concatMapM convert gens
+  ty' <- convert ty
 
-    let preFun = (extTy : map (.annotationValue) convertedArgs) :->: convertedRet
-        argsSchemes = createEnvFromAnnotations convertedArgs
-        schemes = Map.insert extVar extTy argsSchemes
+  searchEnv @"typeEnv" name >>= \case
+    Just sch -> do
+      instantiate sch >>= \case
+        (ty'', _) -> ty' `unifiesWith` ty''
+    Nothing -> throw $ UnboundVariable name
+  -- addClassInstance
 
-    insertEnvWith @"typeEnv" Map.union schemes
+  (bTy, ps', b) <- local id $ infer c
+  ty' `unifiesWith` bTy
 
-    let preExt = MkExtension ann.annotationName extTy preFun
-    exts <- gets extensions
-    preExts <- liftIO $ removeDuplicates $ preExt : exts
-    modifyIORef' checkState $ \s -> s {extensions = preExts}
+  mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) gens
+  pure (bTy, ps', b, name)
 
-    enterLevel
-
-    (inferedTy, body') <- 
-      local (\s -> s {returnType = Just convertedRet}) . extractFromArray $ 
-        infer body
-
-    inferedTy `unifiesWith` convertedRet
-
-    deleteManyEnv @"genericsEnv" (map getGenericName (extGens <> gens))
-    deleteManyEnv @"typeEnv" (Map.keys schemes)
-
-    compressedFun <- liftIO $ compressPaths preFun
-    let compressedExt = MkExtension ann.annotationName extTy compressedFun
-    preExts' <- liftIO $ removeDuplicates $ compressedExt : exts
-    modifyIORef' checkState $ \s -> s {extensions = preExts'}
-    
-    exitLevel
-
-    when (Post.isBlock body' && not (Post.containsReturn body')) $ 
-      throw (NoReturnFound convertedRet)
-
-    pure $
-      Post.EExtensionDeclaration
-        ann.annotationName
-        extTy
-        (Annotation extVar extTy)
-        (Post.EClosure convertedArgs inferedTy body')
-synthExtMember 
-  infer (extVar, preExtTy, extGens) 
-  (Pre.ExtDeclaration gens ann (Pre.EClosure args ret body)) = do
-    let gens' = extGens <> gens
-    void (mapM convert gens' :: Checker [PlumeType])
-
-    extTy :: PlumeType           <- convert preExtTy
-    convertedArgs :: [Converted] <- mapM (convertMaybe . fst . annotationValue) args
-    convertedRet :: Converted    <- convertMaybe ret
-
-    preFun :: PlumeType <- fresh
-
-    let argsNames = map annotationName args
-        env = createEnvFromConverted $ zip argsNames convertedArgs
-        schemes = Map.insert extVar extTy env
-
-    insertEnvWith @"typeEnv" Map.union schemes
-
-    let preExt = MkExtension ann.annotationName extTy preFun
-    exts <- gets extensions
-    preExts <- liftIO $ removeDuplicates $ preExt : exts
-    modifyIORef' checkState $ \s -> s {extensions = preExts}
-
-    let convertedRet' = getConverted convertedRet
-
-    enterLevel
-    (inferedTy, body') <- 
-      local (\s -> s {returnType = Just convertedRet'}) . extractFromArray $ 
-        infer body
-
-    let extFunTy = (extTy : map getConverted convertedArgs) :->: inferedTy
-    convertedRet' `unifiesWith` inferedTy
-    preFun `unifiesWith` extFunTy
-
-    deleteManyEnv @"genericsEnv" (map getGenericName gens')
-
-    compressedFun <- liftIO $ compressPaths preFun
-    let compressedExt = MkExtension ann.annotationName extTy compressedFun
-    preExts' <- liftIO $ removeDuplicates $ compressedExt : exts
-    modifyIORef' checkState $ \s -> s {extensions = preExts'}
-
-    exitLevel
-
-    when (Post.isBlock body' && not (Post.containsReturn body')) $ 
-      throw (NoReturnFound inferedTy)
-    let newArgs = zipWith Annotation argsNames (map getConverted convertedArgs)
-
-    pure $
-      Post.EExtensionDeclaration
-        ann.annotationName
-        extTy
-        (Annotation extVar extTy)
-        (Post.EClosure newArgs inferedTy body')
-synthExtMember 
-  infer (extVar, preExtTy, extGens) 
-  (Pre.ExtDeclaration [] (Annotation name (Just ty)) value) = do
-    void (convert extGens :: Checker [PlumeType])
-    extTy <- convert preExtTy
-    convertedValue <- convert ty
-
-    let preFun = [extTy] :->: convertedValue
-        preExt = MkExtension name extTy preFun
-    exts <- gets extensions
-    preExts <- liftIO $ removeDuplicates $ preExt : exts
-    modifyIORef' checkState $ \s -> s {extensions = preExts}
-
-    insertEnvWith @"typeEnv" Map.union (Map.singleton extVar extTy)
-
-    (inferedTy', value') <- extractFromArray $ infer value
-
-    inferedTy' `unifiesWith` convertedValue
-
-    compressedFun <- liftIO $ compressPaths preFun
-    let compressedExt = MkExtension name extTy compressedFun
-    preExts' <- liftIO $ removeDuplicates $ compressedExt : exts
-    modifyIORef' checkState $ \s -> s {extensions = preExts'}
-
-    when (Post.containsReturn value') $ throw (DeclarationReturn "extension variable")
-
-    pure $
-      Post.EExtensionDeclaration
-        name
-        extTy
-        (Annotation extVar extTy)
-        value'
-synthExtMember 
-  infer (extVar, preExtTy, extGens)
-  (Pre.ExtDeclaration [] (Annotation name Nothing) value) = do
-    void (convert extGens :: Checker [PlumeType])
-    extTy :: PlumeType <- convert preExtTy
-    convertedValue :: PlumeType <- fresh
-
-    preFun :: PlumeType <- fresh
-
-    let preExt = MkExtension name extTy preFun
-    exts <- gets extensions
-    preExts <- liftIO $ removeDuplicates $ preExt : exts
-    modifyIORef' checkState $ \s -> s {extensions = preExts}
-
-    insertEnvWith @"typeEnv" Map.union (Map.singleton extVar extTy)
-
-    enterLevel
-    (inferedTy', value') <- extractFromArray $ infer value
-
-    let extFunTy = [extTy] :->: inferedTy'
-    convertedValue `unifiesWith` inferedTy'
-    preFun `unifiesWith` extFunTy
-
-    compressedFun <- liftIO $ compressPaths preFun
-    let compressedExt = MkExtension name extTy compressedFun
-    preExts' <- liftIO $ removeDuplicates $ compressedExt : exts
-    modifyIORef' checkState $ \s -> s {extensions = preExts'}
-
-    exitLevel
-    
-    when (Post.containsReturn value') $ throw (DeclarationReturn "extension variable")
-
-    pure $
-      Post.EExtensionDeclaration
-        name
-        extTy
-        (Annotation extVar extTy)
-        value'
-
-synthExtMember _ _ _ = throw $ CompilerError "Only extension members are supported"
-
-createEnvFromConverted :: [(Text, Converted)] -> Map Text PlumeScheme
-createEnvFromConverted ((name, Right ty) : xs) = Map.insert name ty (createEnvFromConverted xs)
-createEnvFromConverted ((name, Left ty) : xs) = Map.insert name ty (createEnvFromConverted xs)
-createEnvFromConverted [] = mempty
+getExtMemberNames :: Pre.ExtensionMem -> Text
+getExtMemberNames (Pre.ExtDeclaration _ (Annotation name _) _) = name
 
 getConverted :: Converted -> PlumeType
 getConverted = \case
   Left ty -> ty
   Right ty -> ty
 
-convertMaybe :: a `ConvertsTo` b => Maybe a -> Checker (Either PlumeType b)
+convertMaybe :: (a `ConvertsTo` b) => Maybe a -> Checker (Either PlumeType b)
 convertMaybe = \case
   Just x -> Right <$> convert x
   Nothing -> Left <$> fresh
-
-(=$=) :: Extension -> Extension -> IO Bool
-(MkExtension n1 t1 f1) =$= (MkExtension n2 t2 f2) = do
-  b1 <- t1 `doesUnifyWith` t2 
-  b2 <- f1 `doesUnifyWith` f2
-
-  return $ n1 == n2 && b1 && b2
-
-nubBy :: [Extension] -> IO [Extension]
-nubBy []             =  pure []
-nubBy (x:xs)         = do
-  nubbed <- nubBy =<< filterM (\y -> do
-      b <- x =$= y
-      return $ not b
-    ) xs
-  return $ x : nubbed
-
--- | Removes duplicate extensions from the set
--- | It just check if two names are equal and if the types are unifiable
-removeDuplicates :: [Extension] -> IO [Extension]
-removeDuplicates = nubBy
---  where
---   go [] acc = acc
---   go (x : xs') acc
---     | doesExtensionExist x acc = go xs' acc
---     | otherwise = go xs' (x : acc)
-
---   doesExtensionExist :: Extension -> [Extension] -> Bool
---   doesExtensionExist e@(MkExtension n1 t1 s1) (MkExtension n2 t2 s2 : xs')
---     | n1 == n2 && (t1 `doesUnifyWith` t2 || s1 `doesUnifyWith` s2) = True
---     | otherwise = doesExtensionExist e xs'
---   doesExtensionExist _ [] = False
-  

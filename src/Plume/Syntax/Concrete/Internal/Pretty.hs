@@ -127,10 +127,11 @@ prettyExpr _ (ESwitch e ps) =
   prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "=>" <+> prettyExpr 0 e'
 prettyExpr _ (EProperty n e) = parens $ prettyExpr 0 e <> "." <> anItalic (pretty n)
 prettyExpr _ (EReturn e) = anCol Blue "return" <+> prettyExpr 0 e
-prettyExpr _ (ETypeExtension gens a es) =
+prettyExpr _ (ETypeExtension gens a var es) =
   anCol Blue "extends"
     <> angles (hsep . punctuate comma $ map ansiPretty gens)
-      <+> parens (ansiPretty a)
+      <+> pretty a.annotationName <> angles (hsep . punctuate comma $ map ansiPretty a.annotationValue)
+      <+> "with" <+> pretty var
       <+> line
     <> indent 2 (vsep (map prettyExt es))
 prettyExpr _ (ENativeFunction fp n gens (args :->: ret)) =
@@ -142,13 +143,14 @@ prettyExpr _ (ENativeFunction fp n gens (args :->: ret)) =
       <+> ":"
       <+> ansiPretty ret
 prettyExpr _ (ENativeFunction {}) = compilerError "ENativeFunction: invalid type"
-prettyExpr _ (EGenericProperty gens n ts t) =
-  anCol Blue "property"
+prettyExpr _ (EInterface (Annotation name gens) gs ms) =
+  anCol Blue "interface"
+    <> angles (hsep . punctuate comma $ map ansiPretty gs)
+    <+> anItalic (pretty name)
     <> angles (hsep . punctuate comma $ map ansiPretty gens)
-      <+> anItalic (pretty n)
-    <> parens (hsep . punctuate comma $ map ansiPretty ts)
-      <+> ":"
-      <+> ansiPretty t
+      <+> "="
+    <> line
+    <> indent 2 (vsep . punctuate comma $ map ansiPretty ms)
 prettyExpr _ (EList es) = brackets (hsep . punctuate comma $ map (prettyExpr 0) es)
 
 prettyExt :: ExtensionMember PlumeType -> Doc AnsiStyle

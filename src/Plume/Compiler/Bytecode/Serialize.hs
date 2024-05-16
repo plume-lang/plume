@@ -5,9 +5,11 @@ import Data.Binary.Put
 import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as BSL
 import Data.Text.Encoding (encodeUtf8)
+import Data.Map qualified as Map
 import Plume.Compiler.Bytecode.Syntax
 import Prelude hiding (encodeUtf8)
-import Plume.Syntax.Abstract.Expression (IsStandard)
+import Plume.Syntax.Common.Literal (Literal(..))
+import Plume.Compiler.LLIR.Syntax (Comparator(..), Libraries, NativeLibrary(..))
 
 encodeInteger :: (Integral a) => a -> Put
 encodeInteger = putInt32le . fromIntegral
@@ -46,10 +48,6 @@ encodeInstruction Return =
   encodeInstr 5 >> replicateNull 3
 encodeInstruction (Compare c) = 
   encodeInstr 6 >> encodeComparator c >> replicateNull 2
-encodeInstruction And = 
-  encodeInstr 7 >> replicateNull 3
-encodeInstruction Or = 
-  encodeInstr 8 >> replicateNull 3
 encodeInstruction (LoadNative i cp fp) = 
   encodeInstr 9 >> encodeInteger i >> encodeInteger cp >> encodeInteger fp
 encodeInstruction (MakeList i) = 
@@ -60,12 +58,6 @@ encodeInstruction (Call i) =
   encodeInstr 12 >> encodeInteger i >> replicateNull 2
 encodeInstruction (JumpElseRel i) = 
   encodeInstr 13 >> encodeInteger i >> replicateNull 2
-encodeInstruction TypeOf = 
-  encodeInstr 14 >> replicateNull 3
-encodeInstruction ConstructorName = 
-  encodeInstr 15 >> replicateNull 3
-encodeInstruction (Phi i j) = 
-  encodeInstr 16 >> encodeInteger i >> encodeInteger j >> encodeNull
 encodeInstruction (MakeLambda i l) = 
   encodeInstr 17 >> encodeInteger i >> encodeInteger l >> encodeNull
 encodeInstruction GetIndex = 
@@ -122,33 +114,39 @@ encodeText w = do
  where
   encoded = encodeUtf8 w
 
-encodeConstant :: Constant -> Put
-encodeConstant (CInt i) = putWord8 0 >> encodeInteger i
-encodeConstant (CFloat f) = putWord8 1 >> putDoublele f
-encodeConstant (CString t) = putWord8 2 >> encodeText t
+encodeConstant :: Literal -> Put
+encodeConstant (LInt i) = putWord8 0 >> encodeInteger i
+encodeConstant (LFloat f) = putWord8 1 >> putDoublele f
+encodeConstant (LString t) = putWord8 2 >> encodeText t
+encodeConstant (LBool b) = putWord8 0 >> encodeInteger (fromEnum b)
+encodeConstant (LChar c) = putWord8 2 >> encodeText (fromString [c])
 
-encodeMetaData :: FunctionMetaData -> Put
-encodeMetaData FunctionMetaData {arity, address, localsSpace} = do
-  encodeInteger arity
-  encodeInteger address
-  encodeInteger localsSpace
+type Program = ([Instruction], Libraries, [Literal])
 
 encodeProgram :: Program -> Put
-encodeProgram Program {pInstructions, pConstants, pNativeLibraries} = do
-  encodeInteger $ length pConstants
-  mapM_ encodeConstant pConstants
+encodeProgram (xs, libs, lits) = do
+  encodeInteger $ length lits
+  mapM_ encodeConstant lits
 
-  encodeInteger $ length pNativeLibraries
-  mapM_ encodeNative pNativeLibraries
+  let libs' = prepareLibs libs
+  encodeInteger $ length libs'
+  mapM_ encodeNative libs'
 
-  encodeInteger $ length pInstructions
-  mapM_ encodeInstruction pInstructions
+  encodeInteger $ length xs
+  mapM_ encodeInstruction xs
 
-encodeNative :: ((FilePath, IsStandard), Int) -> Put
-encodeNative ((path, isStandard), idx) = do
-  encodeText $ fromString path
+prepareLibs :: Libraries -> [(Text, Bool, [Text])]
+prepareLibs m = do
+  let (_, ls) = sequence $ Map.toList m
+      ls'     = sortBy (compare `on` (\(MkNativeLibrary _ i _ _) -> i)) ls
+
+  map (\(MkNativeLibrary p _ s n) -> (p, s, Map.keys n)) ls'
+
+encodeNative :: (Text, Bool, [Text]) -> Put
+encodeNative (path, isStandard, nats) = do
+  encodeText path
   encodeInteger $ fromEnum isStandard
-  encodeInteger idx
+  encodeInteger (length nats)
 
 serialize :: Program -> IO BSL.ByteString
 serialize = pure . runPut . encodeProgram

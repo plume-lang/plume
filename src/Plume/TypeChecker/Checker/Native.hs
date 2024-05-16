@@ -5,6 +5,7 @@ import Plume.Syntax.Abstract qualified as Pre
 import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
+import Prelude hiding (gets)
 
 synthNative :: Infer
 synthNative (Pre.ENativeFunction fp name generics ty st) = do
@@ -13,9 +14,9 @@ synthNative (Pre.ENativeFunction fp name generics ty st) = do
     Just (sch, pos) -> throwRaw (pos, DuplicateNative name sch)
     Nothing -> pure ()
 
-  void (convert generics :: Checker [QuVar])
+  gens :: [QuVar] <- convert generics
   convertedTy <- convert ty
-  let scheme = convertedTy
+  let scheme = Forall gens $ [] :=>: convertedTy
 
   insertEnvWith @"typeEnv" (<>) $ Map.singleton name scheme
   pos <- fetchPosition
@@ -24,6 +25,7 @@ synthNative (Pre.ENativeFunction fp name generics ty st) = do
 
   pure
     ( TUnit
-    , [Post.ENativeFunction fp name convertedTy st]
+    , []
+    , pure $ Post.ENativeFunction fp name convertedTy st
     )
 synthNative _ = throw $ CompilerError "Only native functions are supported"

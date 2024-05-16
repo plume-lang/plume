@@ -33,11 +33,16 @@ data DesugaredStatement
   | DSMutUpdate Update DesugaredExpr
   deriving (Eq, Show, Ord)
 
+type LibraryPath = Text
+type FunctionName = Text
+type Argument = Text
+type FunctionArity = Int
+
 data DesugaredProgram
-  = DPFunction Text [Text] [DesugaredStatement]
+  = DPFunction FunctionName [Argument] [DesugaredStatement]
   | DPStatement DesugaredStatement
   | DPDeclaration Text DesugaredExpr
-  | DPNativeFunction Text Text Int IsStandard
+  | DPNativeFunction LibraryPath FunctionName FunctionArity IsStandard
   | DPMutDeclaration Text DesugaredExpr
   | DPMutUpdate Update DesugaredExpr
   deriving (Eq, Show, Ord)
