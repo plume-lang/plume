@@ -1,0 +1,12 @@
+fn welcome(name: str) {
+  println("Hello, $name!")
+}
+
+welcome("world")
+welcome("Plume")
+
+
+username = "Plume"
+age = 42
+
+println("Hello, $username! You are $age years old.")
