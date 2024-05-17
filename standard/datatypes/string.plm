@@ -33,3 +33,6 @@ fn join(c: [str], sep: str) =>
   }
 
 
+extend to_str<str> {
+  fn to_str(x: str) => x
+}
