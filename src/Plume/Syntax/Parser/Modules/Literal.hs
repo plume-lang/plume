@@ -5,7 +5,7 @@ import Data.Text qualified as T
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer
-import Text.Megaparsec hiding (many, some)
+import Text.Megaparsec hiding (many, parse, some)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 
@@ -18,15 +18,41 @@ import Text.Megaparsec.Char.Lexer qualified as L
 -- | and try the integer parser instead.
 parseLiteral :: Parser Expression
 parseLiteral =
-  ELiteral
-    <$> choice
-      [ parseChar
-      , parseString
-      , try parseFloat
-      , parseBool
-      , parseInteger
-      ]
+  choice
+    [ ELiteral <$> parseChar
+    , parseStringWithInterpolation
+    , ELiteral <$> try parseFloat
+    , ELiteral <$> parseBool
+    , ELiteral <$> parseInteger
+    ]
 
+parseStringWithInterpolation :: Parser Expression
+parseStringWithInterpolation = lexeme $ do
+  void $ char '"'
+  es <- manyTill L.charLiteral (char '"')
+  pure . combineCharsIntoString $ buildString es
+
+  where
+    showApp :: Expression -> Expression
+    showApp x = EApplication (EProperty "to_str" x) []
+
+    buildString :: [Char] -> Expression
+    buildString [] = ELiteral (LString "")
+    buildString ('$':x:xs) | isIdentCharStart (T.singleton x) = do
+      -- span the variable name
+      let (var, rest) = span isIdentChar xs
+      let var' = EVariable $ T.pack (x:var)
+      EBinary Plus (showApp var') (buildString rest)
+    buildString (x:xs) = EBinary Plus (ELiteral $ LString $ T.singleton x) (buildString xs)
+
+    combineCharsIntoString :: Expression -> Expression
+    combineCharsIntoString (EBinary Plus (ELiteral (LString x)) y) = do
+      let y' = combineCharsIntoString y
+
+      case y' of
+        ELiteral (LString y'') -> ELiteral $ LString (x <> y'')
+        _ -> EBinary Plus (ELiteral $ LString x) y'
+    combineCharsIntoString x = x
 -- | Parse a character literal
 -- | A character literal is a single character enclosed in single quotes
 -- | Example: 'a'
