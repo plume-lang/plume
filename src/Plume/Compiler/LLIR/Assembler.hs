@@ -72,7 +72,7 @@ instance Assemble Pre.DesugaredProgram where
     let locals = List.nub $ args <> Set.toList freed
         localSpace = zip locals [0..]
 
-    pure [LLIR.Function name args localSpaceSize localSpace finalBody]
+    pure [LLIR.Function name args localSpaceSize localSpace (finalBody <> [LLIR.ReturnUnit])]
 
   assemble (Pre.DPStatement stmt) = assemble stmt
 

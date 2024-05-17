@@ -106,6 +106,7 @@ instance Assemble LLIR.Instruction where
   assemble (LLIR.Slice index) = pure [BC.Slice index]
   assemble LLIR.ListLength = pure [BC.ListLength]
   assemble LLIR.Halt = pure [BC.Halt]
+  assemble LLIR.ReturnUnit = pure [BC.ReturnUnit]
 
 instance Assemble LLIR.Segment where
   assemble (LLIR.Function name _ ls freed instructions) = do

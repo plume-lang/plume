@@ -106,6 +106,8 @@ encodeInstruction Mul =
   encodeInstr 39 >> replicateNull 3
 encodeInstruction (MulConst i) =
   encodeInstr 40 >> encodeInteger i >> replicateNull 2
+encodeInstruction ReturnUnit =
+  encodeInstr 41 >> replicateNull 3
 
 encodeText :: Text -> Put
 encodeText w = do

@@ -58,6 +58,7 @@ data Instruction
   | Slice Index
   | ListLength
   | Halt
+  | ReturnUnit
   deriving (Show, Eq)
 
 instance LLIR.Free LLIR.Segment where

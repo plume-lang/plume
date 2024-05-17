@@ -39,6 +39,7 @@ data Instruction
   | Slice Int
   | ListLength
   | Halt
+  | ReturnUnit
   deriving (Eq)
 
 data Segment
@@ -108,6 +109,7 @@ instance Show Instruction where
   show (Slice n) = "slice " <> show n
   show ListLength = "list length"
   show Halt = "halt"
+  show ReturnUnit = "return unit"
 
 
 instance Show Segment where
