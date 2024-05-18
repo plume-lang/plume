@@ -551,6 +551,14 @@ interpretError (p, UnresolvedTypeVariable as) =
   where
     showAssumps [] = ""
     showAssumps (x :>: t : xs) = toString x <> " extends " <> showTy t <> ", " <> showAssumps xs
+interpretError (p, AlreadyDefinedInstance n t) =
+  printErrorFromString
+    mempty
+    ( "Instance " <> toString n <> " already defined for " <> showTy t,
+      Nothing,
+      p
+    )
+    "while performing typechecking"
 
 capitalize :: Text -> Text
 capitalize = T.toTitle . T.toLower

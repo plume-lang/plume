@@ -76,6 +76,20 @@ getMapNames ((IsIn _ _, Post.EVariable n _) : xs) = n : getMapNames xs
 getMapNames (_ : xs) = getMapNames xs
 getMapNames [] = []
 
+isInstanceAlreadyDefined :: MonadChecker m => PlumeQualifier -> m (Maybe PlumeType)
+isInstanceAlreadyDefined p = do
+  p' <- liftIO $ compressQual p
+  MkExtendEnv instances <- gets (extendEnv . environment)
+
+  found <- findM instances $ \case
+    (p'', _) -> do
+      p''' <- liftIO $ compressQual p''
+      doesMatchQual p''' p'
+
+  case found of
+    Just (IsIn ty _, _) -> return (Just ty)
+    _ -> return Nothing
+
 synthExt :: Infer -> Infer
 synthExt
   infer
@@ -91,6 +105,11 @@ synthExt
     ty <- convert tcTy
     let instH = IsIn ty tcName
     let pred' = gens :=>: instH
+    
+    possibleInst <- isInstanceAlreadyDefined instH
+    when (isJust possibleInst) $ case possibleInst of
+      Just ty' -> throw $ AlreadyDefinedInstance tcName ty'
+      _ -> throw $ CompilerError "Instance already defined"
 
     cls <- findClass tcName
     case cls of
@@ -185,7 +204,8 @@ synthExt
     let cls'' = (instH, void inst)
     addClassInstance cls''
 
-    let name = tcName <> "_" <> createInstName ty
+    ty' <- liftIO $ compressPaths ty
+    let name = tcName <> "_" <> createInstName ty'
     let methods' = Map.toList dict
     let methods'' = sortBy (\(a, _) (b, _) -> compare a b) methods'
 

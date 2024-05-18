@@ -3,6 +3,7 @@ module Plume.TypeChecker.Constraints.Typeclass where
 
 import Data.List qualified as List
 import Data.Map qualified as Map
+import Data.Foldable qualified as Fold
 import Plume.Compiler.Desugaring.Monad (freshName)
 import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Constraints.Solver (unifiesWith)
@@ -44,11 +45,13 @@ discharge cenv p = do
       let ps = removeQVars _ps
       (ps', mp, as, ds) <-
         fmap mconcat
-          . traverse (discharge cenv)
+          . mapM (discharge cenv)
           $ ps
 
-      let t = getDictTypeForPred p'
-          d = Post.EVariable (getDict b) t
+      let ty = getDictTypeForPred p'
+      t <- liftIO $ compressPaths ty
+
+      let d = Post.EVariable (getDict b) t
           e = if null ds then d else Post.EApplication d ds
       pure (ps', mp <> [(p', e)], as, pure e)
     Nothing -> do
@@ -100,6 +103,31 @@ normalize (Forall qs t) = Forall qs $ normqual t
     normtype (TypeApp a b) = TypeApp (normtype a) (map normtype b)
     normtype (TypeVar c) = TypeVar c
     normtype (TypeQuantified a) = TypeQuantified a
+
+doesMatch :: (MonadChecker m) => PlumeType -> PlumeType -> m Bool
+doesMatch (TypeApp x xs) (TypeApp y ys) = do
+  b <- doesMatch x y
+  if b
+    then and <$> zipWithM doesMatch xs ys
+    else pure False
+doesMatch (TypeVar u) t = do
+  v <- readIORef u
+  case v of
+    Link t' -> doesMatch t' t
+    Unbound _ _ -> do
+      writeIORef u (Link t)
+      pure True
+doesMatch (TypeQuantified _) _ = pure True
+doesMatch (TypeId n) (TypeId n') = pure $ n == n'
+doesMatch _ _ = pure False
+
+doesMatchQual :: (MonadChecker m) => PlumeQualifier -> PlumeQualifier -> m Bool
+doesMatchQual (IsIn a b) (IsIn a' b') = do
+  a1 <- liftIO $ compressPaths a
+  a2 <- liftIO $ compressPaths a'
+  bl <- doesMatch a1 a2
+  pure $ bl && b == b'
+doesMatchQual _ _ = pure False
 
 matchMut :: (MonadChecker m) => PlumeType -> PlumeType -> m ()
 matchMut (TypeApp x xs) (TypeApp y ys) = do
@@ -184,13 +212,14 @@ findClass name = do
 instantiateQual :: (MonadChecker m) => Substitution -> Qualified PlumeQualifier -> m (Qualified PlumeQualifier, Substitution)
 instantiateQual s (ps :=>: h) = do
   (ps', s1) <-
-    foldlM
-      ( \(acc, sAcc) p -> do
+    Fold.foldrM
+      ( \p (acc, sAcc) -> do
           (p', s') <- instantiateTyQual sAcc p
           pure (p' : acc, s')
       )
       ([], s)
       ps
+      
   (h', s2) <- instantiateTyQual s1 h
   pure (ps' :=>: h', s2)
 

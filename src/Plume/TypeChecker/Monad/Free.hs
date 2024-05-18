@@ -83,6 +83,11 @@ free (ENativeFunction name t1 t2 st) = do
   t2' <- compressPaths t2
   pure $ ENativeFunction name t1 t2' st
 free (ELiteral l) = pure $ ELiteral l
+free (EInstanceAccess e i) = EInstanceAccess <$> free e <*> pure i
+free (EInstanceDict n t exprs) = EInstanceDict n t <$> mapM free exprs
+free (ESpreadable es) = ESpreadable <$> mapM free es
+free (EInstanceVariable n t) = EInstanceVariable n <$> compressPaths t
+free EEmpty = pure EEmpty
 
 substituteVar :: Expression -> (Text, Text) -> Expression
 substituteVar (EVariable n1 t) (n2, repl)

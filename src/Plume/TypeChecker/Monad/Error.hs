@@ -39,6 +39,7 @@ data TypeError
   | DeclarationReturn Text
   | ExhaustivenessError String
   | UnresolvedTypeVariable [Assumption PlumeType]
+  | AlreadyDefinedInstance Text PlumeType
   deriving (Eq, Show)
 
 -- THROWABLE INSTANCES FOR TYPE ERROR
@@ -87,6 +88,8 @@ instance Throwable TypeError where
   showError ExhaustivenessError {} = "Exhaustiveness error"
   showError (UnresolvedTypeVariable as) =
     "Unresolved type variable: " <> showError as
+  showError (AlreadyDefinedInstance n t) =
+    "Instance " <> show n <> " already defined for " <> showError t
 
 instance Throwable a => Throwable (Assumption a) where
   showError (n :>: a) = show n <> ": " <> showError a
