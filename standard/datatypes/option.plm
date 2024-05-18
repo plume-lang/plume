@@ -9,18 +9,18 @@ type Option<T> {
 // is wrapped in a Some.
 fn when<A>(cond: bool, a: fn(): A): Option<A> =>
   if cond {
-    Some(a())
+    return Some(a())
   } else {
-    None
+    return None
   }
 
 // When the condition is false, the function is called and the result
 // is wrapped in a Some.
 fn unless<A>(cond: bool, a: fn(): A): Option<A> =>
   if cond {
-    None
+    return None
   } else {
-    Some(a())
+    return Some(a())
   }
 
 // Defining control flow constructrs
@@ -34,13 +34,13 @@ type Control<A> {
 // the Control type.
 fn while<A>(cond: fn(): bool, body: fn(): Control<A>): Option<A> =>
   if cond() {
-    switch body() {
+    return switch body() {
       case Return(x) => Some(x)
       case Break => None
       case Continue => while(cond, body)
     }
   } else {
-    None
+    return None
   }
 
 
