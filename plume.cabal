@@ -84,7 +84,6 @@ library
         Plume.Compiler.TypeErasure.Syntax
         Plume.Compiler.TypeErasure.EraseType
         Plume.Compiler.TypeErasure.DynamicDispatch.Dispatch
-        Plume.Compiler.TypeErasure.DynamicDispatch.BundleExtensions
         Plume.Compiler.TypeErasure.DynamicDispatch.RTTI
 
         Plume.Compiler.Desugaring.Syntax
