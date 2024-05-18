@@ -114,6 +114,7 @@ data ConcreteExpression t
   | EReturn (ConcreteExpression t)
   | ETypeExtension [PlumeGeneric] (Annotation [t]) (Maybe Text) [ExtensionMember t]
   | ENativeFunction Text Text [Text] t
+  | ETypeAlias (Annotation [PlumeGeneric]) t
   deriving (Show)
 
 -- | A type constructor is a type that is used to construct a type.

@@ -617,9 +617,24 @@ tType = do
   void $ L.reserved "type"
   name <- L.identifier
   gens <- P.option [] $ L.angles (Typ.parseGeneric `P.sepBy` L.comma)
-  cons <- L.braces (Typ.typeConstructor `P.sepBy` L.comma)
-  return [CST.EType (Cmm.Annotation name gens) cons]
+  cons <- typeConstructors name gens <|> typeAlias name gens 
+  return [cons]
+  
+  where
+    typeConstructors :: Text -> [Cmm.PlumeGeneric] -> P.Parser CST.Expression
+    typeConstructors name gens = do
+      cons <- L.braces (Typ.typeConstructor `P.sepBy` L.comma)
+      return $ CST.EType (Cmm.Annotation name gens) cons
 
+    typeAlias :: Text -> [Cmm.PlumeGeneric] -> P.Parser CST.Expression
+    typeAlias name gens = do
+      void $ L.symbol "="
+      guard (all isNotExtend gens)
+      CST.ETypeAlias (Cmm.Annotation name gens) <$> Typ.tType
+
+    isNotExtend :: Cmm.PlumeGeneric -> Bool
+    isNotExtend (Cmm.GExtends {}) = False
+    isNotExtend _ = True
 -- | Parses a macro
 -- | A macro is a statement that is used to define a macro variable or a
 -- | macro function.

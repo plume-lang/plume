@@ -9,6 +9,7 @@ import Control.Monad.Parser
 import GHC.IO
 import Plume.Syntax.Concrete.Expression (Position)
 import Plume.Syntax.Parser.Lexer
+import Plume.Syntax.Common.Type (PlumeType)
 import System.IO.Pretty (printErrorFromString, parseError, ppFailure)
 
 -- UTILITY REFERENCES
@@ -30,6 +31,11 @@ positionRef = unsafePerformIO $ newIORef Nothing
 {-# NOINLINE operators #-}
 operators :: IORef (SL.SortedList CustomOperator)
 operators = unsafePerformIO $ newIORef mempty
+
+-- | Store type aliases created by the user during the parsing step
+{-# NOINLINE typeAliases #-}
+typeAliases :: IORef (Map Text ([Text], PlumeType))
+typeAliases = unsafePerformIO $ newIORef mempty
 
 -- | A spreadable type is a type that can handle either a single value or a
 -- | spread of values. It is used to specify the translator that we need to

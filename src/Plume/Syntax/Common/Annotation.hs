@@ -23,3 +23,16 @@ deriveHasField ''Annotation
 -- | x :@: y is equivalent to Annotation x y
 pattern (:@:) :: Text -> t -> Annotation t
 pattern name :@: value = Annotation name value
+
+instance Applicative Annotation where
+  pure = Annotation ""
+  Annotation _ f <*> Annotation n x = Annotation n (f x)
+
+instance Monad Annotation where
+  Annotation _ x >>= f = f x
+
+instance Traversable Annotation where
+  traverse f (Annotation n x) = Annotation n <$> f x
+
+instance Foldable Annotation where
+  foldMap f (Annotation _ x) = f x
