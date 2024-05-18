@@ -305,12 +305,17 @@ liftBlock block _ ty = do
       printErrorFromString 
         mempty 
         ( "No return found in the expression for type " <> showTy ty,
-          Just "Every function must have a return in its body",
+          Just (hintMsg ty),
           pos
         )
         "while performing typechecking"
       exitFailure
     _ -> error "Not a block"
+  
+  where 
+    hintMsg ty' = case ty' of
+      TypeVar _ -> "Did you perhaps forget to specify unit? Every function must return a value"
+      _ -> "Every function must have a return in its body"
   
 
 liftPlaceholders ::
