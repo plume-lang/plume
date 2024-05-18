@@ -20,10 +20,6 @@ import Plume.TypeChecker.Monad
 import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (gets, local)
 
-withoutLocated :: Post.Expression -> Post.Expression
-withoutLocated (Post.ELocated expr _) = withoutLocated expr
-withoutLocated e = e
-
 synthesize :: (MonadChecker m) => Pre.Expression -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression)
 
 -- | Some basic and primitive expressions
@@ -54,11 +50,9 @@ synthesize (Pre.EBlock exprs) = local id $ do
       exprs
 
   retTy <- gets returnType
-  case tys of
-    [x] -> do
-      forM_ retTy $ unifiesWith x
-      pure (x, concat pss, Post.EBlock <$> sequence exprs')
-    _ -> return (fromMaybe TUnit retTy, concat pss, Post.EBlock <$> sequence exprs')
+  let retTy' = fromMaybe TUnit retTy
+
+  return (retTy', concat pss, liftBlock (Post.EBlock <$> sequence exprs') tys retTy')
 synthesize (Pre.EReturn expr) = do
   (ty, ps, expr') <- synthesize expr
   returnTy <- gets returnType

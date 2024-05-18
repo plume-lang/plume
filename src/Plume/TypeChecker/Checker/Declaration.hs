@@ -109,8 +109,10 @@ synthDecl
     let tys' = map (\(_ :>: t') -> t') as''
   
     cTy' <- liftIO $ compressPaths ty'
+    
+    pos <- fetchPosition
 
-    let clos = if null args then h'' else Post.EClosure args cTy' h''
+    let clos = if null args then h'' else Post.EClosure args cTy' h'' pos
     let closTy = if null args then t else tys' :->: t
 
     exitLevel

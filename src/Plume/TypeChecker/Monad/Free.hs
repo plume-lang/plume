@@ -59,21 +59,16 @@ free (EMutUpdate ann e1 e2) = do
   e2' <- traverse free e2
   pure $ EMutUpdate ann' e1' e2'
 free (EUnMut e) = EUnMut <$> free e
-free (EExtensionDeclaration name t1 ann e) = do
-  ann' <- freeAnn ann
-  e' <- free e
-  pure $ EExtensionDeclaration name t1 ann' e'
 free (EConditionBranch e1 e2 e3) = do
   e1' <- free e1
   e2' <- free e2
   e3' <- traverse free e3
   pure $ EConditionBranch e1' e2' e3'
-free (EClosure anns t e) = do
+free (EClosure anns t e p) = do
   anns' <- mapM freeAnn anns
   e' <- free e
-  pure $ EClosure anns' t e'
+  pure $ EClosure anns' t e' p
 free (EBlock xs) = EBlock <$> mapM free xs
-free (ELocated e p) = ELocated <$> free e <*> pure p
 free (ESwitch e xs) = do
   e' <- free e
   xs' <- mapM (\(p, b) -> (,) <$> freePattern p <*> free b) xs
@@ -111,11 +106,10 @@ substituteVar (EMutUpdate ann e1 e2) r@(n, _)
   | ann.annotationName /= n = EMutUpdate ann (substituteVar e1 r) (substituteVar <$> e2 <*> pure r)
 substituteVar (EUnMut e) r = EUnMut $ substituteVar e r
 substituteVar (EConditionBranch c t e) r = EConditionBranch (substituteVar c r) (substituteVar t r) (substituteVar <$> e <*> pure r)
-substituteVar (EClosure anns ret body) r@(n, _)
-  | n `notElem` names = EClosure anns ret (substituteVar body r)
+substituteVar (EClosure anns ret body p) r@(n, _)
+  | n `notElem` names = EClosure anns ret (substituteVar body r) p
   where names = map (.annotationName) anns
 substituteVar (EBlock es) r = EBlock (map (`substituteVar` r) es)
-substituteVar (ELocated e p) r = ELocated (substituteVar e r) p
 substituteVar (ESwitch e cases) r = ESwitch (substituteVar e r) (map (`substitutePat` r) cases)
 substituteVar (EReturn e) r = EReturn (substituteVar e r)
 substituteVar (ESpreadable es) r = ESpreadable (map (`substituteVar` r) es)

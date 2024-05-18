@@ -1,25 +1,30 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedRecordDot #-}
 
 module Plume.Compiler.TypeErasure.EraseType where
 
 import Data.Bitraversable
 import Data.List qualified as List
-import GHC.IO
-import Plume.Compiler.TypeErasure.DynamicDispatch.BundleExtensions
+import GHC.IO hiding (liftIO)
 import Plume.Compiler.TypeErasure.Syntax qualified as Post
 import Plume.Syntax.Common.Annotation
+import Plume.Syntax.Concrete (Position)
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Concrete.Expression qualified as Pre (TypeConstructor (..))
 import Plume.TypeChecker.Constraints.Solver (isNotTVar)
 import Plume.TypeChecker.Constraints.Unification (doesUnifyWith)
 import Plume.TypeChecker.Monad
+import Plume.TypeChecker.Constraints.Unification qualified as Uni
 import Plume.TypeChecker.TLIR qualified as Pre
 import Control.Monad.Exception (compilerError)
+import System.IO.Pretty (printErrorFromString)
 
 {-# NOINLINE dispatched #-}
 dispatched :: IORef [((PlumeType, Text), Text)]
 dispatched = unsafePerformIO $ newIORef mempty
+
+{-# NOINLINE currentPosition #-}
+currentPosition :: IORef (Maybe Position)
+currentPosition = unsafePerformIO $ newIORef Nothing
 
 {-# NOINLINE program #-}
 program
@@ -37,7 +42,19 @@ isNotDecl (Pre.EMutUpdate {}) = False
 isNotDecl _ = True
 
 eraseType :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]
-eraseType (Pre.EDeclaration (Annotation name _) (Pre.EClosure args _ body) Nothing : xs) = do
+eraseType (Pre.EDeclaration (Annotation name _) (Pre.EClosure args t body pos) Nothing : xs) = do
+  t' <- liftIO $ Uni.compressPaths t
+  when (Pre.isBlock body && not (Pre.containsReturn body) && t' /= TUnit) $
+    printErrorFromString
+      mempty
+      ( "Anonymous function "
+          <> toString name
+          <> " should return " <> show t' <> " but returns nothing",
+        Nothing,
+        pos
+      )
+      "while performing type erasure"    
+
   let args' = map (\(Annotation n _) -> n) args
   let b = insertReturnStmt body
   b' <- eraseStatement b
@@ -48,29 +65,6 @@ eraseType (Pre.ENativeFunction fp n (args :->: _) st : xs) = do
   modifyIORef'
     program
     (<> [Post.UPNativeFunction fp n (length args) st])
-  eraseType xs
-eraseType (Pre.ELocated e _ : xs) = eraseType (e : xs)
-eraseType (Pre.EExtensionDeclaration name _ arg (Pre.EClosure args _ b) : xs) = do
-  let arg' = arg.annotationName
-  let name' = name <> "::" <> createName arg.annotationValue
-  modifyIORef
-    dispatched
-    (((arg.annotationValue, name), name') :)
-  let b' = insertReturnStmt b
-  fun <-
-    Post.UPFunction name' (arg' : map (.annotationName) args) <$> eraseStatement b'
-
-  modifyIORef' program (<> [fun])
-  eraseType xs
-eraseType (Pre.EExtensionDeclaration name _ arg e : xs) = do
-  let arg' = arg.annotationName
-  let name' = name <> "::" <> createName arg.annotationValue
-  modifyIORef
-    dispatched
-    (((arg.annotationValue, name), name') :)
-  e' <- eraseExpr e
-  let fun = Post.UPFunction name' [arg'] (Post.USReturn e')
-  modifyIORef' program (<> [fun])
   eraseType xs
 eraseType (Pre.EType tyName ts : xs) = do
   tys <- mapM createFunction ts
@@ -144,7 +138,6 @@ eraseStatement (Pre.EConditionBranch e1 e2 e3) = do
   case e3' of
     Just e3'' -> Post.USConditionBranch <$> eraseExpr e1 <*> eraseStatement e2 <*> pure e3''
     Nothing -> compilerError "Condition branch without a body"
-eraseStatement (Pre.ELocated e _) = eraseStatement e
 eraseStatement e = Post.USExpr <$> eraseExpr e
 
 eraseExpr :: Pre.TypedExpression PlumeType -> IO Post.UntypedExpr
@@ -181,7 +174,15 @@ eraseExpr (Pre.ESwitch e cases) = do
   cases' <- mapM (bimapM erasePattern eraseExpr) cases
   return $ Post.UESwitch e' cases'
 eraseExpr (Pre.EBlock es) = Post.UEBlock <$> mapM eraseStatement es
-eraseExpr (Pre.EClosure args _ body) = do
+eraseExpr (Pre.EClosure args t body pos) = do
+  when (Pre.isBlock body && Pre.containsReturn body && t /= TUnit) $
+    printErrorFromString
+      mempty
+      ( "Anonymous function should return " <> show t <> " but returns nothing",
+        Nothing,
+        pos
+      )
+      "while performing type erasure"   
   let b' = insertReturnStmt body
   b <- eraseExpr b'
   return $
@@ -208,10 +209,8 @@ eraseExpr (Pre.EExtVariable x fun t) = do
     findWithKeyM (\(t', n) -> (n == x &&) <$> ty `doesUnifyWith` t') m >>= \case
       Just (_, n) -> return n
       Nothing -> compilerError $ "Extension not found: " <> show x <> " for type " <> show ty
-eraseExpr (Pre.ELocated e _) = eraseExpr e
 eraseExpr (Pre.EEqualsType e t) = Post.UEEqualsType <$> eraseExpr e <*> pure t
 eraseExpr (Pre.ENativeFunction {}) = compilerError "Native functions aren't expressions"
-eraseExpr (Pre.EExtensionDeclaration {}) = compilerError "Extension declarations aren't expressions"
 eraseExpr (Pre.EAnd e1 e2) = Post.UEAnd <$> eraseExpr e1 <*> eraseExpr e2
 eraseExpr (Pre.EIndex e i) = Post.UEIndex <$> eraseExpr e <*> eraseExpr i
 eraseExpr (Pre.EReturn _) = compilerError "Return isn't an expression"

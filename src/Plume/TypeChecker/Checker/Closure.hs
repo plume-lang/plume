@@ -29,7 +29,9 @@ synthClosure infer (Pre.EClosure args ret body) = local id $ do
   -- Creating the closure type
   let closureTy = map (.annotationValue) convertedArgs :->: retTy
 
-  pure (closureTy, ps, Post.EClosure convertedArgs retTy <$> body')
+  pos <- fetchPosition
+
+  pure (closureTy, ps, Post.EClosure convertedArgs retTy <$> body' <*> pure pos)
 synthClosure _ _ = throw $ CompilerError "Only closures are supported"
 
 -- | Function that create a new environment from a list of converted

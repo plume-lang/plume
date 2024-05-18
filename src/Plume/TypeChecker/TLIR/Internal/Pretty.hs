@@ -94,7 +94,7 @@ prettyExpr (EConditionBranch e1' e2' e3') =
     <> case e3' of
       Nothing -> ""
       Just e3'' -> anCol Blue "\nelse " <> prettyExpr e3''
-prettyExpr (EClosure as t e) =
+prettyExpr (EClosure as t e _) =
   ppArgs as t
     <+> "=>"
     <+> prettyExpr e
@@ -106,7 +106,6 @@ prettyExpr (EClosure as t e) =
     arg (Annotation x t') = pretty x <> colon <+> prettyTy t'
 prettyExpr (EBlock es) =
   line' <> indent 2 (vsep (map prettyExpr es))
-prettyExpr (ELocated e _) = prettyExpr e
 prettyExpr (ESwitch e ps) =
   anCol Blue "switch"
     <+> prettyExpr e
@@ -124,13 +123,6 @@ prettyExpr (ENativeFunction fp n (args :->: ret) _) =
     <+> prettyTy ret
 prettyExpr (ENativeFunction {}) = compilerError "ENativeFunction: invalid type"
 prettyExpr (EList es) = brackets (hsep $ punctuate comma $ map prettyExpr es)
-prettyExpr (EExtensionDeclaration name extTy args body) =
-  anCol Blue "extension"
-    <+> pretty name
-    <+> prettyTy extTy
-    <+> parens (ansiPretty args)
-    <+> "="
-    <+> prettyExpr body
 prettyExpr (EInstanceDict name args body) =
   anCol Blue "instance"
     <+> pretty name

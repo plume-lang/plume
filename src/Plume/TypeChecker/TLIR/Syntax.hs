@@ -31,11 +31,6 @@ data TypedExpression t
       (Maybe (TypedExpression t))
   | EMutUpdate (Annotation t) (TypedExpression t) (Maybe (TypedExpression t))
   | EUnMut (TypedExpression t)
-  | EExtensionDeclaration
-      Text
-      t
-      (Annotation t)
-      (TypedExpression t)
   | EConditionBranch
       (TypedExpression t)
       (TypedExpression t)
@@ -44,8 +39,8 @@ data TypedExpression t
       [Annotation t]
       t
       (TypedExpression t)
+      Position
   | EBlock [TypedExpression t]
-  | ELocated (TypedExpression t) Position
   | ESwitch (TypedExpression t) [(TypedPattern t, TypedExpression t)]
   | EReturn (TypedExpression t)
   | ENativeFunction Text Text t IsStandard

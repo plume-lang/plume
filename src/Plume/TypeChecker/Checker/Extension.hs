@@ -189,7 +189,9 @@ synthExt
 
       cTy' <- liftIO $ compressPaths ty'
 
-      let clos = if null args then h'' else Post.EClosure args cTy' h''
+      pos <- fetchPosition
+
+      let clos = if null args then h'' else Post.EClosure args cTy' h'' pos
       let closTy = if null args then t else tys' :->: t
 
       return ((Map.singleton name (Forall qvars ty''), closTy), Map.singleton name clos)
@@ -212,7 +214,9 @@ synthExt
     let tapp = TypeApp (TypeId tcName) [ty]
     let funTy = if null args' then tapp else tys'' :->: ty
     let instDict = Post.EInstanceDict tcName ty (map snd methods'')
-    let dictE = if null args' then instDict else Post.EClosure args' ty instDict
+
+    pos <- fetchPosition
+    let dictE = if null args' then instDict else Post.EClosure args' ty instDict pos
 
     mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) generics
 
