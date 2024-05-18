@@ -1,4 +1,4 @@
-fn welcome(name: str): unit {
+fn welcome(name: str) {
   println("Hello, $name!")
 }
 
