@@ -7,7 +7,7 @@ module Plume.TypeChecker.Monad
     Placeholder,
     Substitution,
     liftPlaceholders,
-    liftBlock,
+    fetchPositionIO,
     throw,
     throwRaw,
     insertWith,
@@ -284,39 +284,6 @@ fetchPositionIO = do
     Just p -> pure p
 
 type Substitution = Map Text PlumeType
-
--- | Lift a block of expressions to check if any return is present
--- | and if the return type matches the expected return type.
-liftBlock :: 
-  Placeholder Typed.Expression ->
-  [PlumeType] -> 
-  PlumeType -> 
-  Placeholder Typed.Expression
-liftBlock block _ ty = do
-  f <- ask
-  res <- liftIO $ runReaderT block f
-
-  case res of
-    Typed.EBlock exprs 
-      | any Typed.containsReturn exprs 
-        || ty == TUnit -> pure $ Typed.EBlock exprs
-    Typed.EBlock _ -> liftIO $ do
-      pos <- fetchPositionIO
-      printErrorFromString 
-        mempty 
-        ( "No return found in the expression for type " <> showTy ty,
-          Just (hintMsg ty),
-          pos
-        )
-        "while performing typechecking"
-      exitFailure
-    _ -> error "Not a block"
-  
-  where 
-    hintMsg ty' = case ty' of
-      TypeVar _ -> "Did you perhaps forget to specify unit? Every function must return a value"
-      _ -> "Every function must have a return in its body"
-  
 
 liftPlaceholders ::
   Text ->

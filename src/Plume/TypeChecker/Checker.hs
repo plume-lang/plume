@@ -15,6 +15,7 @@ import Plume.TypeChecker.Checker.Interface (synthInterface)
 import Plume.TypeChecker.Checker.Native
 import Plume.TypeChecker.Checker.Switch
 import Plume.TypeChecker.Constraints.Solver
+import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.Constraints.Typeclass
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.TLIR qualified as Post

@@ -3,6 +3,8 @@ module Plume.TypeChecker.Constraints.Unification where
 
 import Plume.TypeChecker.Constraints.Definition
 import Plume.TypeChecker.Monad
+import Plume.TypeChecker.TLIR qualified as Typed
+import System.IO.Pretty
 
 -- infix 4 `unifiesTo`
 
@@ -134,3 +136,48 @@ compressPaths (TypeApp t ts) = do
   ts' <- traverse compressPaths ts
   pure (TypeApp t' ts')
 compressPaths t = pure t
+
+-- | Lift a block of expressions to check if any return is present
+-- | and if the return type matches the expected return type.
+liftBlock :: 
+  Placeholder Typed.Expression ->
+  [PlumeType] -> 
+  PlumeType -> 
+  Placeholder Typed.Expression
+liftBlock block _ t = do
+  f <- ask
+  res <- liftIO $ runReaderT block f
+  ty <- liftIO $ compressPaths t
+
+  case res of
+    Typed.EBlock exprs 
+      | any Typed.containsReturn exprs 
+        || ty == TUnit -> do
+          pure $ Typed.EBlock exprs
+    Typed.EBlock exprs
+      | not (any Typed.containsReturn exprs)
+        && isTVar ty -> case ty of
+          TypeVar ref -> do
+            writeIORef ref (Link TUnit)
+            pure $ Typed.EBlock exprs
+          _ -> error "Not a type variable"
+
+    Typed.EBlock _ -> liftIO $ do
+      pos <- fetchPositionIO
+      printErrorFromString 
+        mempty 
+        ( "No return found in the expression for type " <> show ty,
+          Just (hintMsg ty),
+          pos
+        )
+        "while performing typechecking"
+      exitFailure
+    _ -> error "Not a block"
+  
+  where 
+    hintMsg ty' = case ty' of
+      TypeVar _ -> "Did you perhaps forget to specify unit? Every function must return a value"
+      _ -> "Every function must have a return in its body"
+
+    isTVar (TypeVar _) = True
+    isTVar _ = False
