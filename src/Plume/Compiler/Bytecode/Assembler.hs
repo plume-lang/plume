@@ -45,7 +45,7 @@ instance Assemble LLIR.Instruction where
       Just address -> do
         address' <- negIdx address
         pure [BC.StoreLocal address']
-      Nothing -> error "Local not found"
+      Nothing -> error $ "Local " <> name <> " not found"
   
   assemble (LLIR.LoadConstant address) = pure [BC.LoadConstant address]
   
@@ -53,20 +53,20 @@ instance Assemble LLIR.Instruction where
     globals <- readIORef globalPool
     case Map.lookup address globals of
       Just address' -> pure [BC.LoadGlobal address']
-      Nothing -> error "Global not found"
+      Nothing -> error $ "Global " <> address <> " not found"
   
   assemble (LLIR.StoreGlobal address) = do
     globals <- readIORef globalPool
     case Map.lookup address globals of
       Just address' -> pure [BC.StoreGlobal address']
-      Nothing -> error "Global not found"
+      Nothing -> error $ "Global " <> address <> " not found"
   
   assemble (LLIR.LoadNative name) = do
     natives <- readIORef nativeFunctions
     case Map.lookup name natives of
       Just (LLIR.NativeFunction nameAddr funIdx libAddr) -> 
         pure [BC.LoadNative nameAddr libAddr funIdx]
-      Nothing -> error "Native not found"
+      Nothing -> error $ "Native " <> name <> " not found"
   
   assemble LLIR.Update = pure [BC.Update]
   assemble LLIR.Return = pure [BC.Return]
@@ -85,14 +85,14 @@ instance Assemble LLIR.Instruction where
     globals <- readIORef globalPool
     case Map.lookup index globals of
       Just idx -> pure [BC.CallGlobal idx arity]
-      Nothing -> error "Global not found"
+      Nothing -> error $ "Global " <> index <> " not found"
   assemble (LLIR.CallLocal index arity) = do
     locals <- readIORef localPool
     case Map.lookup index locals of
       Just idx -> do
         addr <- negIdx idx
         pure [BC.CallLocal addr arity]
-      Nothing -> error "Local not found"
+      Nothing -> error $ "Local " <> index <> " not found"
   assemble (LLIR.JumpElseRel address) = pure [BC.JumpElseRel address]
   assemble (LLIR.JumpElseRelCmp address cmp) = pure [BC.JumpElseRelCmp address cmp]
   assemble (LLIR.JumpElseRelCmpConstant address cmp constant) = pure [BC.JumpElseRelCmpConstant address cmp constant]
