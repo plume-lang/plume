@@ -139,3 +139,33 @@ Value input(int arg_n, Module* mod, Value* args) {
 
   return MAKE_STRING(buffer, strlen(buffer));
 }
+
+Value copy_ref(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 1) THROW("CopyRef expects 1 argument");
+
+  if (IS_PTR(args[0])) {
+    HeapValue* p = GET_PTR(args[0]);
+    p->refcount++;
+  }
+
+  return args[0];
+}
+
+Value free_ref(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 2) THROW("FreeRef expects 2 arguments");
+
+  if (IS_PTR(args[0])) {
+    HeapValue* p = GET_PTR(args[0]);
+    p->refcount--;
+    if (p->refcount == 0) {
+      if (p->type == TYPE_STRING) {
+        free(p->as_string);
+      } else {
+        free(p->as_ptr);
+      }
+      free(p);
+    }
+  }
+
+  return args[0];
+}

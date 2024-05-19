@@ -1,4 +1,8 @@
 native "std:native" to_string<A>(x: A): str
+native "std:native" {
+  copy_ref<A>(x: A): A
+  free_ref<A>(x: A): A
+}
 
 interface<A> show<A> {
   fn show(a: A): str

@@ -41,5 +41,7 @@ does_file_exist
 execute_command
 input
 print_int
+copy_ref
+free_ref
 
 ffi_fetch
