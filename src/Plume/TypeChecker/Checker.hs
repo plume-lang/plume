@@ -70,7 +70,7 @@ synthesize (Pre.EList xs) = do
 -- \| Calling synthesis modules
 synthesize app@(Pre.EApplication {}) = synthApp synthesize app
 synthesize clos@(Pre.EClosure {}) = synthClosure synthesize clos
-synthesize decl@(Pre.EDeclaration {}) = synthDecl synthesize decl
+synthesize decl@(Pre.EDeclaration {}) = synthDecl False synthesize decl
 synthesize cond@(Pre.EConditionBranch {}) = synthCond synthesize cond
 synthesize ext@(Pre.ETypeExtension {}) = synthExt synthesize ext
 synthesize ty@(Pre.EType {}) = synthDataType ty
@@ -80,6 +80,23 @@ synthesize nat@(Pre.ENativeFunction {}) = synthNative nat
 
 synthesizeToplevel :: (MonadChecker m) => Pre.Expression -> m (PlumeScheme, [Post.Expression])
 synthesizeToplevel (Pre.ELocated e pos) = withPosition pos $ synthesizeToplevel e
+synthesizeToplevel e@(Pre.EDeclaration {}) = do
+  (pos, (ty, ps, h)) <- getPosition $ synthDecl True synthesize e
+  cenv <- gets (extendEnv . environment)
+  zs <- traverse (discharge cenv) ps
+
+  let (ps', m, as, _) = mconcat zs
+  (_, as') <- removeDuplicatesAssumps as
+  ps'' <- removeDuplicatesQuals ps'
+  let t'' = Forall [] $ List.nub ps'' :=>: ty
+  h' <- liftIO $ runReaderT h $ getExpr m
+
+  unless (null as') $ do
+    throwRaw (pos, UnresolvedTypeVariable as')
+
+  case h' of
+    Post.ESpreadable es -> pure (t'', es)
+    _ -> pure (t'', [h'])
 synthesizeToplevel e = do
   (pos, (ty, ps, h)) <- getPosition $ synthesize e
   cenv <- gets (extendEnv . environment)

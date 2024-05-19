@@ -11,7 +11,7 @@ import Plume.Syntax.Common.Type (getGenericName)
 import Plume.Syntax.Translation.Generics (concatMapM)
 import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Constraints.Solver
-import Plume.TypeChecker.Constraints.Typeclass (discharge, removeDuplicatesAssumps, removeDuplicatesQuals)
+import Plume.TypeChecker.Constraints.Typeclass
 import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.Checker.Extension
 import Plume.TypeChecker.Monad.Free (substituteVar)
@@ -19,8 +19,9 @@ import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (gets, local)
 
-synthDecl :: Infer -> Infer
+synthDecl :: Bool -> Infer -> Infer
 synthDecl
+  isToplevel
   infer
   (Pre.EDeclaration isMut generics (Annotation name ty) expr body) = do
     convertedGenerics :: [PlumeQualifier] <- concatMapM convert generics
@@ -37,7 +38,7 @@ synthDecl
     -- type as the variable
     searchEnv @"typeEnv" name >>= \case
       Just (Forall _ (_ :=>: (TMut t))) -> convertedTy `unifiesWith` t
-      Just _ -> throw $ CompilerError "Variable already declared"
+      Just _ -> throw . CompilerError $ "Variable " <> name <> " already declared"
       _ -> pure ()
 
     -- Creating an utility function that shortens the code and a boolean
@@ -52,13 +53,13 @@ synthDecl
             if isMut
               then (Post.EMutDeclaration, isMut)
               else (Post.EDeclaration, isMut)
-        _ -> throw $ CompilerError "Variable already declared"
+        _ -> throw . CompilerError $ "Variable " <> name <> "  already declared"
 
     let mut = if isMut' then TMut else id
-
     -- Creating the type of the variable based on mutability and adding it
     -- to the environment
     let convertedTy' = mut convertedTy
+
     let scheme = Forall qvars $ convertedGenerics :=>: convertedTy'
     insertEnv @"typeEnv" name scheme
 
@@ -73,47 +74,54 @@ synthDecl
     let ty' = mut exprTy
     convertedTy' `unifiesWith` ty'
 
-    cenv <- gets (extendEnv . environment)
+    (clos, closTy, t, remainingPs) <- if null qvars && not isToplevel then do
+      ps' <- removeDuplicatesQuals ps
+      return (h, ty', ty', ps')
+    else do
 
-    res' <- traverse (discharge cenv) ps
-    let (_ps, m2, as, _) = List.unzip4 res'
-    let ps' = concatMap removeQVars _ps
+      cenv <- gets (extendEnv . environment)
 
-    ps'' <- removeDuplicatesQuals ps'
+      res' <- traverse (discharge cenv) ps
+      let (_ps, m2, as, _) = List.unzip4 res'
+      let ps' = concatMap removeQVars _ps
 
-    let (_ :=>: t) = List.nub ps'' :=>: ty'
+      ps'' <- removeDuplicatesQuals ps'
 
-    m' <- liftIO $ mapM (firstM compressQual) $ List.nub $ concat m2
+      let (_ :=>: t) = List.nub ps'' :=>: ty'
 
-    let names = getMapNames m'
-    let as' = keepAssumpWithName (concat as) names
+      m' <- liftIO $ mapM (firstM compressQual) $ List.nub $ concat m2
 
-    (sub, as'') <- removeDuplicatesAssumps as'
+      let names = getMapNames m'
+      let as'' = keepAssumpWithName (concat as) names
 
-    let finalM = m'
+      (sub, as''') <- removeDuplicatesAssumps as''
 
-    let finalExprs = map (second getAllElements) finalM
-    let finalExprs' = List.nub $ concatMap (\(_, e) -> map (\case
-            Post.EVariable n t' -> (n, t')
-            _ -> error "Not a variable"
-          ) e) finalExprs
+      let finalM = m'
 
-    sub' <- unify finalExprs'
+      let finalExprs = map (second getAllElements) finalM
+      let finalExprs' = List.nub $ concatMap (\(_, e) -> map (\case
+              Post.EVariable n t' -> (n, t')
+              _ -> error "Not a variable"
+            ) e) finalExprs
 
-    let sub'' = Map.toList sub' <> sub
+      sub' <- unify finalExprs'
 
-    h' <- liftIO $ runReaderT h $ getExpr finalM
-    let h'' = List.foldl substituteVar h' sub''
+      let sub'' = Map.toList sub' <> sub
 
-    let args = map (\(n :>: t') -> n :@: t') as''
-    let tys' = map (\(_ :>: t') -> t') as''
-  
-    cTy' <- liftIO $ compressPaths ty'
+      h' <- liftIO $ runReaderT h $ getExpr finalM
+      let h'' = List.foldl substituteVar h' sub''
+
+      let args = map (\(n :>: t') -> n :@: t') as'''
+      let tys' = map (\(_ :>: t') -> t') as'''
     
-    pos <- fetchPosition
+      cTy' <- liftIO $ compressPaths ty'
+      
+      pos <- fetchPosition
 
-    let clos = if null args then h'' else Post.EClosure args cTy' h'' pos
-    let closTy = if null args then t else tys' :->: t
+      let clos = if null args then h'' else Post.EClosure args cTy' h'' pos
+      let closTy = if null args then t else tys' :->: t
+
+      return (pure clos, closTy, t, [])
 
     exitLevel
 
@@ -130,5 +138,35 @@ synthDecl
     let body' = mapM thd3 b
     let psb = maybe [] snd3 b
 
-    pure (retTy, psb, declFun (Annotation name closTy) clos <$> body')
-synthDecl _ _ = throw $ CompilerError "Only declarations are supported"
+    pure (retTy, psb <> remainingPs, declFun (Annotation name closTy) <$> clos <*> body')
+synthDecl _ _ _ = throw $ CompilerError "Only declarations are supported"
+
+removeGeneralizedQuals :: [PlumeQualifier] -> [QuVar] -> IO [PlumeQualifier]
+removeGeneralizedQuals [] _ = pure []
+removeGeneralizedQuals qs [] = filterM removeQualWithQVar qs
+removeGeneralizedQuals (IsIn (TypeQuantified n) _: qs) qvars 
+  | n `elem` qvars = removeGeneralizedQuals qs qvars
+removeGeneralizedQuals (q : qs) qvars = (q:) <$> removeGeneralizedQuals qs qvars
+
+removeQualWithQVar :: PlumeQualifier -> IO Bool
+removeQualWithQVar (IsIn (TypeQuantified _) _) = pure False
+removeQualWithQVar (IsIn (TypeVar l) n) = do
+  v <- readIORef l
+  case v of
+    Link t -> removeQualWithQVar (IsIn t n)
+    _ -> pure True
+removeQualWithQVar _ = pure True
+
+isTypeSubsetOf :: [PlumeType] -> [PlumeType] -> IO Bool
+isTypeSubsetOf [] _ = pure True
+isTypeSubsetOf (x : xs) ys = do
+  res <- anyM (x `doesUnifyWith`) ys
+  if res then isTypeSubsetOf xs ys else pure False
+
+keepAssumpWithQual :: [Assumption PlumeType] -> [PlumeQualifier] -> IO [Assumption PlumeType]
+keepAssumpWithQual as (q:qs) = do
+  let t' = getDictTypeForPred q
+  as1 <- filterM (\(_ :>: t) -> doesUnifyWith t' t) as
+  as2 <- keepAssumpWithQual as qs
+  pure . List.nub $ as1 <> as2
+keepAssumpWithQual _ _ = pure []
