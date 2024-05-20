@@ -689,4 +689,8 @@ parseToplevel =
 -- | Additionally, we use the `sepEndBy` combinator to parse toplevel
 -- | expressions separated by newlines.
 parseProgram :: P.Parser [CST.Expression]
-parseProgram = L.scn *> (concat <$> P.sepEndBy parseToplevel L.scn)
+parseProgram = do
+  stt <- P.getSourcePos
+  end <- P.getSourcePos
+  writeIORef L.defaultPosition (Just (stt, end))
+  L.scn *> (concat <$> P.sepEndBy parseToplevel L.scn)

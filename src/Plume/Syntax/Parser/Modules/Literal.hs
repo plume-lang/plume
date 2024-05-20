@@ -41,17 +41,25 @@ parseStringWithInterpolation = lexeme $ do
     buildString ('$':x:xs) | isIdentCharStart (T.singleton x) = do
       -- span the variable name
       let (var, rest) = span isIdentChar xs
-      let var' = EVariable $ T.pack (x:var)
-      EBinary Plus (showApp var') (buildString rest)
-    buildString (x:xs) = EBinary Plus (ELiteral $ LString $ T.singleton x) (buildString xs)
+          rest'       = buildString rest
+          var'        = EVariable $ T.pack (x:var)
+
+      EBinary Plus (showApp var') rest'
+    buildString (x:xs) = do
+      let (rest, next) = span (/= '$') xs
+          rest'        = T.pack (x:rest)
+
+      EBinary Plus (ELiteral $ LString rest') (buildString next)
 
     combineCharsIntoString :: Expression -> Expression
-    combineCharsIntoString (EBinary Plus (ELiteral (LString x)) y) = do
+    combineCharsIntoString (EBinary Plus x (ELiteral (LString ""))) = combineCharsIntoString x 
+    combineCharsIntoString (EBinary Plus x y) = do
+      let x' = combineCharsIntoString x
       let y' = combineCharsIntoString y
 
-      case y' of
-        ELiteral (LString y'') -> ELiteral $ LString (x <> y'')
-        _ -> EBinary Plus (ELiteral $ LString x) y'
+      case (x', y') of
+        (ELiteral (LString a), ELiteral (LString b)) -> ELiteral (LString (a <> b))
+        _ -> EBinary Plus x' y'
     combineCharsIntoString x = x
 -- | Parse a character literal
 -- | A character literal is a single character enclosed in single quotes

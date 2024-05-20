@@ -20,6 +20,8 @@ import Plume.Syntax.Abstract.Internal.Pretty ()
 import Plume.Syntax.Parser.Modules.ParseImports
 import Plume.Syntax.Translation.ConcreteToAbstract
 import Plume.TypeChecker.Checker
+import Plume.Syntax.Memory
+import Plume.Syntax.Blocks
 import System.Directory
 import System.FilePath
 import System.IO.Pretty
@@ -76,13 +78,17 @@ main = setEncoding $ do
 
       ppBuilding "Parsing file and dependencies..."
       runConcreteToAbstract env dir paths' file `with` \ast -> do
+        let ast' = concatMap (removeUselessBlocks False) ast
+        -- memoryManaged <- transform ast'
         ppBuilding "Typechecking..."
-        runSynthesize ast `with` \tlir -> do
+        runSynthesize ast' `with` \tlir -> do
+          -- ppPrint tlir
           ppBuilding "Compiling and optimizing..."
           erased <- erase tlir
           runClosureConversion erased `with` \closed -> do
             desugared <- desugar closed
             let ssa = runSSA desugared
+            -- mapM_ print ssa
             (bytecode, natives', constants) <- runLLIRAssembler ssa
             let nativeFuns = getNativeFunctions natives'
             (bytecode', labelPool) <- runUnlabelize bytecode

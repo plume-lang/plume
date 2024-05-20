@@ -47,6 +47,9 @@ library
         Plume.Syntax.Translation.ConcreteToAbstract.UFCS
         Plume.Syntax.Translation.Substitution
 
+        Plume.Syntax.Memory
+        Plume.Syntax.Blocks
+
         Plume.TypeChecker.TLIR
         Plume.TypeChecker.TLIR.Syntax
         Plume.TypeChecker.TLIR.Synonyms

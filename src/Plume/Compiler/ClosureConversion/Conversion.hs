@@ -18,6 +18,10 @@ globalVars = unsafePerformIO $ newIORef S.empty
 functions :: IORef (M.Map Text Int)
 functions = unsafePerformIO $ newIORef M.empty
 
+{-# NOINLINE locals #-}
+locals :: IORef (S.Set Text)
+locals = unsafePerformIO $ newIORef S.empty
+
 {-# NOINLINE closedCounter #-}
 closedCounter :: IORef Int
 closedCounter = unsafePerformIO $ newIORef 0
@@ -49,11 +53,15 @@ closeClosure
   -> m ([Post.ClosedProgram], Post.ClosedExpr)
 closeClosure args e = do
   globalV <- readIORef globalVars
-  res <- readIORef reserved
-  let env = free e S.\\ (S.fromList args <> globalV <> res)
+  funs <- S.fromList . M.keys <$> readIORef functions
+  lcls <- readIORef locals
+
+  let defined = (funs <> globalV) S.\\ lcls
+
+  let env = free e S.\\ (S.fromList args <> defined)
 
   name <- newLambdaName
-  modifyIORef' reserved (<> S.singleton name)
+  modifyIORef' functions (M.insert name (length args))
 
   let envVars = fromList $ zip (S.toList env) [0 ..]
   let envDict =
@@ -93,7 +101,10 @@ closeExpression
   -> m ([Post.ClosedProgram], Post.ClosedExpr)
 closeExpression (Pre.UEVar x) = do
   res <- readIORef reserved
-  if x `S.member` res
+  lcls <- getDefinedWithoutNatives
+  if x `S.member` lcls 
+    then pure ([], Post.CEVar x)
+  else if x `S.member` res
     then do
       funs <- readIORef functions
       case M.lookup x funs of
@@ -105,15 +116,18 @@ closeExpression (Pre.UEVar x) = do
                   (Pre.USReturn (Pre.UEApplication (Pre.UEVar x) (map Pre.UEVar args)))
           closeExpression lambda
         Nothing -> pure ([], Post.CEVar x)
-    else pure ([], Post.CEVar x)
+  else pure ([], Post.CEVar x)
 closeExpression (Pre.UELiteral l) = pure ([], Post.CELiteral l)
 closeExpression (Pre.UEList es) = (Post.CEList <$>) . sequence <$> traverse closeExpression es
 closeExpression Pre.UESpecial = pure ([], Post.CESpecial)
 closeExpression (Pre.UEApplication f args) = do
   res <- readIORef reserved
+  funs <- S.fromList . M.keys <$> readIORef functions
+  let toplevels = funs <> res
+
   (p2s, args') <- sequence <$> traverse closeExpression args
   case f of
-    Pre.UEVar x | x `S.member` res -> do
+    Pre.UEVar x | x `S.member` toplevels -> do
       pure (p2s, Post.CEApplication (Post.CEVar x) args')
     _ -> do
       name <- newCallName
@@ -124,6 +138,7 @@ closeExpression (Pre.UEApplication f args) = do
       let call = Post.CEApplication callVarP (callDict : args')
       pure (p1 <> p2s, Post.CEDeclaration name f' call)
 closeExpression (Pre.UEDeclaration name e1 e2) = do
+  modifyIORef' locals (S.insert name)
   (p1, e1') <- closeExpression e1
   (p2, e2') <- closeExpression e2
   pure (p1 <> p2, Post.CEDeclaration name e1' e2')
@@ -136,9 +151,17 @@ closeExpression (Pre.UEConditionBranch e1 e2 e3) = do
   (p3, e3') <- closeExpression e3
   pure (p1 <> p2 <> p3, Post.CEConditionBranch e1' e2' e3')
 closeExpression (Pre.UEClosure args e) = do
+  old <- readIORef locals
+  modifyIORef' locals (S.union (S.fromList args))
   (stmts, body) <- closeStatement e
-  first (stmts <>) <$> closeClosure args body
-closeExpression (Pre.UEBlock es) = (Post.CEBlock <$>) . sequence <$> traverse closeStatement es
+  xs <- first (stmts <>) <$> closeClosure args body
+  writeIORef locals old
+  pure xs
+closeExpression (Pre.UEBlock es) = do
+  old <- readIORef locals
+  xs <- (Post.CEBlock <$>) . sequence <$> traverse closeStatement es
+  writeIORef locals old
+  pure xs
 closeExpression (Pre.UESwitch e cases) = do
   (s1, e') <- closeExpression e
   (s2, cases') <-
@@ -191,6 +214,7 @@ closeStatement
   -> m ([Post.ClosedProgram], Post.ClosedStatement)
 closeStatement (Pre.USReturn e) = (Post.CSReturn <$>) <$> closeExpression e
 closeStatement (Pre.USDeclaration name e1) = do
+  modifyIORef' locals (S.insert name)
   (stmts, e1') <- closeExpression e1
   pure (stmts, Post.CSDeclaration name e1')
 closeStatement (Pre.USConditionBranch e1 e2 e3) = do
@@ -202,6 +226,7 @@ closeStatement (Pre.USExpr e) = do
   (stmts, e') <- closeExpression e
   pure (stmts, Post.CSExpr e')
 closeStatement (Pre.USMutDeclaration name e) = do
+  modifyIORef' locals (S.insert name)
   (stmts, e') <- closeExpression e
   pure (stmts, Post.CSMutDeclaration name e')
 closeStatement (Pre.USMutUpdate name e) = do
@@ -218,18 +243,16 @@ makeReturnBody e = Post.CSExpr (Post.CEBlock $ makeReturn e)
 closeProgram
   :: (MonadClosure m) => Pre.UntypedProgram -> m [Post.ClosedProgram]
 closeProgram (Pre.UPFunction name args e) = do
-  modifyIORef' reserved (<> S.singleton name)
+  lcls <- readIORef locals
+  modifyIORef' locals (S.union (S.fromList args))
   modifyIORef' functions (M.insert name (length args))
   (stmts, e') <- closeStatement e
+  writeIORef locals lcls
   pure $ stmts ++ [Post.CPFunction name args e']
 closeProgram (Pre.UPNativeFunction fp name arity st) = do
   modifyIORef' reserved (S.insert name)
   modifyIORef' functions (M.insert name arity)
   pure [Post.CPNativeFunction fp name arity st]
-closeProgram (Pre.UPStatement (Pre.USDeclaration n e)) = do
-  modifyIORef' reserved (<> S.singleton n)
-  (stmts, e') <- closeExpression e
-  pure $ stmts ++ [Post.CPStatement (Post.CSDeclaration n e')]
 closeProgram (Pre.UPStatement s) = do
   (stmts, s') <- closeStatement s
   pure $ stmts ++ [Post.CPStatement s']
@@ -253,3 +276,13 @@ runClosureConversion
 runClosureConversion e = do
   writeIORef closedCounter 0
   (concat <$>) <$> runExceptT (traverse closeProgram e)
+
+getDefinedWithoutNatives :: MonadIO m => m (Set Text)
+getDefinedWithoutNatives = do
+  res <- readIORef reserved
+  _lcls <- readIORef locals
+  funs <- S.fromList . M.keys <$> readIORef functions
+  globals <- readIORef globalVars
+  let defined = (funs <> globals) S.\\ res
+
+  pure $ _lcls S.\\ defined

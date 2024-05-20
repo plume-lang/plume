@@ -90,9 +90,6 @@ instance Assemble Pre.DesugaredProgram where
     pure (expr' <> update' <> [LLIR.Instruction LLIR.Update])
 
   assemble (Pre.DPNativeFunction fp name _ isStd) = do
-    whenM (doesNativeAlreadyExist name) $ do
-      error $ "Native function " <> show name <> " already exists"
-
     modifyIORef' natives (Set.insert name)
     nativesHandlers <- readIORef nativeFunctionsHandler
 
@@ -139,27 +136,32 @@ instance Assemble Pre.DesugaredStatement where
 instance Assemble Pre.DesugaredExpr where
   assemble (Pre.DEVar name) = do
     locals <- ask
+    glbs <- readIORef globals
+    nats <- readIORef globals
     if name `Set.member` locals
       then pure [LLIR.Instruction (LLIR.LoadLocal name)]
-      else do
-        nats <- readIORef natives
-        if name `Set.member` nats
-          then pure [LLIR.Instruction (LLIR.LoadNative name)]
-          else pure [LLIR.Instruction (LLIR.LoadGlobal name)]
+    else if name `Set.member` glbs
+      then pure [LLIR.Instruction (LLIR.LoadGlobal name)]
+    else if name `Set.member` nats
+      then pure [LLIR.Instruction (LLIR.LoadNative name)]
+    else error $ "Variable " <> show name <> " not found"
   
   assemble (Pre.DEApplication name args) = do
     args' <- concat <$> mapM assemble args
     let argsLength = length args
     locals <- ask
+    nats <- readIORef natives
+    glbs <- readIORef globals
+
     if name `Set.member` locals
       then pure $ args' ++ [LLIR.Instruction (LLIR.CallLocal name argsLength)]
-      else do
-        nats <- readIORef natives
-        if name `Set.member` nats
-          then pure $ args' 
-                    ++ LLIR.instr (LLIR.LoadNative name) 
-                    ++ LLIR.instr (LLIR.Call argsLength)
-          else pure $ args' ++ [LLIR.Instruction (LLIR.CallGlobal name argsLength)]
+    else if name `Set.member` glbs
+      then pure $ args' ++ [LLIR.Instruction (LLIR.CallGlobal name argsLength)]
+    else if name `Set.member` nats
+      then pure $ args' 
+                ++ LLIR.instr (LLIR.LoadNative name) 
+                ++ LLIR.instr (LLIR.Call argsLength)
+    else error $ "Function " <> show name <> " not found"
 
   assemble (Pre.DELiteral lit) = do
     i <- liftIO $ fetchConstant lit
@@ -190,7 +192,7 @@ instance Assemble Pre.DesugaredExpr where
     else'' <- concatMapM assemble else'
 
     let doesElseReturn = doesReturn else''
-        thenJumpAddr   = length then'' + if doesElseReturn then 1 else 0
+        thenJumpAddr   = length then'' + if doesElseReturn then 1 else 2
         thenBranch     = LLIR.instr (LLIR.JumpElseRel thenJumpAddr)
 
         elseJumpAddr   = if doesElseReturn then length else'' else length else'' + 1
@@ -233,9 +235,12 @@ instance Assemble Pre.DesugaredExpr where
 instance Assemble Pre.Update where
   assemble (Pre.UVariable name) = do
     locals <- ask
+    glbs <- readIORef globals
     if name `Set.member` locals
       then pure [LLIR.Instruction (LLIR.LoadLocal name)]
-      else pure [LLIR.Instruction (LLIR.LoadGlobal name)]
+    else if name `Set.member` glbs
+      then pure [LLIR.Instruction (LLIR.LoadGlobal name)]
+    else error $ "Variable " <> show name <> " not found"
   
   assemble (Pre.UProperty u i) = do
     u' <- assemble u
@@ -253,9 +258,9 @@ doesReturn [] = False
 
 runLLIRAssembler :: (Assemble a, LLIR.Free a, LLIR.Name a) => a -> IO LLIR.Program
 runLLIRAssembler xs = do
-  writeIORef globals (LLIR.free mempty xs)
+  writeIORef globals (getGlobals xs)
   writeIORef constantPool Map.empty
-  writeIORef natives Set.empty
+  writeIORef natives (LLIR.getNames xs)
   writeIORef nativeFunctionsHandler Map.empty
 
   xs' <- runReaderT (assemble xs) Set.empty
@@ -265,25 +270,14 @@ runLLIRAssembler xs = do
   let constants'' = IntMap.fromList (invertAList constants')
   pure (xs', nats, IntMap.elems constants'')
 
-getNativesNames :: (LLIR.Name a, LLIR.Free a) => a -> Set Text
-getNativesNames x = do
-  let allNames = LLIR.getNames x
-      funNames = LLIR.free mempty x
-
-  helper allNames funNames
-  where
-    -- Get names of all native functions, meaning all names except
-    -- functions, declarations and native functions (got from free)
-    helper :: Set Text -> Set Text -> Set Text
-    helper allNames funNames = allNames Set.\\ funNames
+getGlobals :: (LLIR.Name a, LLIR.Free a) => a -> Set Text
+getGlobals x = do
+  let globals' = LLIR.free mempty x
+      natives' = LLIR.getNames x
+    in globals' Set.\\ natives'
 
 getNativeFunctions :: LLIR.Libraries -> Map Text LLIR.NativeFunction
 getNativeFunctions = Map.unions . map LLIR.nativeFunctions . Map.elems
 
 invertAList :: [(b, a)] -> [(a, b)]
 invertAList = map (\(a, b) -> (b, a))
-
-doesNativeAlreadyExist :: MonadIO m => Text -> m Bool
-doesNativeAlreadyExist name = do
-  nats <- readIORef natives
-  pure (name `Set.member` nats)

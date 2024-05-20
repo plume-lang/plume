@@ -47,6 +47,7 @@ import Data.List qualified as L
 import Data.Map qualified as Map
 import Data.Text qualified as T
 import GHC.Records
+import Plume.Syntax.Parser.Lexer qualified as L
 import Plume.Syntax.Concrete (Position)
 import Plume.TypeChecker.Monad.Error as Monad
 import Plume.TypeChecker.Monad.State as Monad
@@ -353,7 +354,11 @@ fetchPosition :: (MonadChecker m) => m Position
 fetchPosition = do
   pos <- get <&> positions
   case viaNonEmpty last pos of
-    Nothing -> compilerError "No position found in checker state"
+    Nothing -> do
+      defaultPos <- readIORef L.defaultPosition
+      case defaultPos of
+        Nothing -> compilerError "No position found in checker state"
+        Just p -> pure p
     Just p -> pure p
 
 -- | Track the current position in the position stack

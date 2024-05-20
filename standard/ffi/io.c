@@ -17,48 +17,6 @@ bool file_exists(const char* filename) {
   return is_exist;
 }
 
-void print_helper(Value v) {
-  switch (get_type(v)) {
-    case TYPE_MUTABLE: {
-        printf("mut ");
-        print_helper(GET_MUTABLE(v));
-        break;
-    }
-    case TYPE_INTEGER:
-      printf("%d", (int32_t) v);
-      break;
-    case TYPE_FLOAT:
-      printf("%f", GET_FLOAT(v));
-      break;
-    case TYPE_STRING:
-      printf("\"%s\"", GET_STRING(v));
-      break;
-    case TYPE_LIST: {
-      HeapValue* p = GET_PTR(v);
-      printf("[");
-      for (int i = 0; i < p->length; i++) {
-        print_helper(p->as_ptr[i]);
-        if (i < p->length - 1) printf(", ");
-      }
-      printf("]");
-      break;
-    }
-    case TYPE_SPECIAL:
-      printf("<special>");
-      break;
-    
-    case TYPE_UNKNOWN: {
-      printf("<unknown>");
-      break;
-    }
-
-    case TYPE_FUNCTION: case TYPE_FUNCENV: {
-      printf("<function>");
-      break;
-    }
-  }
-}
-
 Value print(int arg_n, Module* mod, Value* args) {
   if (arg_n < 1) THROW("Print expects at least 1 argument");
   Value v = args[0];
@@ -138,4 +96,34 @@ Value input(int arg_n, Module* mod, Value* args) {
   scanf("%s", buffer);
 
   return MAKE_STRING(buffer, strlen(buffer));
+}
+
+Value copy_ref(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 1) THROW("CopyRef expects 1 argument");
+
+  if (IS_PTR(args[0])) {
+    HeapValue* p = GET_PTR(args[0]);
+    p->refcount++;
+  }
+
+  return args[0];
+}
+
+Value free_ref(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 2) THROW("FreeRef expects 2 arguments");
+
+  if (IS_PTR(args[0])) {
+    HeapValue* p = GET_PTR(args[0]);
+    p->refcount--;
+    if (p->refcount == 0) {
+      if (p->type == TYPE_STRING) {
+        free(p->as_string);
+      } else {
+        free(p->as_ptr);
+      }
+      free(p);
+    }
+  }
+
+  return args[0];
 }

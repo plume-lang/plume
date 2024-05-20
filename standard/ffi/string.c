@@ -234,8 +234,8 @@ Value char_to_string(int arg_n, Module* mod, Value* args) {
 
 Value eq_char(int arg_n, Module* mod, Value* args) {
   if (arg_n != 2) THROW("Eq expects 2 arguments");
-  ASSERT(get_type(args[0]) == TYPE_STRING && get_type(args[1]) == TYPE_STRING,
-         "Eq expects char arguments");
+  ASSERT_FMT(get_type(args[0]) == TYPE_STRING && get_type(args[1]) == TYPE_STRING,
+         "Eq expects char arguments, received %s and %s", type_of(args[0]), type_of(args[1]));
 
   HeapValue* hp1 = GET_PTR(args[0]);
   HeapValue* hp2 = GET_PTR(args[1]);
