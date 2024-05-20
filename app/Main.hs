@@ -79,14 +79,16 @@ main = setEncoding $ do
       ppBuilding "Parsing file and dependencies..."
       runConcreteToAbstract env dir paths' file `with` \ast -> do
         let ast' = concatMap (removeUselessBlocks False) ast
-        memoryManaged <- transform ast'
+        -- memoryManaged <- transform ast'
         ppBuilding "Typechecking..."
-        runSynthesize memoryManaged `with` \tlir -> do
+        runSynthesize ast' `with` \tlir -> do
+          -- ppPrint tlir
           ppBuilding "Compiling and optimizing..."
           erased <- erase tlir
           runClosureConversion erased `with` \closed -> do
             desugared <- desugar closed
             let ssa = runSSA desugared
+            -- mapM_ print ssa
             (bytecode, natives', constants) <- runLLIRAssembler ssa
             let nativeFuns = getNativeFunctions natives'
             (bytecode', labelPool) <- runUnlabelize bytecode

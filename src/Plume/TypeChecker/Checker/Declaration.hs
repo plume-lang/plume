@@ -74,13 +74,13 @@ synthDecl
     let ty' = mut exprTy
     convertedTy' `unifiesWith` ty'
 
-    (clos, closTy, t, remainingPs) <- if null qvars && not isToplevel then do
+    (clos, closTy, remainingPs, sch) <- if null qvars && not isToplevel then do
       ps' <- removeDuplicatesQuals ps
-      return (h, ty', ty', ps')
+      return (h, ty', ps', scheme)
     else do
-
       cenv <- gets (extendEnv . environment)
-
+      let givenPs = concatMap (\case x@(IsIn _ _) -> [x]; _ -> []) convertedGenerics
+      
       res' <- traverse (discharge cenv) ps
       let (_ps, m2, as, _) = List.unzip4 res'
       let ps' = concatMap removeQVars _ps
@@ -121,13 +121,16 @@ synthDecl
       let clos = if null args then h'' else Post.EClosure args cTy' h'' pos
       let closTy = if null args then t else tys' :->: t
 
-      return (pure clos, closTy, t, [])
+      _ps <- removeDuplicatesQuals (ps'' <> givenPs)
+      let scheme' = Forall qvars $ _ps :=>: convertedTy'
+
+      return (pure clos, closTy, [], scheme')
 
     exitLevel
-
+  
     -- Creating a new scheme for the variable based on the substitution
-    newScheme <- liftIO $ compressPaths t
-    insertEnv @"typeEnv" name (Forall qvars $ convertedGenerics :=>: newScheme)
+    -- newScheme <- liftIO $ compressPaths t
+    insertEnv @"typeEnv" name sch
 
     -- Removing the generic types from the environment
     mapM_ (deleteEnv @"genericsEnv" . getGenericName) generics

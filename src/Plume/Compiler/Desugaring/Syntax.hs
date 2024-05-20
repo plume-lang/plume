@@ -83,7 +83,7 @@ instance Show DesugaredStatement where
 instance Show DesugaredProgram where
   show (DPFunction name args body) =
     "function " <> toString name <> "(" <> intercalate ", " (map toString args) <> ") {\n"
-      <> intercalate "\n" (map show body)
+      <> intercalate "\n" (map (("  " <>) . show) body)
       <> "\n}"
   show (DPStatement s) = show s
   show (DPDeclaration n e) = "let " <> toString n <> " = " <> show e
