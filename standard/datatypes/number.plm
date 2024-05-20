@@ -67,6 +67,7 @@ extend ordering<int> {
 extend numeric<float> {
   fn (*) (c: float, d: float) => mul_float(c, d)
   fn (+) (c: float, d: float) => add_float(c, d)
+  fn (-) (x: float, y: float) => sub_float(x, y)
 }
 
 extend equality<float> {
