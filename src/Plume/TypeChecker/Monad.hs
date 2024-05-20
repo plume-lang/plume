@@ -579,6 +579,14 @@ interpretError (p, MissingExtensionMethods n ms) =
       p
     )
     "while performing typechecking"
+interpretError (p, FunctionAlreadyExists n s) =
+  printErrorFromString
+    mempty
+    ( "Function " <> toString n <> " already exists with type " <> show s,
+      Nothing,
+      p
+    )
+    "while performing typechecking"
 
 capitalize :: Text -> Text
 capitalize = T.toTitle . T.toLower

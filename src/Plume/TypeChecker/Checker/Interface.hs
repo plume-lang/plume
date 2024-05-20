@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Plume.TypeChecker.Checker.Interface where
 
 import Data.Map qualified as Map
@@ -53,6 +54,10 @@ synthInterface _ _ = throw $ CompilerError "Only interfaces are supported"
 convertMethod :: (MonadChecker m) => Annotation Pre.PlumeScheme -> m (Text, PlumeScheme)
 convertMethod (Annotation name (Pre.MkScheme gens ty)) = do
   gens' :: [PlumeQualifier] <- concatMapM convert gens
+
+  searchEnv @"typeEnv" name >>= \case
+    Just sch -> throw $ FunctionAlreadyExists name sch
+    Nothing -> pure ()
 
   let qvars = getQVars gens'
   ty' <- convert ty

@@ -42,6 +42,7 @@ data TypeError
   | AlreadyDefinedInstance Text PlumeType
   | ClassMismatch Text PlumeQualifier PlumeQualifier
   | MissingExtensionMethods Text [Text]
+  | FunctionAlreadyExists Text PlumeScheme
   deriving (Eq, Show)
 
 -- THROWABLE INSTANCES FOR TYPE ERROR
@@ -95,6 +96,7 @@ instance Throwable TypeError where
   showError (ClassMismatch n q1 q2) =
     "Class mismatch for " <> show n <> ": " <> showError q1 <> " and " <> showError q2
   showError (MissingExtensionMethods n ms) = "Missing methods for " <> show n <> ": " <> showError ms
+  showError (FunctionAlreadyExists n s) = "Function " <> show n <> " already exists with " <> showError s
 
 instance Throwable a => Throwable (Assumption a) where
   showError (n :>: a) = show n <> ": " <> showError a
