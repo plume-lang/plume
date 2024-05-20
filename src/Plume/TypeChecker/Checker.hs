@@ -81,7 +81,7 @@ synthesize nat@(Pre.ENativeFunction {}) = synthNative nat
 synthesizeToplevel :: (MonadChecker m) => Pre.Expression -> m (PlumeScheme, [Post.Expression])
 synthesizeToplevel (Pre.ELocated e pos) = withPosition pos $ synthesizeToplevel e
 synthesizeToplevel e@(Pre.EDeclaration {}) = do
-  (pos, (ty, ps, h)) <- getPosition $ synthDecl True synthesize e
+  (ty, ps, h) <- synthDecl True synthesize e
   cenv <- gets (extendEnv . environment)
   zs <- traverse (discharge cenv) ps
 
@@ -92,13 +92,13 @@ synthesizeToplevel e@(Pre.EDeclaration {}) = do
   h' <- liftIO $ runReaderT h $ getExpr m
 
   unless (null as') $ do
-    throwRaw (pos, UnresolvedTypeVariable as')
+    throw (UnresolvedTypeVariable as')
 
   case h' of
     Post.ESpreadable es -> pure (t'', es)
     _ -> pure (t'', [h'])
 synthesizeToplevel e = do
-  (pos, (ty, ps, h)) <- getPosition $ synthesize e
+  (ty, ps, h) <- synthesize e
   cenv <- gets (extendEnv . environment)
   zs <- traverse (discharge cenv) ps
 
@@ -109,7 +109,7 @@ synthesizeToplevel e = do
   h' <- liftIO $ runReaderT h $ getExpr m
 
   unless (null as') $ do
-    throwRaw (pos, UnresolvedTypeVariable as')
+    throw (UnresolvedTypeVariable as')
 
   case h' of
     Post.ESpreadable es -> pure (t'', es)
