@@ -666,7 +666,7 @@ tOrphanExtension = do
   (members, schs) <- unzip <$> L.braces (P.many eTypedExtensionMember)
 
   i <- liftIO incOrphan
-  let name = "orphan_ext_" <> show ty <> "è" <> show i
+  let name = "orphan_ext_" <> show ty <> "_" <> show i
       anns = map (uncurry Cmm.Annotation) schs
 
       intf = CST.EInterface (name Cmm.:@: [ty]) gens anns
