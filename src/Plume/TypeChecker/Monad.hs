@@ -539,14 +539,22 @@ interpretError (p, ExhaustivenessError hints) =
 interpretError (p, UnresolvedTypeVariable as) =
   printErrorFromString
     mempty
-    ( "Unresolved type variable(s): " <> showAssumps as,
+    ( "Unresolved extensions: " <> showAssumps as,
       Nothing,
       p
     )
     "while performing typechecking"
   where
     showAssumps [] = ""
-    showAssumps (x :>: t : xs) = toString x <> " extends " <> showTy t <> ", " <> showAssumps xs
+    showAssumps [x] = showAssump x
+    showAssumps (x : xs) = 
+      showAssump x <> ", " <> showAssumps xs
+
+    showAssump (_ :>: TypeApp (TypeId tcName) [ty]) = 
+      toString (T.drop 1 tcName) <> " for " <> showTy ty
+    showAssump (_ :>: TypeId tcName) = 
+      toString (T.drop 1 tcName)
+    showAssump _ = error "Not a type application"
 interpretError (p, AlreadyDefinedInstance n t) =
   printErrorFromString
     mempty

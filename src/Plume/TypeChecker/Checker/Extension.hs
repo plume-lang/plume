@@ -199,8 +199,6 @@ synthExt
 
       pos <- fetchPosition
 
-      -- print (tcName, finalM)
-
       oldScs <- readIORef superclasses
       writeIORef superclasses scs
       h' <- liftIO $ runReaderT h $ getExpr pos finalM
