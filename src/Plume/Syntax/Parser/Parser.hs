@@ -15,6 +15,7 @@ import Text.Megaparsec qualified as P
 import Text.Megaparsec.Char qualified as P
 
 type Argument = Cmm.Annotation (Maybe Cmm.PlumeType, CST.IsMutable)
+type TypedArg = Cmm.Annotation (Cmm.PlumeType, CST.IsMutable)
 
 -- SOME UTILITY FUNCTIONS
 
@@ -75,6 +76,13 @@ mutArg =
     typ <- P.optional $ L.symbol ":" *> Typ.tType
     return $ name Cmm.:@: (typ, mut)
 
+mutArg' :: P.Parser TypedArg
+mutArg' = do
+  mut <- P.option False (True <$ L.reserved "mut")
+  name <- L.identifier
+  typ <- L.symbol ":" *> Typ.tType
+  return $ name Cmm.:@: (typ, mut)
+
 -- | Parses an annotated parser with a generic annotation
 -- | This is useful to parse generic annotations in declarations
 -- | or type annotations.
@@ -92,6 +100,12 @@ annotated p = do
 -- | parser.
 typeAnnot :: P.Parser (Cmm.Annotation (Maybe Cmm.PlumeType))
 typeAnnot = annotated Typ.tType
+
+typeAnnotTyped :: P.Parser (Cmm.Annotation Cmm.PlumeType)
+typeAnnotTyped = do
+  n <- L.lexeme $ L.nonLexedID <* P.lookAhead (L.symbol ":")
+  a <- L.symbol ":" *> Typ.tType
+  return $ n Cmm.:@: a
 
 -- | Parses a type annotation, but without optional type parsing 
 -- | This is useful to parse type extension's type
@@ -475,6 +489,41 @@ eExtFunction = do
       (name Cmm.:@: Nothing)
       (CST.EClosure args ret body)
 
+eTypedExtensionMember :: P.Parser (CST.ExtensionMember Cmm.PlumeType, (Text, Cmm.PlumeScheme))
+eTypedExtensionMember = 
+  P.choice
+    [ eTypedExtFunction
+    , eTypedExtVariable
+    ]
+
+eTypedExtFunction :: P.Parser (CST.ExtensionMember Cmm.PlumeType, (Text, Cmm.PlumeScheme))
+eTypedExtFunction = do
+  void $ L.reserved "fn"
+  name <- L.identifier <|> L.parens L.operator
+  gens <- P.option [] $ L.angles (Typ.parseGeneric `P.sepBy` L.comma)
+  args <- L.parens (mutArg' `P.sepBy` L.comma)
+  ret <- L.symbol ":" *> Typ.tType
+
+  let argsTys = map (\(Cmm.Annotation _ (ty, _)) -> ty) args
+  let sch = Cmm.MkScheme gens (argsTys Cmm.:->: ret)
+  
+  let args' = map (\(Cmm.Annotation n (ty, m)) -> n Cmm.:@: (Just ty, m)) args
+
+  body <- L.symbol "=>" *> parseExpression <|> eBlock
+  pure 
+    (CST.ExtDeclaration
+      gens
+      (name Cmm.:@: Nothing)
+      (CST.EClosure args' (Just ret) body), (name, sch))
+
+eTypedExtVariable :: P.Parser (CST.ExtensionMember Cmm.PlumeType, (Text, Cmm.PlumeScheme))
+eTypedExtVariable = do
+  (name Cmm.:@: ty) <- P.try $ typeAnnotTyped <* P.lookAhead (L.symbol "=")
+  void $ L.symbol "="
+  let ann = Cmm.Annotation name (Just ty)
+  r <- CST.ExtDeclaration [] ann <$> parseExpression
+  return (r, (name, Cmm.MkScheme [] ty))
+
 -- TOP-LEVEL DECLARATIONS
 
 -- | Parses a require statement
@@ -599,10 +648,34 @@ tExtension = do
   gens <- P.option [] $ L.angles (Typ.parseGeneric `P.sepBy` L.comma)
   
   tc <- Cmm.Annotation <$> L.identifier <*> L.angles (Typ.tType `P.sepBy1` L.comma)
-  
-  var <- P.optional $ L.reserved "with" *> L.identifier
+
   members <- L.braces (P.many eExtensionMember)
-  return [CST.ETypeExtension gens tc var members]
+  return [CST.ETypeExtension gens tc Nothing members]
+
+-- | Parses an orphan type extension
+-- | An orphan type extension is a extension used for implementing methods
+-- | only for one type (e.g. the old extension-system used to be like this).
+-- |
+-- | SYNTAX:
+-- |  - extend<generics> ty { ext_members }
+tOrphanExtension :: P.Parser [CST.Expression]
+tOrphanExtension = do
+  void $ L.reserved "extend"
+  gens <- P.option [] $ L.angles (Typ.parseGeneric `P.sepBy` L.comma)
+  ty <- Typ.tType
+  (members, schs) <- unzip <$> L.braces (P.many eTypedExtensionMember)
+
+  i <- liftIO incOrphan
+  let name = "orphan_ext_" <> show ty <> "è" <> show i
+      anns = map (uncurry Cmm.Annotation) schs
+
+      intf = CST.EInterface (name Cmm.:@: [ty]) gens anns
+      ext  = CST.ETypeExtension gens (name Cmm.:@: [ty]) Nothing members
+
+  return [intf, ext]
+  where
+    incOrphan :: IO Int
+    incOrphan = atomicModifyIORef' L.orphanExtCounter (\x -> (x + 1, x))
 
 -- | Parses a type declaration
 -- | A type declaration is a statement that is used to declare a new
@@ -635,6 +708,7 @@ tType = do
     isNotExtend :: Cmm.PlumeGeneric -> Bool
     isNotExtend (Cmm.GExtends {}) = False
     isNotExtend _ = True
+
 -- | Parses a macro
 -- | A macro is a statement that is used to define a macro variable or a
 -- | macro function.
@@ -678,7 +752,8 @@ parseToplevel =
       , tRequire
       , tType
       , tCustomOperator
-      , tExtension
+      , P.try tExtension
+      , tOrphanExtension
       , tMacro
       , pure <$> parseStatement
       ]

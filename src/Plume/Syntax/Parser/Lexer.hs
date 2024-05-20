@@ -51,6 +51,10 @@ data CustomOperator
 defaultPosition :: IORef (Maybe Position)
 defaultPosition = unsafePerformIO $ newIORef Nothing
 
+{-# NOINLINE orphanExtCounter #-}
+orphanExtCounter :: IORef Int
+orphanExtCounter = unsafePerformIO $ newIORef 0
+
 -- OPERATOR INSTANCES
 
 instance Eq CustomOperator where
