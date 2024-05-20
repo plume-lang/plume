@@ -265,13 +265,13 @@ getExpr pos xs p = do
 
 removeSuperclassAssumps :: MonadIO m => [Assumption PlumeType] -> [PlumeQualifier] -> m [Assumption PlumeType]
 removeSuperclassAssumps [] _ = pure []
-removeSuperclassAssumps (x@(n :>: TypeApp (TypeId tcName) [ty]) : xs) scs = do
+removeSuperclassAssumps (x@(_ :>: TypeApp (TypeId tcName) [ty]) : xs) scs = do
   ty' <- liftIO $ compressPaths ty
   let tcName' = toString tcName
   case tcName' of
     '@':tcName'' -> do
       let tcName''' = fromString tcName''
-      found <- filterM (\q -> liftIO $ doesQualUnifiesWith (IsIn ty' tcName''') q) scs
+      found <- filterM (liftIO . doesQualUnifiesWith (IsIn ty' tcName''')) scs
       case found of
         [] -> (x:) <$> removeSuperclassAssumps xs scs
         _ -> removeSuperclassAssumps xs scs
