@@ -20,7 +20,7 @@ import Plume.Syntax.Abstract.Internal.Pretty ()
 import Plume.Syntax.Parser.Modules.ParseImports
 import Plume.Syntax.Translation.ConcreteToAbstract
 import Plume.TypeChecker.Checker
-import Plume.Syntax.Memory
+-- import Plume.Syntax.Memory
 import Plume.Syntax.Blocks
 import System.Directory
 import System.FilePath
