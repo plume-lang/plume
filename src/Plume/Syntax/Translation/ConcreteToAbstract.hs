@@ -15,12 +15,17 @@ import Plume.Syntax.Translation.ConcreteToAbstract.UFCS
 import Plume.Syntax.Translation.Generics
 import System.Directory
 import System.FilePath
+import GHC.IO hiding (liftIO)
 import qualified Data.Text as T
 
 -- | The shared library extension for all platforms
 {-# INLINE sharedLibExt #-}
 sharedLibExt :: String
 sharedLibExt = "plmc"
+
+{-# NOINLINE initialCWD #-}
+initialCWD :: IORef FilePath
+initialCWD = unsafePerformIO $ newIORef ""
 
 -- | Interpret spreadable by compiling a spreadable expression into
 -- | a single expression
@@ -165,11 +170,16 @@ concreteToAbstract (CST.ETypeExtension g ann var ems) = do
   transRet $ AST.ETypeExtension g ann' var <$> ems'
 concreteToAbstract (CST.ENativeFunction fp n gens t) = do
   t' <- transformType t
+  dir <- asks fst
+  initialDir <- liftIO $ readIORef initialCWD
+
+  let basePath = makeRelative initialDir dir
+
   -- Native function resolution is kind the same as require resolution
   -- except we do not parse everything. But we need to resolve the path 
   -- absolutely to make it work everywhere on the system.
   let strModName = fromString $ toString fp -<.> sharedLibExt
-  let (isStd, path) = if "std:" `T.isPrefixOf` fp then (True, T.drop 4 strModName) else (False, strModName)
+  let (isStd, path) = if "std:" `T.isPrefixOf` fp then (True, T.drop 4 strModName) else (False, fromString $ basePath </> toString fp -<.> sharedLibExt)
   transRet . Right $ AST.ENativeFunction path n gens t' isStd
 concreteToAbstract (CST.EList es) = do
   -- Lists can be composed of spread elements, so we need to flatten
@@ -255,6 +265,8 @@ runConcreteToAbstract std dir paths fp = do
   -- Writing the standard library path to the IORef to keep it
   -- without needing to refetch it every time
   writeIORef stdPath std
+  initialDir <- absolutize dir
+  writeIORef initialCWD initialDir
 
   -- Getting the current working directory as a starting point
   -- for the reader monad

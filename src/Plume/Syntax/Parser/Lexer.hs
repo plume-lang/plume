@@ -47,6 +47,10 @@ data CustomOperator
   }
   deriving (Show)
 
+{-# NOINLINE defaultPosition #-}
+defaultPosition :: IORef (Maybe Position)
+defaultPosition = unsafePerformIO $ newIORef Nothing
+
 -- OPERATOR INSTANCES
 
 instance Eq CustomOperator where
