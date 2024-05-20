@@ -11,7 +11,10 @@ native "std:native" {
 
 interface<T> traversable<T> {
   fn map<A, B>(self: T<A>, f: fn(A): B): T<B>
-  fn length<A>(self: T<A>): int
+}
+
+interface<T> foldable<T> {
+  fn foldl<A, B>(self: T<A>, f: fn(B, A): B, init: B): B
 }
 
 extend traversable<list> {
@@ -19,12 +22,17 @@ extend traversable<list> {
     case [] => []
     case [x, ..xs] => xs.map(f).list_append(f(x))
   }
+}
 
-  fn length<A>(self: list<A>): int => switch self {
-    case [] => 0
-    case [?, ..xs] => 1 + xs.length()
+extend foldable<list> {
+  fn foldl<A, B>(self: list<A>, f: fn(B, A): B, init: B): B => switch self {
+    case [] => init
+    case [x, ..xs] => xs.foldl(f, f(init, x))
   }
 }
+
+fn length<T extends foldable, A>(x: T<A>) => 
+  x.foldl(fn (acc, _) => acc + 1, 0)
 
 fn showListHelper<A extends show>(ls: list<A>): str => switch ls {
   case [] => ""

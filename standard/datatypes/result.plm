@@ -1,11 +1,11 @@
 type Result<A, B> {
-  Error(A),
-  Ok(B)
+  Ok(A),
+  Error(B)
 }
 
 extend<A extends show, B extends show> show<Result<A, B>> {
   fn show(self: Result<A, B>): str => switch self {
-    case Error(a) => "Error: " + a.show()
-    case Ok(b) => "Ok: " + b.show()
+    case Error(a) => "Error(" + a.show() + ")"
+    case Ok(b) => "Ok(" + b.show() + ")"
   }
 }

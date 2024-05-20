@@ -12,4 +12,6 @@ Value make_unit();
 Value make_ok(Value v);
 Value make_err(Value v);
 
+void print_helper(Value v);
+
 #endif  // CONS_H
