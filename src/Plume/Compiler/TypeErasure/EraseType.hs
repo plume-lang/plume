@@ -13,10 +13,8 @@ import Plume.Syntax.Concrete.Expression qualified as Pre (TypeConstructor (..))
 import Plume.TypeChecker.Constraints.Solver (isNotTVar)
 import Plume.TypeChecker.Constraints.Unification (doesUnifyWith)
 import Plume.TypeChecker.Monad
-import Plume.TypeChecker.Constraints.Unification qualified as Uni
 import Plume.TypeChecker.TLIR qualified as Pre
 import Control.Monad.Exception (compilerError)
-import System.IO.Pretty (printErrorFromString)
 
 {-# NOINLINE dispatched #-}
 dispatched :: IORef [((PlumeType, Text), Text)]
@@ -42,19 +40,7 @@ isNotDecl (Pre.EMutUpdate {}) = False
 isNotDecl _ = True
 
 eraseType :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]
-eraseType (Pre.EDeclaration (Annotation name _) (Pre.EClosure args t body pos) Nothing : xs) = do
-  t' <- liftIO $ Uni.compressPaths t
-  when (Pre.isBlock body && not (Pre.containsReturn body) && t' /= TUnit) $
-    printErrorFromString
-      mempty
-      ( "Anonymous function "
-          <> toString name
-          <> " should return " <> show t' <> " but returns nothing",
-        Nothing,
-        pos
-      )
-      "while performing type erasure"    
-
+eraseType (Pre.EDeclaration (Annotation name _) (Pre.EClosure args _ body _) Nothing : xs) = do
   let args' = map (\(Annotation n _) -> n) args
   let b = insertReturnStmt body
   b' <- eraseStatement b
@@ -99,7 +85,7 @@ eraseType (Pre.EType tyName ts : xs) = do
       ts
   createFunction :: Pre.TypeConstructor PlumeType -> IO Post.UntypedProgram
   createFunction (Pre.TVariable n) = case List.lookup n ts' of
-    Just f -> return $ Post.UPStatement (Post.USDeclaration n (f []))
+    Just f -> return $ Post.UPDeclaration n (f [])
     Nothing -> compilerError "Type constructor not found"
   createFunction (Pre.TConstructor n vars) = case List.lookup n ts' of
     Just f -> return $ Post.UPFunction n args (Post.USReturn (f args))
@@ -174,15 +160,7 @@ eraseExpr (Pre.ESwitch e cases) = do
   cases' <- mapM (bimapM erasePattern eraseExpr) cases
   return $ Post.UESwitch e' cases'
 eraseExpr (Pre.EBlock es) = Post.UEBlock <$> mapM eraseStatement es
-eraseExpr (Pre.EClosure args t body pos) = do
-  when (Pre.isBlock body && Pre.containsReturn body && t /= TUnit) $
-    printErrorFromString
-      mempty
-      ( "Anonymous function should return " <> show t <> " but returns nothing",
-        Nothing,
-        pos
-      )
-      "while performing type erasure"   
+eraseExpr (Pre.EClosure args _ body _) = do
   let b' = insertReturnStmt body
   b <- eraseExpr b'
   return $
@@ -213,7 +191,7 @@ eraseExpr (Pre.EEqualsType e t) = Post.UEEqualsType <$> eraseExpr e <*> pure t
 eraseExpr (Pre.ENativeFunction {}) = compilerError "Native functions aren't expressions"
 eraseExpr (Pre.EAnd e1 e2) = Post.UEAnd <$> eraseExpr e1 <*> eraseExpr e2
 eraseExpr (Pre.EIndex e i) = Post.UEIndex <$> eraseExpr e <*> eraseExpr i
-eraseExpr (Pre.EReturn _) = compilerError "Return isn't an expression"
+eraseExpr (Pre.EReturn e) = eraseExpr e
 eraseExpr (Pre.EType {}) = compilerError "Type isn't an expression"
 eraseExpr (Pre.EInstanceDict _ _ exprs) = do
   exprs' <- mapM eraseExpr exprs

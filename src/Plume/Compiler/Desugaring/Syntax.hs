@@ -4,6 +4,9 @@ import Plume.Compiler.ClosureConversion.Free
 import Plume.Compiler.ClosureConversion.Syntax (Update(..))
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Abstract.Expression (IsStandard)
+import GHC.Show
+import Prelude hiding (show)
+import Data.IntMap qualified as IntMap
 
 data DesugaredExpr
   = DEVar Text
@@ -23,7 +26,8 @@ data DesugaredExpr
   | DEGreaterThan DesugaredExpr Int
   | DEListLength DesugaredExpr
   | DEUnMut DesugaredExpr
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Ord)
+  
 
 data DesugaredStatement
   = DSExpr DesugaredExpr
@@ -31,7 +35,7 @@ data DesugaredStatement
   | DSDeclaration Text DesugaredExpr
   | DSMutDeclaration Text DesugaredExpr
   | DSMutUpdate Update DesugaredExpr
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Ord)
 
 type LibraryPath = Text
 type FunctionName = Text
@@ -45,7 +49,48 @@ data DesugaredProgram
   | DPNativeFunction LibraryPath FunctionName FunctionArity IsStandard
   | DPMutDeclaration Text DesugaredExpr
   | DPMutUpdate Update DesugaredExpr
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Ord)
+
+instance Show DesugaredExpr where
+  show (DEVar x) = toString x
+  show (DEApplication f args) =
+    toString f <> "(" <> intercalate ", " (map show args) <> ")"
+  show (DELiteral l) = show l
+  show (DEList es) = "[" <> intercalate ", " (map show es) <> "]"
+  show (DEIndex e1 e2) = show e1 <> "[" <> show e2 <> "]"
+  show (DEProperty e i) = show e <> "." <> show i
+  show (DEIf e1 e2 e3) =
+    "if " <> show e1 <> " then " <> show e2 <> " else " <> show e3
+  show (DETypeOf e) = "typeof " <> show e
+  show (DEIsConstructor e t) = "isConstructor " <> show e <> " " <> toString t
+  show (DEEqualsTo e1 e2) = show e1 <> " == " <> show e2
+  show (DEAnd e1 e2) = show e1 <> " && " <> show e2
+  show DESpecial = "special"
+  show (DESlice e i) = show e <> "[" <> show i <> "]"
+  show (DEGreaterThan e i) = show e <> " > " <> show i
+  show (DEListLength e) = "length " <> show e
+  show (DEUnMut e) = "unmut " <> show e
+  show (DEDictionary es) =
+    "{" <> intercalate ", " (map show (IntMap.elems es)) <> "}"
+
+instance Show DesugaredStatement where
+  show (DSExpr e) = show e
+  show (DSReturn e) = "return " <> show e
+  show (DSDeclaration n e) = "let " <> toString n <> " = " <> show e
+  show (DSMutDeclaration n e) = "mut " <> toString n <> " = " <> show e
+  show (DSMutUpdate n e) = show n <> " = " <> show e
+
+instance Show DesugaredProgram where
+  show (DPFunction name args body) =
+    "function " <> toString name <> "(" <> intercalate ", " (map toString args) <> ") {\n"
+      <> intercalate "\n" (map show body)
+      <> "\n}"
+  show (DPStatement s) = show s
+  show (DPDeclaration n e) = "let " <> toString n <> " = " <> show e
+  show (DPNativeFunction lib name arity _) =
+    "native function " <> toString lib <> "." <> toString name <> " " <> show arity
+  show (DPMutDeclaration n e) = "mut " <> toString n <> " = " <> show e
+  show (DPMutUpdate n e) = show n <> " = " <> show e
 
 instance Substitutable DesugaredStatement DesugaredExpr where
   substitute s (DSExpr e) = DSExpr $ substitute s e

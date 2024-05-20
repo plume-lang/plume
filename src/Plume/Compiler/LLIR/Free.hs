@@ -34,7 +34,7 @@ instance Free Pre.DesugaredExpr where
   free _ _ = mempty
 
 instance Free Update where
-  free _ (UVariable x) = Set.singleton x
+  free res (UVariable x) = Set.singleton x Set.\\ res
   free res (UProperty e _) = free res e
 
 instance Free Pre.DesugaredStatement where
@@ -53,10 +53,10 @@ instance Free Pre.DesugaredProgram where
   free res (Pre.DPMutUpdate n _) = free res n
 
 instance Name Pre.DesugaredProgram where
-  getNames (Pre.DPFunction name _ _) = Set.singleton name
-  getNames (Pre.DPDeclaration name _) = Set.singleton name
-  getNames (Pre.DPMutDeclaration name _) = Set.singleton name
-  getNames (Pre.DPMutUpdate name _) = getNames name
+  getNames (Pre.DPFunction {}) = Set.empty
+  getNames (Pre.DPDeclaration _ _) = Set.empty
+  getNames (Pre.DPMutDeclaration _ _) = Set.empty
+  getNames (Pre.DPMutUpdate _ _) = Set.empty
   getNames (Pre.DPNativeFunction _ name _ _) = Set.singleton name
   getNames (Pre.DPStatement _) = mempty
 
