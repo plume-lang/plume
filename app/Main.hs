@@ -21,6 +21,7 @@ import Plume.Syntax.Parser.Modules.ParseImports
 import Plume.Syntax.Translation.ConcreteToAbstract
 import Plume.TypeChecker.Checker
 import Plume.Syntax.Memory
+import Plume.Syntax.Blocks
 import System.Directory
 import System.FilePath
 import System.IO.Pretty
@@ -77,7 +78,8 @@ main = setEncoding $ do
 
       ppBuilding "Parsing file and dependencies..."
       runConcreteToAbstract env dir paths' file `with` \ast -> do
-        memoryManaged <- transform ast
+        let ast' = concatMap (removeUselessBlocks False) ast
+        memoryManaged <- transform ast'
         ppBuilding "Typechecking..."
         runSynthesize memoryManaged `with` \tlir -> do
           ppBuilding "Compiling and optimizing..."
