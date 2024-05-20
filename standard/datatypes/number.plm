@@ -75,7 +75,7 @@ extend numeric<float> {
 extend product<float> {
   fn (*) (c: float, d: float): float => mul_float(c, d)
   fn (/) (c: float, d: float) => div_float(c, d)
-  fn (^) (c: float, d: float) => pow_float(c, d)
+  fn (^) (c: float, d) => pow_float(c, int_to_float(d))
 }
 
 extend equality<float> {

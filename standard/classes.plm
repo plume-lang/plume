@@ -22,6 +22,11 @@ interface<A> from_str<A> {
   fn from_str(s: str): A
 }
 
+interface<A> coercible<A> {
+  fn from<B>(b: B): A
+  fn to<B>(a: A): B
+}
+
 interface<A extends boolean_algebra> equality<A> {
   fn (==)(a: A, b: A): bool
 }
@@ -36,7 +41,7 @@ interface<A> numeric<A> {
 interface<A> product<A> {
   fn (*)(a: A, b: A): A
   fn (/)(a: A, b: A): A
-  fn (^)(a: A, b: A): A
+  fn (^)(a: A, b: int): A
 }
 
 interface<A> ordering<A> {
