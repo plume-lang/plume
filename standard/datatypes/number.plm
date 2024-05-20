@@ -33,20 +33,20 @@ extend numeric<int> {
   fn (-) (x: int, y: int) => sub_int(x, y)
 }
 
-extend int {
+extend product<int> {
   fn (*) (c: int, d: int): int => mul_int(c, d)
+  fn (/) (c: int, d: int) => div_int(c, d)
+  fn (^) (c: int, d: int) => switch d {
+    case 0 => 1
+    case ? => c * (c ^ (d - 1))
+  }
 }
 
 extend show<int> {
   fn show(c: int) => to_string(c)
 }
 
-fn (/) (c: int, d: int) => div_int(c, d)
 fn (%) (c: int, d: int) => mod_int(c, d)
-fn (^) (c: int, d: int) => switch d {
-  case 0 => 1
-  case ? => c * (c ^ (d - 1))
-}
 
 extend to_str<int> {
   fn to_str(c: int) => to_string(c)
@@ -72,8 +72,10 @@ extend numeric<float> {
   fn (-) (x: float, y: float) => sub_float(x, y)
 }
 
-extend float {
+extend product<float> {
   fn (*) (c: float, d: float): float => mul_float(c, d)
+  fn (/) (c: float, d: float) => div_float(c, d)
+  fn (^) (c: float, d: float) => pow_float(c, d)
 }
 
 extend equality<float> {

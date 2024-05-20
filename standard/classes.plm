@@ -33,6 +33,12 @@ interface<A> numeric<A> {
   fn (-)(a: A, b: A): A
 }
 
+interface<A> product<A> {
+  fn (*)(a: A, b: A): A
+  fn (/)(a: A, b: A): A
+  fn (^)(a: A, b: A): A
+}
+
 interface<A> ordering<A> {
   fn (<)(a: A, b: A): bool
 }
