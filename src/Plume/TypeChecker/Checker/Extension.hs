@@ -20,6 +20,7 @@ import Plume.TypeChecker.Monad.Free (substituteVar)
 import Plume.TypeChecker.Monad.Type qualified as Post
 import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (gets, local)
+import Plume.Syntax.Concrete qualified as CST
 
 
 firstM :: (Monad m) => (a -> m b) -> (a, c) -> m (b, c)
@@ -128,8 +129,9 @@ synthExt
 
         addClassInstance (instH, void preInst)
 
+    let schs = Map.map (\(Forall qs (quals :=>: ty')) -> Forall (qs <> qvars) ((quals <> gens) :=>: ty')) meths
     -- Typechecking the instance methods
-    exprs <- mapM (extMemberToDeclaration infer) methods
+    exprs <- zipWithM (extMemberToDeclaration infer) (Map.elems schs) methods
 
     cenv <- gets (extendEnv . environment)
 
@@ -155,6 +157,15 @@ synthExt
       --
       -- Instance superclases should not interfere with method-local instances
       -- to avoid duplicate instances.
+
+      (__ps, scs) <- case Map.lookup name schs of
+        Just (Forall _ (ps2 :=>: _)) -> do
+          p1 <- removeSuperclasses ps ps2
+          p2 <- removeSuperclasses ps gens
+
+          return (List.nub $ p1 <> p2, List.nub $ ps2 <> gens)
+        Nothing -> pure ([], [])
+
       res' <- traverse (discharge cenv) ps
       let (_ps, m2, as, _) = unzip4 res'
       let ps' = concatMap removeQVars _ps
@@ -171,6 +182,8 @@ synthExt
       let as' = keepAssumpWithName (concat as) names
 
       (sub, as'') <- removeDuplicatesAssumps as'
+      (remainingSub, _) <- removeDuplicatesAssumps (as'' <> ass')
+      as''' <- removeSuperclassAssumps as'' scs
 
       let finalM = m'' <> m1'
 
@@ -182,19 +195,25 @@ synthExt
 
       sub' <- unify finalExprs'
 
-      let sub'' = Map.toList sub' <> sub
-
-      h' <- liftIO $ runReaderT h $ getExpr finalM
-      let h'' = List.foldl substituteVar h' sub''
-
-      unless (null as'') $ throw (UnresolvedTypeVariable as'')
-
-      let args = map (\(n :>: t') -> n :@: t') as''
-      let tys' = map getAssumpVal as''
-
-      cTy' <- liftIO $ compressPaths ty'
+      let sub'' = Map.toList sub' <> sub <> remainingSub
 
       pos <- fetchPosition
+
+      -- print (tcName, finalM)
+
+      oldScs <- readIORef superclasses
+      writeIORef superclasses scs
+      h' <- liftIO $ runReaderT h $ getExpr pos finalM
+      writeIORef superclasses oldScs
+
+      let h'' = List.foldl substituteVar h' sub''
+      
+      unlessM (allIsSuperclass as'' scs) $ throw (UnresolvedTypeVariable as'')
+
+      let args = map (\(n :>: t') -> n :@: t') as'''
+      let tys' = map getAssumpVal as'''
+
+      cTy' <- liftIO $ compressPaths ty'
 
       let clos = if null args then h'' else Post.EClosure args cTy' h'' pos
       let closTy = if null args then t else tys' :->: t
@@ -237,24 +256,37 @@ synthExt
       getAssumpVal (_ :>: val) = val
 synthExt _ _ = throw $ CompilerError "Only type extensions are supported"
 
-getExpr :: [(PlumeQualifier, Post.Expression)] -> PlumeQualifier -> Post.Expression
-getExpr xs p = do
+getExpr :: CST.Position -> [(PlumeQualifier, Post.Expression)] -> PlumeQualifier -> Post.Expression
+getExpr pos xs p = do
   let p' = unsafePerformIO $ compressQual p
   case List.lookup p' xs of
     Just x -> x
-    Nothing -> error $ "getExpr: " <> show p' <> " not found in " <> show xs
+    Nothing -> unsafePerformIO $ do
+      interpretError (pos, CompilerError $ "getExpr: " <> show p' <> " not found in " <> show xs)
+      exitFailure
 
-extMemberToDeclaration :: (MonadChecker m) => Infer -> Pre.ExtensionMem -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression, Text)
-extMemberToDeclaration infer (Pre.ExtDeclaration gens (Annotation name ty) c) = do
+removeSuperclassAssumps :: MonadIO m => [Assumption PlumeType] -> [PlumeQualifier] -> m [Assumption PlumeType]
+removeSuperclassAssumps [] _ = pure []
+removeSuperclassAssumps (x@(n :>: TypeApp (TypeId tcName) [ty]) : xs) scs = do
+  ty' <- liftIO $ compressPaths ty
+  let tcName' = toString tcName
+  case tcName' of
+    '@':tcName'' -> do
+      let tcName''' = fromString tcName''
+      found <- filterM (\q -> liftIO $ doesQualUnifiesWith (IsIn ty' tcName''') q) scs
+      case found of
+        [] -> (x:) <$> removeSuperclassAssumps xs scs
+        _ -> removeSuperclassAssumps xs scs
+    _ -> removeSuperclassAssumps xs scs
+removeSuperclassAssumps (x : xs) scs = (x:) <$> removeSuperclassAssumps xs scs
+
+extMemberToDeclaration :: (MonadChecker m) => Infer -> PlumeScheme -> Pre.ExtensionMem -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression, Text)
+extMemberToDeclaration infer sch (Pre.ExtDeclaration gens (Annotation name ty) c) = do
   _ :: [PlumeQualifier] <- concatMapM convert gens
   ty' <- convert ty
 
-  searchEnv @"typeEnv" name >>= \case
-    Just sch -> do
-      instantiate sch >>= \case
-        (ty'', _) -> ty' `unifiesWith` ty''
-    Nothing -> throw $ UnboundVariable name
-  -- addClassInstance
+  instantiate sch >>= \case
+    (ty'', _) -> ty' `unifiesWith` ty''
 
   (bTy, ps', b) <- local id $ infer c
   ty' `unifiesWith` bTy
@@ -274,3 +306,25 @@ convertMaybe :: (a `ConvertsTo` b) => Maybe a -> Checker (Either PlumeType b)
 convertMaybe = \case
   Just x -> Right <$> convert x
   Nothing -> Left <$> fresh
+
+isSuperClass :: MonadIO m => PlumeQualifier -> [PlumeQualifier] -> m Bool
+isSuperClass p ps = do
+  p' <- liftIO $ compressQual p
+  ps' <- liftIO $ mapM compressQual ps
+  found <- findMatchingClass p' ps'
+
+  case found of
+    [] -> pure False
+    _ -> pure True
+
+allIsSuperclass :: MonadIO m => [Assumption PlumeType] -> [PlumeQualifier] -> m Bool
+allIsSuperclass [] _ = pure True
+allIsSuperclass (_ :>: TypeApp (TypeId tc) [ty] : xs) ps = do
+  let name = toString tc
+  case name of
+    '@':tcName -> do
+      let inst = IsIn ty (fromString tcName)
+      b <- isSuperClass inst ps
+      if b then allIsSuperclass xs ps else pure False
+    _ -> allIsSuperclass xs ps
+allIsSuperclass (_ : xs) ps = allIsSuperclass xs ps

@@ -257,3 +257,40 @@ createInstName (TypeApp x xs) = createInstName x <> "_" <> buildArray xs
     buildArray [] = ""
 createInstName (TypeVar _) = "tvar"
 createInstName (TypeQuantified _) = "tvar"
+
+removeSuperclasses :: MonadIO m => [PlumeQualifier] -> [PlumeQualifier] -> m [PlumeQualifier]
+removeSuperclasses [] _ = pure []
+removeSuperclasses (x : xs) ys = do
+  found <- findMatchingClass x ys
+  case found of
+    [] -> (x :) <$> removeSuperclasses xs ys
+    _  -> removeSuperclasses xs (ys List.\\ found)
+
+findMatchingClass :: MonadIO m => PlumeQualifier -> [PlumeQualifier] -> m [PlumeQualifier]
+findMatchingClass (IsIn t1 n1) qs = flip filterM qs $ \case
+  IsIn t2 n2 -> do
+    b <- liftIO $ doesUnifyWith t1 t2
+    pure $ b && n1 == n2
+  _ -> pure False
+findMatchingClass _ _ = pure []
+
+liftPlaceholders ::
+  Text ->
+  PlumeType ->
+  [PlumeQualifier] ->
+  Placeholder Post.Expression
+liftPlaceholders name ty ps = do
+  -- scs <- readIORef superclasses
+  -- pss <- removeSuperclasses ps scs
+  f <- ask
+  let dicts = fmap f ps
+  pure $ case length dicts of
+    0 -> Post.EVariable name ty
+    _ | null dicts -> Post.EInstanceVariable name ty
+    _ -> Post.EApplication (Post.EInstanceVariable name ty) dicts
+
+instantiateFromName :: (MonadChecker m) => Text -> PlumeScheme -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression)
+instantiateFromName name sch = do
+  (ty, qs) <- instantiate sch
+  let r = liftPlaceholders name ty qs
+  pure (ty, qs, r)

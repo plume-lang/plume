@@ -89,7 +89,9 @@ synthesizeToplevel e@(Pre.EDeclaration {}) = do
   (_, as') <- removeDuplicatesAssumps as
   ps'' <- removeDuplicatesQuals ps'
   let t'' = Forall [] $ List.nub ps'' :=>: ty
-  h' <- liftIO $ runReaderT h $ getExpr m
+
+  pos <- fetchPosition
+  h' <- liftIO $ runReaderT h $ getExpr pos m
 
   unless (null as') $ do
     throw (UnresolvedTypeVariable as')
@@ -106,7 +108,9 @@ synthesizeToplevel e = do
   (_, as') <- removeDuplicatesAssumps as
   ps'' <- removeDuplicatesQuals ps'
   let t'' = Forall [] $ List.nub ps'' :=>: ty
-  h' <- liftIO $ runReaderT h $ getExpr m
+
+  pos <- fetchPosition
+  h' <- liftIO $ runReaderT h $ getExpr pos m
 
   unless (null as') $ do
     throw (UnresolvedTypeVariable as')

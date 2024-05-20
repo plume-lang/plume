@@ -81,3 +81,7 @@ currentLevel = unsafePerformIO $ newIORef 0
 {-# NOINLINE currentSymbol #-}
 currentSymbol :: IORef Int
 currentSymbol = unsafePerformIO $ newIORef 0
+
+{-# NOINLINE superclasses #-}
+superclasses :: IORef [PlumeQualifier]
+superclasses = unsafePerformIO $ newIORef mempty

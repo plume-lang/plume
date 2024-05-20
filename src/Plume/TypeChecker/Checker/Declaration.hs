@@ -108,15 +108,14 @@ synthDecl
 
       let sub'' = Map.toList sub' <> sub
 
-      h' <- liftIO $ runReaderT h $ getExpr finalM
+      pos <- fetchPosition
+      h' <- liftIO $ runReaderT h $ getExpr pos finalM
       let h'' = List.foldl substituteVar h' sub''
 
       let args = map (\(n :>: t') -> n :@: t') as'''
       let tys' = map (\(_ :>: t') -> t') as'''
     
       cTy' <- liftIO $ compressPaths ty'
-      
-      pos <- fetchPosition
 
       let clos = if null args then h'' else Post.EClosure args cTy' h'' pos
       let closTy = if null args then t else tys' :->: t

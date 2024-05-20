@@ -6,7 +6,6 @@ module Plume.TypeChecker.Monad
     Checker,
     Placeholder,
     Substitution,
-    liftPlaceholders,
     fetchPositionIO,
     throw,
     throwRaw,
@@ -22,7 +21,6 @@ module Plume.TypeChecker.Monad
     fresh,
     instantiate,
     instantiateWithSub,
-    instantiateFromName,
     fetchPosition,
     trackPosition,
     withPosition,
@@ -281,29 +279,14 @@ fetchPositionIO :: MonadIO m => m Position
 fetchPositionIO = do
   pos <- readIORef checkState <&> positions
   case viaNonEmpty last pos of
-    Nothing -> compilerError "No position found in checker state"
+    Nothing -> do
+      defaultPos <- readIORef L.defaultPosition
+      case defaultPos of
+        Nothing -> liftIO $ compilerError "No position found in checker state"
+        Just p -> pure p
     Just p -> pure p
 
 type Substitution = Map Text PlumeType
-
-liftPlaceholders ::
-  Text ->
-  PlumeType ->
-  [PlumeQualifier] ->
-  Placeholder Typed.Expression
-liftPlaceholders name ty ps = do
-  f <- ask
-  let dicts = fmap f ps
-  pure $ case length dicts of
-    0 -> Typed.EVariable name ty
-    _ | null dicts -> Typed.EInstanceVariable name ty
-    _ -> Typed.EApplication (Typed.EInstanceVariable name ty) dicts
-
-instantiateFromName :: (MonadChecker m) => Text -> PlumeScheme -> m (PlumeType, [PlumeQualifier], Placeholder Typed.Expression)
-instantiateFromName name sch = do
-  (ty, qs) <- instantiate sch
-  let r = liftPlaceholders name ty qs
-  pure (ty, qs, r)
 
 instantiate :: (MonadChecker m) => PlumeScheme -> m (PlumeType, [PlumeQualifier])
 instantiate t = do
