@@ -5,3 +5,9 @@
 @println("Hello, World!")
 
 @println(Some(8))
+
+extend str {
+  fn test(): str => "tesdt"
+}
+
+println("Hello".test())
