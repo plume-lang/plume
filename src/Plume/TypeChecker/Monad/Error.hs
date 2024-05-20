@@ -40,6 +40,8 @@ data TypeError
   | ExhaustivenessError String
   | UnresolvedTypeVariable [Assumption PlumeType]
   | AlreadyDefinedInstance Text PlumeType
+  | ClassMismatch Text PlumeQualifier PlumeQualifier
+  | MissingExtensionMethods Text [Text]
   deriving (Eq, Show)
 
 -- THROWABLE INSTANCES FOR TYPE ERROR
@@ -90,6 +92,9 @@ instance Throwable TypeError where
     "Unresolved type variable: " <> showError as
   showError (AlreadyDefinedInstance n t) =
     "Instance " <> show n <> " already defined for " <> showError t
+  showError (ClassMismatch n q1 q2) =
+    "Class mismatch for " <> show n <> ": " <> showError q1 <> " and " <> showError q2
+  showError (MissingExtensionMethods n ms) = "Missing methods for " <> show n <> ": " <> showError ms
 
 instance Throwable a => Throwable (Assumption a) where
   showError (n :>: a) = show n <> ": " <> showError a

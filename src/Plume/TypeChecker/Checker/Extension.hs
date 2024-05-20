@@ -5,6 +5,7 @@ module Plume.TypeChecker.Checker.Extension where
 import Data.List (unzip4)
 import Data.List qualified as List
 import Data.Map qualified as Map
+import Data.Set qualified as Set
 import Plume.Syntax.Abstract qualified as Pre
 import GHC.IO hiding (liftIO)
 import Plume.Syntax.Common qualified as Cmm
@@ -111,9 +112,13 @@ synthExt
       Just ty' -> throw $ AlreadyDefinedInstance tcName ty'
       _ -> throw $ CompilerError "Instance already defined"
 
-    cls <- findClass tcName
+    cls@(MkClass _ _ meths) <- findClass tcName
     case cls of
       MkClass qs' quals methods' -> do
+        case quals of 
+          _  :=>: t -> do
+            b <- liftIO $ doesQualUnifiesWith t instH 
+            unless b $ throw $ CompilerError "Instance does not match the class"
 
         let finalMethods = fmap (\(Forall qs (quals' :=>: ty')) -> Forall (qs <> qs') $ (gens <> quals') :=>: ty') methods'
 
@@ -201,6 +206,12 @@ synthExt
 
     let dict = Map.unions exprs'
     let dictFunTys = Map.unions funTys
+
+    let meths' = Map.keys dict
+    let missingMeths = Map.keysSet meths `Set.difference` Set.fromList meths'
+
+    unless (Set.null missingMeths) $ 
+      throw $ MissingExtensionMethods tcName (Set.toList missingMeths)
 
     let inst = MkInstance qvars pred' dict dictFunTys
     let cls'' = (instH, void inst)

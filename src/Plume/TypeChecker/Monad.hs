@@ -484,7 +484,7 @@ interpretError (p, MultipleExtensionsFound e ts t) =
         <> " found for type "
         <> showTy t
         <> ": "
-        <> showList ts,
+        <> intercalate ", " (map showTy ts),
       Nothing,
       p
     )
@@ -572,14 +572,25 @@ interpretError (p, AlreadyDefinedInstance n t) =
       p
     )
     "while performing typechecking"
+interpretError (p, ClassMismatch n q1 q2) =
+  printErrorFromString
+    mempty
+    ( "Interface mismatch header for " <> toString n <> ": " <> show q1 <> " and " <> show q2,
+      Nothing,
+      p
+    )
+    "while performing typechecking"
+interpretError (p, MissingExtensionMethods n ms) =
+  printErrorFromString
+    mempty
+    ( "Missing methods for " <> toString n <> ": " <> intercalate ", " (map toString ms),
+      Nothing,
+      p
+    )
+    "while performing typechecking"
 
 capitalize :: Text -> Text
 capitalize = T.toTitle . T.toLower
-
-showList :: [PlumeType] -> String
-showList [] = ""
-showList [x] = " and " <> showTy x
-showList (x : xs) = showTy x <> ", " <> showList xs
 
 instance IOThrowable PlumeError where
   showErrorIO e = interpretError e >> exitFailure
