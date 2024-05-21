@@ -33,7 +33,7 @@ instance Show PlumeType where
     let v = unsafePerformIO $ readIORef ref
     case v of
       Link t -> show t
-      Unbound q l -> toString q <> "-" <> show l <> " (may be a generic type)"
+      Unbound q l -> toString q <> "-" <> show l -- <> " (may be a generic type)"
   show (TypeQuantified q) = toString q
   show (TypeApp (TypeId "cons") [x, _]) = "[" <> show x <> "]"
   show (TypeApp (TypeId "nil") _) = "[]"

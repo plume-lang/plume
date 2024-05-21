@@ -38,15 +38,17 @@ discharge cenv p = do
     sub <- Map.fromList <$> mapM (\c -> (c,) <$> fresh) qvs
     (a :=>: b, _) <- instantiateQual sub sch
     b' <- liftIO $ compressQual b
-    (fmap (a,b,) <$> matchMut' b' p') `tryOr` pure Nothing
+    First <$> (fmap (a,b,) <$> matchMut' b' p') `tryOr` pure Nothing
 
-  case mconcat x of
+  case getFirst $ mconcat x of
     Just (_ps, b, _) -> do
-      let ps = removeQVars _ps
+      let ps = List.nub $ removeQVars _ps
+      _ps <- removeDuplicatesQuals ps
+      _ps' <- removeSuperclassesQuals _ps
       (ps', mp, as, ds) <-
         fmap mconcat
           . mapM (discharge cenv)
-          $ ps
+          $ _ps'
 
       let ty = getDictTypeForPred p'
       t <- liftIO $ compressPaths ty
@@ -294,3 +296,27 @@ instantiateFromName name sch = do
   (ty, qs) <- instantiate sch
   let r = liftPlaceholders name ty qs
   pure (ty, qs, r)
+
+isInSuperclassOf :: MonadChecker m => PlumeQualifier -> [PlumeQualifier] -> m Bool
+isInSuperclassOf p@(IsIn t n) ps = not . null <$> filterM (\case
+    IsIn t' n' -> do
+      MkClass _ (quals :=>: _) _ <- findClass n'
+      if null quals then liftIO $ do
+        _t <- compressPaths t
+        _t' <- compressPaths t'
+        bl <- doesUnifyWith _t _t'
+        pure $ bl && n == n'
+      else isInSuperclassOf p quals
+    _ -> pure False
+  ) ps
+isInSuperclassOf _ _ = pure False
+
+removeSuperclassesQuals :: MonadChecker m => [PlumeQualifier] -> m [PlumeQualifier]
+removeSuperclassesQuals [] = pure []
+removeSuperclassesQuals [x] = pure [x]
+removeSuperclassesQuals (x : xs) = do
+  xs' <- removeSuperclassesQuals xs
+  b <- isInSuperclassOf x xs'
+  if b
+    then pure xs'
+    else pure (x : xs)

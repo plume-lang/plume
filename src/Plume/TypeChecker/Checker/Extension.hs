@@ -205,7 +205,7 @@ synthExt
       writeIORef superclasses oldScs
 
       let h'' = List.foldl substituteVar h' sub''
-      
+
       unlessM (allIsSuperclass as''' scs) $ throw (UnresolvedTypeVariable as''')
 
       let args = map (\(n :>: t') -> n :@: t') as'''
