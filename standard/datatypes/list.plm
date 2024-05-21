@@ -54,3 +54,12 @@ extend<A extends equality> numeric<list<A>> {
   fn (+) (x, y) => x.list_concat(y)
   fn (-) (x, y) => x.filter(fn (z) => not elem(y, z))
 }
+
+extend<A extends equality> equality<list<A>> {
+  fn (==) (x, y) => switch (x, y) {
+    case ([], []) => true
+    case ([], ?) => false
+    case (?, []) => false
+    case ([a, ..as], [b, ..bs]) => (a == b) and (as == bs)
+  }
+}
