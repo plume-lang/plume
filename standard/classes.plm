@@ -31,8 +31,6 @@ interface<A extends boolean_algebra> equality<A> {
   fn (==)(a: A, b: A): bool
 }
 
-fn (!=)<A extends equality>(a: A, b: A): bool => not(a == b)
-
 interface<A> numeric<A> {
   fn (+)(a: A, b: A): A
   fn (-)(a: A, b: A): A
