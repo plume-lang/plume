@@ -79,49 +79,57 @@ synthDecl
       return (h, ty', ps', scheme)
     else do
       cenv <- gets (extendEnv . environment)
-      let givenPs = concatMap (\case x@(IsIn _ _) -> [x]; _ -> []) convertedGenerics
-      
+      (__ps, scs) <- do
+          p2 <- removeSuperclasses ps convertedGenerics
+          return (List.nub p2, List.nub convertedGenerics)
+
       res' <- traverse (discharge cenv) ps
       let (_ps, m2, as, _) = List.unzip4 res'
       let ps' = concatMap removeQVars _ps
 
       ps'' <- removeDuplicatesQuals ps'
 
-      let (_ :=>: t) = List.nub ps'' :=>: ty'
+      let ty''@(_ :=>: t) = List.nub ps'' :=>: ty'
 
       m' <- liftIO $ mapM (firstM compressQual) $ List.nub $ concat m2
 
       let names = getMapNames m'
-      let as'' = keepAssumpWithName (concat as) names
+      let as' = keepAssumpWithName (concat as) names
 
-      (sub, as''') <- removeDuplicatesAssumps as''
+      (sub, as'') <- removeDuplicatesAssumps as'
+      (remainingSub, _) <- removeDuplicatesAssumps as''
+      as''' <- removeSuperclassAssumps as'' scs
 
-      let finalM = m'
-
-      let finalExprs = map (second getAllElements) finalM
-      let finalExprs' = List.nub $ concatMap (\(_, e) -> map (\case
+      let finalExprs = map (second getAllElements) m'
+      let finalExprs' = concatMap (\(_, e) -> map (\case
               Post.EVariable n t' -> (n, t')
               _ -> error "Not a variable"
             ) e) finalExprs
 
       sub' <- unify finalExprs'
 
-      let sub'' = Map.toList sub' <> sub
+      let sub'' = Map.toList sub' <> sub <> remainingSub
 
       pos <- fetchPosition
-      h' <- liftIO $ runReaderT h $ getExpr pos finalM
-      let h'' = List.foldl substituteVar h' sub''
 
-      let args = map (\(n :>: t') -> n :@: t') as'''
-      let tys' = map (\(_ :>: t') -> t') as'''
+      oldScs <- readIORef superclasses
+      writeIORef superclasses scs
+      h' <- liftIO $ runReaderT h $ getExpr pos m'
+      writeIORef superclasses oldScs
+
+      let h'' = List.foldl substituteVar h' sub''
+      
+      unlessM (allIsSuperclass as''' scs) $ throw (UnresolvedTypeVariable as''')
+      
+      let args = map (\(n :>: t') -> n :@: t') as''
+      let tys' = map (\(_ :>: t') -> t') as''
     
       cTy' <- liftIO $ compressPaths ty'
 
       let clos = if null args then h'' else Post.EClosure args cTy' h'' pos
       let closTy = if null args then t else tys' :->: t
 
-      _ps <- removeDuplicatesQuals (ps'' <> givenPs)
-      let scheme' = Forall qvars $ _ps :=>: convertedTy'
+      let scheme' = Forall qvars ty''
 
       return (pure clos, closTy, [], scheme')
 

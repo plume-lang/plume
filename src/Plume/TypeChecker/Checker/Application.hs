@@ -25,5 +25,5 @@ synthApp infer (Pre.EApplication f xs) = local id $ do
   ret <- fresh
   t `unifiesWith` ts :->: ret
 
-  pure (ret, ps ++ concat pss, Post.EApplication <$> f'' <*> sequence xs')
+  pure (ret, ps <> concat pss, Post.EApplication <$> f'' <*> sequence xs')
 synthApp _ _ = throw $ CompilerError "Only applications are supported"

@@ -206,7 +206,7 @@ synthExt
 
       let h'' = List.foldl substituteVar h' sub''
       
-      unlessM (allIsSuperclass as'' scs) $ throw (UnresolvedTypeVariable as'')
+      unlessM (allIsSuperclass as''' scs) $ throw (UnresolvedTypeVariable as''')
 
       let args = map (\(n :>: t') -> n :@: t') as'''
       let tys' = map getAssumpVal as'''
