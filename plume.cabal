@@ -89,6 +89,8 @@ library
         Plume.Compiler.TypeErasure.DynamicDispatch.Dispatch
         Plume.Compiler.TypeErasure.DynamicDispatch.RTTI
 
+        Plume.Compiler.Dictionary
+
         Plume.Compiler.Desugaring.Syntax
         Plume.Compiler.Desugaring.Desugar
         Plume.Compiler.Desugaring.Monad
