@@ -34,7 +34,7 @@ newLambdaName :: (MonadIO m) => m Text
 newLambdaName = do
   i <- readIORef closedCounter
   writeIORef closedCounter (i + 1)
-  pure $ "lambda" <> show i
+  pure $ "@lambda" <> show i
 
 newCallName :: (MonadIO m) => m Text
 newCallName = do
@@ -63,20 +63,18 @@ closeClosure args e = do
   name <- newLambdaName
   modifyIORef' functions (M.insert name (length args))
 
-  let envVars = fromList $ zip (S.toList env) [0 ..]
-  let envDict =
+  let envVars = S.toList env
+      envDict =
         Post.CEDictionary . fromList $
-          map (\(x, i) -> (i, Post.CEVar x)) $
-            M.toList envVars
+          map (\x -> (x, Post.CEVar x)) envVars
 
   let envVar = Post.CEVar $ name <> "_env"
-  let envProps = M.map (Post.CEProperty envVar) envVars
+  let envProps = map (\x -> (x, Post.CEProperty envVar x)) envVars
 
   let envDecl =
-        map (\(x, i) -> Post.CSDeclaration x (Post.CEProperty envVar i)) $
-          M.toList envVars
+        map (\x -> Post.CSDeclaration x (Post.CEProperty envVar x)) envVars
 
-  let substBody = substituteMany (M.toList envProps) e
+  let substBody = substituteMany envProps e
 
   let body = case substBody of
         Post.CSExpr (Post.CEBlock [Post.CSExpr ret]) ->
@@ -90,7 +88,7 @@ closeClosure args e = do
 
   let lambdaDict =
         Post.CEDictionary $
-          fromList [(0, envDict), (1, Post.CEVar name)]
+          fromList [("env", envDict), ("f", Post.CEVar name)]
 
   return
     ([Post.CPFunction name (name <> "_env" : args) body], lambdaDict)
@@ -133,8 +131,8 @@ closeExpression (Pre.UEApplication f args) = do
       name <- newCallName
       (p1, f') <- closeExpression f
       let callVar = Post.CEVar name
-      let callVarP = Post.CEProperty callVar 1
-      let callDict = Post.CEProperty callVar 0
+      let callVarP = Post.CEProperty callVar "1"
+      let callDict = Post.CEProperty callVar "0"
       let call = Post.CEApplication callVarP (callDict : args')
       pure (p1 <> p2s, Post.CEDeclaration name f' call)
 closeExpression (Pre.UEDeclaration name e1 e2) = do

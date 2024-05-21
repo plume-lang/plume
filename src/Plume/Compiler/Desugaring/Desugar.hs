@@ -2,7 +2,8 @@
 
 module Plume.Compiler.Desugaring.Desugar where
 
-import Data.IntMap qualified as M
+import Data.Map qualified as M 
+import Data.IntMap qualified as IM
 import Data.Set qualified as Set
 import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Compiler.Desugaring.Monad
@@ -26,17 +27,23 @@ desugarExpr isTop = \case
     return (Post.DEList xs', concat stmts)
   Pre.CEProperty x i -> do
     (x', stmts) <- desugarExpr isTop x
-    return (Post.DEProperty x' i, stmts)
+    case readEither (toString i) of
+      Right i' -> return (Post.DEProperty x' i', stmts)
+      Left _ -> error $ "Invalid property index, received: " <> show i
   Pre.CEDictionary xs -> do
     (dicts, stmts) <-
       mapAndUnzipM
-        ( \(i, x) -> do
-            (x', stmts) <- desugarExpr isTop x
-            return (M.singleton i x', stmts)
+        ( \(idxStr, x) -> do
+            case readEither (toString idxStr) of
+              Right idx -> do
+                (x', stmts) <- desugarExpr isTop x
+                return (M.singleton (idx :: Int) x', stmts)
+              Left _ -> error "Invalid dictionary index"
         )
         (M.toList xs)
     let m = mconcat dicts
-    return (Post.DEDictionary m, concat stmts)
+    let m' = IM.fromList $ zip [0 ..] (M.elems m)
+    return (Post.DEDictionary m', concat stmts)
   c@Pre.CEConditionBranch {} -> desugarANF isTop (desugarExpr isTop) c
   Pre.CEEqualsType x t -> do
     (x', stmts) <- desugarExpr isTop x

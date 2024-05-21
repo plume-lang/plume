@@ -15,9 +15,9 @@ data ClosedExpr
   | CEMutUpdate Update ClosedExpr ClosedExpr
   | CEConditionBranch ClosedExpr ClosedExpr ClosedExpr
   | CESwitch ClosedExpr [(ClosedPattern, ClosedExpr)]
-  | CEDictionary (IntMap ClosedExpr)
+  | CEDictionary (Map Text ClosedExpr)
   | CEBlock [ClosedStatement]
-  | CEProperty ClosedExpr Int
+  | CEProperty ClosedExpr Text
   | CEEqualsType ClosedExpr Text
   | CESpecial
   | CEUnMut ClosedExpr
@@ -25,7 +25,7 @@ data ClosedExpr
 
 data Update
   = UVariable Text
-  | UProperty Update Int
+  | UProperty Update Text
   deriving (Eq, Show, Ord)
 
 data ClosedPattern

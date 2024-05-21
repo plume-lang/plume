@@ -71,7 +71,8 @@ instance Show DesugaredExpr where
   show (DEListLength e) = "length " <> show e
   show (DEUnMut e) = "unmut " <> show e
   show (DEDictionary es) =
-    "{" <> intercalate ", " (map show (IntMap.elems es)) <> "}"
+    "{" <> intercalate ", " (map showMap (IntMap.toList es)) <> "}"
+    where showMap (i, e) = show i <> ": " <> show e
 
 instance Show DesugaredStatement where
   show (DSExpr e) = show e

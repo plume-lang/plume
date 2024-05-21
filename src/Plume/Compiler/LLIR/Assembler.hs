@@ -242,9 +242,11 @@ instance Assemble Pre.Update where
       then pure [LLIR.Instruction (LLIR.LoadGlobal name)]
     else error $ "Variable " <> show name <> " not found"
   
-  assemble (Pre.UProperty u i) = do
-    u' <- assemble u
-    pure (u' <> [LLIR.Instruction (LLIR.ListGet i)])
+  assemble (Pre.UProperty u i) = case readEither (toString i) of
+    Right i' -> do
+      u' <- assemble u
+      pure (u' <> [LLIR.Instruction (LLIR.ListGet i')])
+    Left _ -> error "Property index must be an integer"
 
 isReturn :: LLIR.Instruction -> Bool
 isReturn LLIR.Return = True
