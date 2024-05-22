@@ -4,6 +4,7 @@ module Plume.Compiler.Desugaring.Modules.Switch where
 
 import Data.Map qualified as M
 import Data.Set qualified as S
+import Data.List qualified as L
 import GHC.IO hiding (liftIO)
 import Plume.Compiler.ClosureConversion.Free
 import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
@@ -11,6 +12,7 @@ import Plume.Compiler.Desugaring.Monad
 import Plume.Compiler.Desugaring.Syntax qualified as Post
 import Plume.Syntax.Common.Literal
 import Control.Monad.Exception (compilerError)
+import Plume.Syntax.Translation.Generics
 
 type Desugar' =
   Desugar Pre.ClosedStatement [ANFResult (Maybe Post.DesugaredStatement)]
@@ -28,44 +30,53 @@ switchCounter :: IORef Int
 switchCounter = unsafePerformIO $ newIORef 0
 
 desugarSwitch :: (IsToplevel, IsReturned, IsExpression) -> DesugarSwitch
-desugarSwitch (_, shouldReturn, isExpr) (fExpr, _) (Pre.CESwitch x cases) = do
-  (x', stmts) <- fExpr x
+desugarSwitch (_, shouldReturn, isExpr) (fExpr, fStmt) (Pre.CESwitch x cases) = do
   let freedPat = foldMap (free . fst) cases
-  (decl, declVar) <- case x' of
-    Post.DEVar n | n `S.notMember` freedPat -> return ([], x')
+  (decl, declVar) <- case x of
+    Pre.CEVar n | n `S.notMember` freedPat -> return ([], x)
     _ -> do
       i <- readIORef switchCounter
       let switchName = "$switch" <> show i
       modifyIORef' switchCounter (+ 1)
-      return (createLets (M.singleton switchName x'), Post.DEVar switchName)
+      return (createCloseLets (M.singleton switchName x), Pre.CEVar switchName)
   let (conds, maps) = unzip $ map (createCondition declVar . fst) cases
 
   let bodies = map snd cases
   let cases' = zip3 [0 ..] bodies maps
 
-  res <-
-    mapM
+  (stmts, res) <-
+    mapAndUnzipM
       ( \case
           (i, expr, m) -> do
             let pat = maybeAt i conds
-            (expr', stmts'') <- fExpr expr
+            let expr' = substituteMany (M.toList m) expr
+            (expr'', stmts'') <- fExpr expr'
             let lastStmt =
                   if shouldReturn
-                    then Post.DSReturn expr'
-                    else Post.DSExpr expr'
-            let stmts''' = substituteMany (M.toList m) (stmts'' <> [lastStmt])
-            let cond = createConditionExpr (fromMaybe [] pat)
-            return (Post.DEIf cond stmts''' [])
+                    then Post.DSReturn expr''
+                    else Post.DSExpr expr''
+            let stmts''' = stmts'' <> [lastStmt]
+            case pat of
+              Nothing -> return (mempty, Post.DEIf (Post.DELiteral (LBool True)) stmts''' [])
+              Just pats -> do
+                (pats', stmts2) <- mapAndUnzipM fExpr pats
+                let cond = createConditionExpr pats'
+                return (stmts2, Post.DEIf cond stmts''' [])
       )
       cases'
+
+  let stmts' = concat $ concat stmts
+
+  t <- concat <$> sequenceMapM fStmt decl
+  let finalDecl = L.foldl (\acc (x', stmts'') -> acc <> stmts'' <> maybeToList x') [] t
 
   if isExpr
     then do
       let ifs'' = createIfsExpr res
-      return (ifs'', stmts <> decl)
+      return (ifs'', stmts' <> finalDecl)
     else do
       let ifs' = createIfsStatement res
-      return (Post.DEVar "nil", stmts <> decl <> ifs')
+      return (Post.DEVar "nil", stmts' <> finalDecl <> ifs')
 desugarSwitch _ _ _ = compilerError "Received incorrect expression, not a switch."
 
 unboxStatement :: Post.DesugaredStatement -> Post.DesugaredExpr
@@ -110,39 +121,43 @@ createIfsExpr _ = compilerError "Incorrect list of conditions"
 createLets :: Map Text Post.DesugaredExpr -> [Post.DesugaredStatement]
 createLets = M.foldrWithKey (\k v acc -> Post.DSDeclaration k v : acc) []
 
+createCloseLets :: Map Text Pre.ClosedExpr -> [Pre.ClosedStatement]
+createCloseLets = M.foldrWithKey (\k v acc -> Pre.CSDeclaration k v : acc) []
+
 createCondition
-  :: Post.DesugaredExpr
+  :: Pre.ClosedExpr
   -> Pre.ClosedPattern
-  -> ([Post.DesugaredExpr], Map Text Post.DesugaredExpr)
+  -> ([Pre.ClosedExpr], Map Text Pre.ClosedExpr)
 createCondition _ Pre.CPWildcard = ([], mempty)
 createCondition x (Pre.CPVariable y) = ([], M.singleton y x)
 createCondition x (Pre.CPConstructor y xs) =
-  let spc = Post.DEEqualsTo (Post.DEProperty x 0) Post.DESpecial
-      cons = Post.DEEqualsTo (Post.DEProperty x 2) (Post.DELiteral (LString y))
-      (conds, maps) = unzip $ zipWith (createCondition . Post.DEProperty x) [3 ..] xs
+  let spc = Pre.CEEqualsTo (Pre.CEProperty x "0") Pre.CESpecial
+      cons = Pre.CEEqualsTo (Pre.CEProperty x "2") (Pre.CELiteral (LString y))
+      (conds, maps) = unzip $ zipWith (createCondition . Pre.CEProperty x) [show i | i <- [(3 :: Int) ..]] xs
    in (spc : cons : concat conds, mconcat maps)
 createCondition x (Pre.CPLiteral l) =
-  ([Post.DEEqualsTo x (Post.DELiteral l)], mempty)
+  ([Pre.CEEqualsTo x (Pre.CELiteral l)], mempty)
 createCondition x (Pre.CPSpecialVar n) = do
-  let spc = Post.DEEqualsTo (Post.DEProperty x 0) Post.DESpecial
-  let cons = Post.DEEqualsTo (Post.DEProperty x 2) (Post.DELiteral (LString n))
+  let spc = Pre.CEEqualsTo (Pre.CEProperty x "0") Pre.CESpecial
+  let cons = Pre.CEEqualsTo (Pre.CEProperty x "2") (Pre.CELiteral (LString n))
   ([spc, cons], mempty)
 createCondition x (Pre.CPList pats slice) =
   let (conds, maps) =
         unzip $
           zipWith
             createCondition
-            [Post.DEProperty x i | i <- [0 .. length pats - 1]]
+            [Pre.CEProperty x (show i) | i <- [0 .. length pats - 1]]
             pats
-      (conds', maps') = maybe mempty (createCondition (Post.DESlice x (length pats))) slice
+      (conds', maps') = maybe mempty (createCondition (Pre.CESlice x (length pats))) slice
       patLen = fromIntegral $ length pats
       lenCond = case slice of
         Just _ ->
-          Post.DEGreaterThan
-            (Post.DEListLength x)
-            (patLen - 1)
+          Pre.CEApplication (Pre.CEVar ">") [
+              Pre.CEApplication (Pre.CEVar "@list_length") [x]
+            , Pre.CELiteral (LInt $ patLen - 1)
+          ]
         Nothing ->
-          Post.DEEqualsTo
-            (Post.DEListLength x)
-            (Post.DELiteral (LInt (toInteger patLen)))
+          Pre.CEEqualsTo
+            (Pre.CEApplication (Pre.CEVar "@list_length") [x])
+            (Pre.CELiteral (LInt (toInteger patLen)))
    in (lenCond : concat conds <> conds', mconcat maps <> maps')

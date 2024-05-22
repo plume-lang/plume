@@ -57,7 +57,7 @@ instance Show DesugaredExpr where
     toString f <> "(" <> intercalate ", " (map show args) <> ")"
   show (DELiteral l) = show l
   show (DEList es) = "[" <> intercalate ", " (map show es) <> "]"
-  show (DEIndex e1 e2) = show e1 <> "[" <> show e2 <> "]"
+  show (DEIndex e1 e2) = show e1 <> ".index(" <> show e2 <> ")"
   show (DEProperty e i) = show e <> "." <> show i
   show (DEIf e1 e2 e3) =
     "if " <> show e1 <> " then " <> show e2 <> " else " <> show e3
