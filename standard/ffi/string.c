@@ -226,8 +226,8 @@ Value get_index_str(int arg_n, Module* mod, Value* args) {
 
 Value char_to_string(int arg_n, Module* mod, Value* args) {
   if (arg_n != 1) THROW("CharToString expects 1 argument");
-  ASSERT(get_type(args[0]) == TYPE_STRING,
-         "CharToString expects a string argument");
+  ASSERT_FMT(get_type(args[0]) == TYPE_STRING,
+         "CharToString expects a string argument, received %s", type_of(args[0]));
 
   return args[0];
 }
