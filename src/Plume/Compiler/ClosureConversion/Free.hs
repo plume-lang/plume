@@ -38,6 +38,8 @@ instance Free ClosedExpr where
   free (CEMutDeclaration x e1 e2) = (free e1 <> free e2) S.\\ S.singleton x
   free (CEMutUpdate x e1 e2) = ((free e1 <> free e2) S.\\ free x) <> free x
   free (CEUnMut e) = free e
+  free (CEEqualsTo e1 e2) = free e1 <> free e2
+  free (CESlice e1 _) = free e1
 
 instance Free Update where
   free (UVariable x) = S.singleton x
@@ -122,6 +124,8 @@ instance Substitutable ClosedExpr ClosedExpr where
     | otherwise = CEMutUpdate (UVariable x) (substitute e e1) (substitute e e2)
   substitute e (CEMutUpdate x e1 e2) = CEMutUpdate x (substitute e e1) (substitute e e2)
   substitute e (CEUnMut e') = CEUnMut (substitute e e')
+  substitute e (CEEqualsTo e1 e2) = CEEqualsTo (substitute e e1) (substitute e e2)
+  substitute e (CESlice e1 e2) = CESlice (substitute e e1) e2
 
 convertToUpdate :: ClosedExpr -> Update
 convertToUpdate (CEVar x) = UVariable x

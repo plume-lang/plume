@@ -10,17 +10,49 @@ import Plume.Compiler.TypeErasure.Syntax qualified as Pre
 
 type MonadClosure m = (MonadIO m, MonadError Text m)
 
-{-# NOINLINE globalVars #-}
-globalVars :: IORef (S.Set Text)
-globalVars = unsafePerformIO $ newIORef S.empty
-
-{-# NOINLINE functions #-}
-functions :: IORef (M.Map Text Int)
-functions = unsafePerformIO $ newIORef M.empty
+-- | CLOSURE CONVERSION
+-- | Closure conversion may be one of the most important steps in the
+-- | compilation process. It converts all anonymous functions and closures
+-- | into named functions. This is done by creating a new function that
+-- | carries an environment (contains all the free variables) and a reference
+-- | to the original function.
+-- |
+-- | - All remaining closures should converted to named functions.
+-- | - When encountering a native function or global variable, it should be
+-- |   added to the reserved stack, meaning that we shall not convert this 
+-- |   function. However, if the function is used as a variable name in a 
+-- |   call, it should be semi-converted.
+-- | - Local stack is used to prevent name conflicts between reserved and locals
+-- |   variables. They're defined as a set of text containing the names of the 
+-- |   variables encountered in a block scope.
+-- | - Special functions should not be converted, this especially includes 
+-- |   ADTs. They're recognized by a special and unique character at the 
+-- |   beginning of their name.
+-- | 
+-- | The conversion process is done by traversing the AST and converting each
+-- | expression and statement into a closed expression or statement.
+-- | When encountering a closure, the following algorithm is applied:
+-- | - The free variables are calculated, to determine the environment.
+-- | - Reserved functions are eliminated from environment, except for those
+-- |   that are used as variables in the closure.
+-- | - A new environment dictionary is created, containing all the free
+-- |   variables (e.g. { x: x, y: y }).
+-- | - A new environment variable is created, representing the closure
+-- |   environment.
+-- | - The body of the closure is substituted with the environment dictionary
+-- |   and the closure environment variable.
+-- | - The closure is converted into a named function, containing the
+-- |   environment as the first argument and the rest of the arguments.
+-- | - A new object (resp. dictionary) is created, containing the closure's
+-- |   environment and the function reference (e.g. { f: <func>, env: <env> }).
 
 {-# NOINLINE locals #-}
 locals :: IORef (S.Set Text)
 locals = unsafePerformIO $ newIORef S.empty
+
+{-# NOINLINE reserved #-}
+reserved :: IORef (M.Map Text Int)
+reserved = unsafePerformIO $ newIORef M.empty
 
 {-# NOINLINE closedCounter #-}
 closedCounter :: IORef Int
@@ -42,37 +74,32 @@ newCallName = do
   writeIORef callCounter (i + 1)
   pure $ "call" <> show i
 
-{-# NOINLINE reserved #-}
-reserved :: IORef (S.Set Text)
-reserved = unsafePerformIO $ newIORef S.empty
-
 closeClosure
   :: (MonadClosure m)
   => [Text]
   -> Post.ClosedStatement
   -> m ([Post.ClosedProgram], Post.ClosedExpr)
 closeClosure args e = do
-  globalV <- readIORef globalVars
-  funs <- S.fromList . M.keys <$> readIORef functions
+  funs <- S.fromList . M.keys <$> readIORef reserved
   lcls <- readIORef locals
 
-  let defined = (funs <> globalV) S.\\ lcls
+  let defined = funs S.\\ lcls
 
   let env = free e S.\\ (S.fromList args <> defined)
 
   name <- newLambdaName
-  modifyIORef' functions (M.insert name (length args))
 
-  let envVars = S.toList env
+  let envVars = M.fromList $ zip (S.toList env) [show x :: Text | x <- [(0 :: Int) ..]]
       envDict =
         Post.CEDictionary . fromList $
-          map (\x -> (x, Post.CEVar x)) envVars
+          map (\(x, i) -> (i, Post.CEVar x)) (M.toList envVars)
+      envL    = M.toList envVars
 
   let envVar = Post.CEVar $ name <> "_env"
-  let envProps = map (\x -> (x, Post.CEProperty envVar x)) envVars
+  let envProps = map (second $ Post.CEProperty envVar) envL
 
   let envDecl =
-        map (\x -> Post.CSDeclaration x (Post.CEProperty envVar x)) envVars
+        map (\(x, i) -> Post.CSDeclaration x (Post.CEProperty envVar i)) envL
 
   let substBody = substituteMany envProps e
 
@@ -88,45 +115,53 @@ closeClosure args e = do
 
   let lambdaDict =
         Post.CEDictionary $
-          fromList [("env", envDict), ("f", Post.CEVar name)]
+          fromList [("0", envDict), ("1", Post.CEVar name)]
 
   return
     ([Post.CPFunction name (name <> "_env" : args) body], lambdaDict)
+
+tupleMaybe :: (Maybe a, Maybe a) -> Maybe a
+tupleMaybe (Just x, _) = Just x
+tupleMaybe (_, Just y) = Just y
+tupleMaybe _ = Nothing
 
 closeExpression
   :: (MonadClosure m)
   => Pre.UntypedExpr
   -> m ([Post.ClosedProgram], Post.ClosedExpr)
 closeExpression (Pre.UEVar x) = do
-  res <- readIORef reserved
-  lcls <- getDefinedWithoutNatives
-  if x `S.member` lcls 
-    then pure ([], Post.CEVar x)
-  else if x `S.member` res
+  reserved' <- readIORef reserved
+  locals'   <- readIORef locals
+
+  let newRes = M.keysSet reserved' S.\\ locals'
+
+  if S.member x newRes
     then do
-      funs <- readIORef functions
-      case M.lookup x funs of
-        Just arity -> do
+      case M.lookup x reserved' of
+        Just arity | arity >= 0 -> do
           let args = [x <> "_arg" <> show i | i <- [0 .. arity - 1]]
           let lambda =
                 Pre.UEClosure
                   args
                   (Pre.USReturn (Pre.UEApplication (Pre.UEVar x) (map Pre.UEVar args)))
           closeExpression lambda
-        Nothing -> pure ([], Post.CEVar x)
-  else pure ([], Post.CEVar x)
+        _ -> pure ([], Post.CEVar x)
+    else pure ([], Post.CEVar x)
 closeExpression (Pre.UELiteral l) = pure ([], Post.CELiteral l)
 closeExpression (Pre.UEList es) = (Post.CEList <$>) . sequence <$> traverse closeExpression es
 closeExpression Pre.UESpecial = pure ([], Post.CESpecial)
 closeExpression (Pre.UEApplication f args) = do
-  res <- readIORef reserved
-  funs <- S.fromList . M.keys <$> readIORef functions
-  let toplevels = funs <> res
+  reserved' <- readIORef reserved
+  locals'   <- readIORef locals
 
-  (p2s, args') <- sequence <$> traverse closeExpression args
+  let newRes = M.keysSet reserved' S.\\ locals'
+  
+  (stmts1, args') <- mapAndUnzipM closeExpression args
+
   case f of
-    Pre.UEVar x | x `S.member` toplevels -> do
-      pure (p2s, Post.CEApplication (Post.CEVar x) args')
+    Pre.UEVar x | x `S.member` newRes -> 
+      pure (concat stmts1, Post.CEApplication (Post.CEVar x) args')
+    
     _ -> do
       name <- newCallName
       (p1, f') <- closeExpression f
@@ -134,7 +169,7 @@ closeExpression (Pre.UEApplication f args) = do
       let callVarP = Post.CEProperty callVar "1"
       let callDict = Post.CEProperty callVar "0"
       let call = Post.CEApplication callVarP (callDict : args')
-      pure (p1 <> p2s, Post.CEDeclaration name f' call)
+      pure (p1 <> concat stmts1, Post.CEDeclaration name f' call)
 closeExpression (Pre.UEDeclaration name e1 e2) = do
   modifyIORef' locals (S.insert name)
   (p1, e1') <- closeExpression e1
@@ -240,30 +275,30 @@ makeReturnBody e = Post.CSExpr (Post.CEBlock $ makeReturn e)
 
 closeProgram
   :: (MonadClosure m) => Pre.UntypedProgram -> m [Post.ClosedProgram]
-closeProgram (Pre.UPFunction name args e) = do
-  lcls <- readIORef locals
-  modifyIORef' locals (S.union (S.fromList args))
-  modifyIORef' functions (M.insert name (length args))
+closeProgram (Pre.UPADTFunction name args e) = do
+  modifyIORef' reserved (M.insert name (length args))
   (stmts, e') <- closeStatement e
-  writeIORef locals lcls
+  pure $ stmts ++ [Post.CPFunction name args e']
+closeProgram (Pre.UPFunction name args e) = do
+  modifyIORef' reserved (M.insert name (length args))
+  (stmts, e') <- closeStatement e
   pure $ stmts ++ [Post.CPFunction name args e']
 closeProgram (Pre.UPNativeFunction fp name arity st) = do
-  modifyIORef' reserved (S.insert name)
-  modifyIORef' functions (M.insert name arity)
+  modifyIORef' reserved (M.insert name arity)
   pure [Post.CPNativeFunction fp name arity st]
 closeProgram (Pre.UPStatement s) = do
   (stmts, s') <- closeStatement s
   pure $ stmts ++ [Post.CPStatement s']
 closeProgram (Pre.UPDeclaration n e) = do
-  modifyIORef' globalVars (<> S.singleton n)
+  modifyIORef' reserved (M.insert n (-1))
   (stmts, e') <- closeExpression e
   pure $ stmts ++ [Post.CPDeclaration n e']
 closeProgram (Pre.UPMutDeclaration n e) = do
-  modifyIORef' globalVars (<> S.singleton n)
+  modifyIORef' reserved (M.insert n (-1))
   (stmts, e') <- closeExpression e
   pure $ stmts ++ [Post.CPMutDeclaration n e']
 closeProgram (Pre.UPMutUpdate n e) = do
-  modifyIORef' globalVars (<> S.singleton n)
+  modifyIORef' reserved (M.insert n (-1))
   (stmts, e') <- closeExpression e
   pure $ stmts ++ [Post.CPMutUpdate (Post.UVariable n) e']
 
@@ -274,13 +309,3 @@ runClosureConversion
 runClosureConversion e = do
   writeIORef closedCounter 0
   (concat <$>) <$> runExceptT (traverse closeProgram e)
-
-getDefinedWithoutNatives :: MonadIO m => m (Set Text)
-getDefinedWithoutNatives = do
-  res <- readIORef reserved
-  _lcls <- readIORef locals
-  funs <- S.fromList . M.keys <$> readIORef functions
-  globals <- readIORef globalVars
-  let defined = (funs <> globals) S.\\ res
-
-  pure $ _lcls S.\\ defined
