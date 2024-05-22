@@ -43,5 +43,6 @@ input
 print_int
 copy_ref
 free_ref
+read_file
 
 ffi_fetch

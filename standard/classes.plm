@@ -45,3 +45,20 @@ interface<A> product<A> {
 interface<A> ordering<A> {
   fn (<)(a: A, b: A): bool
 }
+
+interface<T> traversable<T> {
+  fn map<A, B>(self: T<A>, f: fn(A): B): T<B>
+}
+
+interface<T> foldable<T> {
+  fn foldl<A, B>(self: T<A>, f: fn(B, A): B, init: B): B
+}
+
+interface<T> indexable<T> {
+  fn get_index<A>(self: T<A>, i: int): Option<A>
+}
+
+interface<A> monoidal<A> {
+  fn empty(): A
+  fn concat(a: A, b: A): A
+}

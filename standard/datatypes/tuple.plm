@@ -5,3 +5,17 @@ extend<A extends show, B extends show> show<tuple<A, B>> {
     case tuple(a, b) => "(" + show(a) + ", " + show(b) + ")"
   }
 }
+
+extend<A extends equality, B extends equality> equality<tuple<A, B>> {
+  fn (==) (a: tuple<A, B>, b: tuple<A, B>) => switch (a, b) {
+    case ((a1, b1), (a2, b2)) => a1 == a2 and b1 == b2
+  }
+}
+
+fn fst<A, B>(t: tuple<A, B>): A => switch t {
+  case tuple(a, _) => a
+}
+
+fn snd<A, B>(t: tuple<A, B>): B => switch t {
+  case tuple(_, b) => b
+}

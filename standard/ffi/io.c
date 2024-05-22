@@ -127,3 +127,26 @@ Value free_ref(int arg_n, Module* mod, Value* args) {
 
   return args[0];
 }
+
+
+// Function that reads a file and returns Option<str>
+Value read_file(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 1) THROW("ReadFile expects 1 argument");
+  Value file = args[0];
+  ASSERT(get_type(file) == TYPE_STRING, "ReadFile expects a string argument");
+
+  FILE* fp = fopen(GET_STRING(file), "r");
+  if (fp == NULL) return make_none();
+
+  fseek(fp, 0, SEEK_END);
+  long fsize = ftell(fp);
+  fseek(fp, 0, SEEK_SET);
+
+  char* buffer = malloc(fsize + 1);
+  fread(buffer, 1, fsize, fp);
+  fclose(fp);
+
+  buffer[fsize] = 0;
+
+  return make_some(MAKE_STRING(buffer, fsize));
+}

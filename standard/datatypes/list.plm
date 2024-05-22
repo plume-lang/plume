@@ -9,18 +9,14 @@ native "std:native" {
   ffi_slice_list<A>(x: [A], start: int, end: int): [A]
 }
 
-interface<T> traversable<T> {
-  fn map<A, B>(self: T<A>, f: fn(A): B): T<B>
-}
-
-interface<T> foldable<T> {
-  fn foldl<A, B>(self: T<A>, f: fn(B, A): B, init: B): B
+extend indexable<list> {
+  fn get_index<A>(self: list<A>, i): Option<A> => ffi_get_index(self, i)
 }
 
 extend traversable<list> {
   fn map<A, B>(self: list<A>, f: fn(A): B): list<B> => switch self {
     case [] => []
-    case [x, ..xs] => xs.map(f).list_append(f(x))
+    case [x, ..xs] => xs.map(f).list_prepend(f(x))
   }
 }
 
@@ -63,3 +59,14 @@ extend<A extends equality> equality<list<A>> {
     case ([a, ..as], [b, ..bs]) => (a == b) and (as == bs)
   }
 }
+
+fn slice<A>(xs: [A], start: int): [A] => switch (xs, start) {
+  case ([], ?) => []
+  case ([y, ..ys], 0) => xs
+  case ([?, ..ys], ?) => slice(ys, start - 1)
+}
+
+fn find<T extends foldable, A, B>(x: T<(A, B)>, f: fn(A): bool): Option<B> =>
+  x.foldl(fn (acc, tp) => switch tp {
+    case tuple(a, b) => if (f(a)) Some(b) else acc
+  }, None)

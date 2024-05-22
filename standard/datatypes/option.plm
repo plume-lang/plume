@@ -50,3 +50,29 @@ extend<A extends show> show<Option<A>> {
     case None => "None"
   }
 }
+
+extend<A> boolean_algebra<Option<A>> {
+  fn and(a: Option<A>, b: Option<A>): Option<A> => switch a {
+    case Some(_) => b
+    case None => None
+  }
+
+  fn or(a: Option<A>, b: Option<A>): Option<A> => switch a {
+    case Some(_) => a
+    case None => b
+  }
+
+  fn not(a: Option<A>): Option<A> => None
+}
+
+fn or_else<A>(a: Option<A>, b: A): A => switch a {
+  case Some(x) => x
+  case None => b
+}
+
+extend traversable<Option> {
+  fn map<A, B>(a: Option<A>, f: fn(A): B): Option<B> => switch a {
+    case Some(x) => Some(f(x))
+    case None => None
+  }
+}

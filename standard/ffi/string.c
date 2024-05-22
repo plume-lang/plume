@@ -130,7 +130,7 @@ Value string_length(int arg_n, Module* mod, Value* args) {
          "String_length expects a string argument");
 
   HeapValue* str = GET_PTR(args[0]);
-  return MAKE_INTEGER(str->length);
+  return MAKE_INTEGER(strlen(str->as_string));
 }
 
 Value eq_string(int arg_n, Module* mod, Value* args) {
@@ -140,8 +140,6 @@ Value eq_string(int arg_n, Module* mod, Value* args) {
 
   HeapValue* str1 = GET_PTR(args[0]);
   HeapValue* str2 = GET_PTR(args[1]);
-
-  if (str1->length != str2->length) return MAKE_INTEGER(0);
 
   return MAKE_INTEGER(strcmp(str1->as_string, str2->as_string) == 0);
 }
