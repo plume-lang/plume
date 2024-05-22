@@ -323,7 +323,6 @@ removeSuperclassesQuals [x] = pure [x]
 removeSuperclassesQuals (x : xs) = do
   xs' <- removeSuperclassesQuals xs
   b <- isInSuperclassOf x xs'
-  print (b, x, xs)
   if b
     then pure xs'
     else pure (x : xs)
