@@ -8,6 +8,16 @@ import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Control.Monad.IO
 
+-- | BYTECODE ASSEMBLER
+-- | The bytecode assembler is the process of transforming the LLIR bytecode
+-- | AST into a sequence of instructions that can be read by the virtual machine.
+-- | This step is not that much different from the previous one, it globally only
+-- | requires to set-up correctly load indexes and call indexes, by removing the
+-- | variables names in favor of negative indexes.
+-- |
+-- | We're using negative indexes for optimization purposes, as it's easier to 
+-- | lookup when only knowing the base pointer in the execution process.
+
 {-# NOINLINE standardPath #-}
 standardPath :: IORef Text
 standardPath = IO.unsafePerformIO $ newIORef ""

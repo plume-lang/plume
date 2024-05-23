@@ -13,6 +13,30 @@ import Data.List qualified as List
 import Plume.Syntax.Common qualified as Cmm
 import Plume.Syntax.Translation.Generics
 
+-- | LLIR ASSEMBLER
+-- | The LLIR assembler is a step in the compilation process where the AST is
+-- | transformed into a simpler form, the LLIR (Low-Level Intermediate
+-- | Representation). It is a mix of high-level constructs (variables,
+-- | functions...) and low-level constructs (instructions, jumps...).
+-- |
+-- | Transforming our code to LLIR is quite straightforward, as we only need to
+-- | transform our AST into a sequence of instructions.
+-- | But they are rules to respect:
+-- |
+-- |  - We need to keep track of the constants we use in our code, in order to
+-- |    have a constant table to serialize
+-- |
+-- |  - We need to keep track of the global variables we use in our code, in
+-- |    order to know if we load a local, global, or native variable
+-- |
+-- |  - We need to keep track of the native functions we use in our code, in
+-- |    order to know if we call a local, global, or native function. We need it
+-- |    too to know the address of the native function in the final binary and
+-- |    the address too of the library.
+-- |
+-- |  - We need to know which functions are returning something, to know if we 
+-- |    need to put a relative jump or not.
+
 {-# NOINLINE natives #-}
 natives :: IORef (Set Text)
 natives = IO.unsafePerformIO $ newIORef Set.empty
