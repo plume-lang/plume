@@ -5,6 +5,52 @@ All notable changes from Plume releases will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2](https://github.com/plume-lang/plume/compare/0.7.1...0.7.2) - 2024-05-23
+
+### Fixed
+
+- fix(tc): removed unwanted print from typechecker [`#fix(tc): removed unwanted print from typechecker`](https://github.com/plume-lang/plume/issues/fix(tc): removed unwanted print from typechecker)
+- fix(tc): fixed super-interface removal in typechecker [`#fix(tc): fixed super-interface removal in typechecker`](https://github.com/plume-lang/plume/issues/fix(tc): fixed super-interface removal in typechecker)
+- fix(llir): fixed choice between store local and store global [`#fix(llir): fixed choice between store local and store global`](https://github.com/plume-lang/plume/issues/fix(llir): fixed choice between store local and store global)
+- fix(compiler): fixed ADT-nested functions in switch removal [`#fix(compiler): fixed ADT-nested functions in switch removal`](https://github.com/plume-lang/plume/issues/fix(compiler): fixed ADT-nested functions in switch removal)
+- fix(cc): rewrote entirely closure conversion [`#fix(cc): rewrote entirely closure conversion`](https://github.com/plume-lang/plume/issues/fix(cc): rewrote entirely closure conversion)
+- fix(tc): fixed superclass discharging [`#fix(tc): fixed superclass discharging`](https://github.com/plume-lang/plume/issues/fix(tc): fixed superclass discharging)
+- fix(std): fixed standard library according to new typechecker errors [`#fix(std): fixed standard library according to new typechecker errors`](https://github.com/plume-lang/plume/issues/fix(std): fixed standard library according to new typechecker errors)
+- fix(compiler): fixed closure conversion dictionary generation order [`#fix(compiler): fixed closure conversion dictionary generation order`](https://github.com/plume-lang/plume/issues/fix(compiler): fixed closure conversion dictionary generation order)
+- fix(tc): fixed drunkely error in extension and declaration typechecking [`#fix(tc): fixed drunkely error in extension and declaration typechecking`](https://github.com/plume-lang/plume/issues/fix(tc): fixed drunkely error in extension and declaration typechecking)
+- fix(std): fixed standard with orphan extensions [`#fix(std): fixed standard with orphan extensions`](https://github.com/plume-lang/plume/issues/fix(std): fixed standard with orphan extensions)
+- fix(tc): fixed extension typechecking by providing better error handling [`#fix(tc): fixed extension typechecking by providing better error handling`](https://github.com/plume-lang/plume/issues/fix(tc): fixed extension typechecking by providing better error handling)
+- fix(parser): fixed orphan extension names [`#fix(parser): fixed orphan extension names`](https://github.com/plume-lang/plume/issues/fix(parser): fixed orphan extension names)
+- fix(std): fixed standard library with new errors [`#fix(std): fixed standard library with new errors`](https://github.com/plume-lang/plume/issues/fix(std): fixed standard library with new errors)
+- fix(main): removed temporarily memory module import [`#fix(main): removed temporarily memory module import`](https://github.com/plume-lang/plume/issues/fix(main): removed temporarily memory module import)
+- fix(language): removed memory manager due to critical issue [`#fix(language): removed memory manager due to critical issue`](https://github.com/plume-lang/plume/issues/fix(language): removed memory manager due to critical issue)
+- fix(compiler): fixed jumps, locals variables and return compilation [`#fix(compiler): fixed jumps, locals variables and return compilation`](https://github.com/plume-lang/plume/issues/fix(compiler): fixed jumps, locals variables and return compilation)
+- fix(tc): added default position for errors [`#fix(tc): added default position for errors`](https://github.com/plume-lang/plume/issues/fix(tc): added default position for errors)
+- fix(tc): fixed local declaration typechecking with qualifiers [`#fix(tc): fixed local declaration typechecking with qualifiers`](https://github.com/plume-lang/plume/issues/fix(tc): fixed local declaration typechecking with qualifiers)
+- fix(parser): optimized literal with string interpolation parsing [`#fix(parser): optimized literal with string interpolation parsing`](https://github.com/plume-lang/plume/issues/fix(parser): optimized literal with string interpolation parsing)
+
+### Commits
+
+- **Breaking change:** feat(language): added WIP memory management reference counting algorithm [`392691f`](https://github.com/plume-lang/plume/commit/392691f415323cf30b01a5e06ae367925afc5666)
+- **Breaking change:** feat(compiler): removed dictionary resolving step [`59d3b33`](https://github.com/plume-lang/plume/commit/59d3b332fdbacc50c8d923d2c6bbd7417e0548bc)
+- **Breaking change:** feat(std): added some new standard functions [`86bbac4`](https://github.com/plume-lang/plume/commit/86bbac4a8ab1bcfb8b596afcacb3f99224523030)
+- **Breaking change:** feat(syntax): added useless block removal step [`399f4bb`](https://github.com/plume-lang/plume/commit/399f4bbf71106d652fbbc904fd277d717032f468)
+- **Breaking change:** feat(lang): added support for orphan extensions [`3d65ab1`](https://github.com/plume-lang/plume/commit/3d65ab1a866c5773c4e877dd65beadc857f4d815)
+- **Breaking change:** feat(std): added complex number datatype [`138d9e5`](https://github.com/plume-lang/plume/commit/138d9e59c9b4b3b3496ec4940076584fc7fdaf79)
+- **Breaking change:** feat(std): added monadic interface [`ec0e8da`](https://github.com/plume-lang/plume/commit/ec0e8dae2f62ac43ebe9eb4f7a7cac39ced8f7f5)
+- **Breaking change:** feat(tc): added new error messages for extensions [`26e33c8`](https://github.com/plume-lang/plume/commit/26e33c8b7190e9a34514e430273644676bde02e5)
+- **Breaking change:** feat(std): added GC functions [`97a4647`](https://github.com/plume-lang/plume/commit/97a46478330609ef227104ea3afcecc8824b9571)
+- **Breaking change:** feat(std): added product interface to fix orphan extension issue [`752d8ea`](https://github.com/plume-lang/plume/commit/752d8ea3c1822039574420407424c2a5d60e5139)
+- **Breaking change:** feat(tc): added error handling for already defined function in instance [`660c6a8`](https://github.com/plume-lang/plume/commit/660c6a8debb899b6b062ba151d93294fc90f5892)
+- **Breaking change:** feat(language): added support for multiple interface inheritance [`2e89641`](https://github.com/plume-lang/plume/commit/2e89641e2a4085f9653c09afa9799ef5ff60df6f)
+- **Breaking change:** feat(type): added special compilation case for ADTs [`612bb3e`](https://github.com/plume-lang/plume/commit/612bb3e6b78d03cb16abaff1c33ee4d2f5d61fe7)
+- **Breaking change:** feat(std): added list equality [`f3bd57c`](https://github.com/plume-lang/plume/commit/f3bd57c68ea59fac72abf5e8f0342e2a8744e3bd)
+- **Breaking change:** feat(main): removed dictionary solving step from main entry [`d3d2542`](https://github.com/plume-lang/plume/commit/d3d2542088cbf68fe2b1f4881f3d08f70db432ed)
+- **Breaking change:** feat(main): added dictionary resolving step in main app [`4300229`](https://github.com/plume-lang/plume/commit/4300229cdf082d0f7aad9bb2af2de2a4e8bd725a)
+- **Breaking change:** feat(ffi): added more precise char_to_string error message [`cd7b5b2`](https://github.com/plume-lang/plume/commit/cd7b5b221c347a0fcad874c919dd38006253692b)
+- **Breaking change:** feat(main): added block removal step [`4400c02`](https://github.com/plume-lang/plume/commit/4400c02158a43406a82d8747b7f6e39612139918)
+- **Breaking change:** feat(main): added memory management step [`dff2ce5`](https://github.com/plume-lang/plume/commit/dff2ce5d2d3359cdf21fbeaa4af008635773c7b8)
+
 ## [0.7.1](https://github.com/plume-lang/plume/compare/0.7...0.7.1) - 2024-05-18
 
 ### Fixed
