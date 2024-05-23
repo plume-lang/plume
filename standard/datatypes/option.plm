@@ -76,3 +76,12 @@ extend traversable<Option> {
     case None => None
   }
 }
+
+extend monadic<Option> {
+  fn bind<A, B>(a: Option<A>, f: fn(A): Option<B>): Option<B> => switch a {
+    case Some(x) => f(x)
+    case None => None
+  }
+
+  fn pure<A>(a: A): Option<A> => Some(a)
+}
