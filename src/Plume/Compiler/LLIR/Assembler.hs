@@ -17,6 +17,10 @@ import Plume.Syntax.Translation.Generics
 natives :: IORef (Set Text)
 natives = IO.unsafePerformIO $ newIORef Set.empty
 
+{-# NOINLINE isFunctionCurrently #-}
+isFunctionCurrently :: IORef Bool
+isFunctionCurrently = IO.unsafePerformIO $ newIORef False
+
 {-# NOINLINE nativeFunctionsHandler #-}
 nativeFunctionsHandler :: IORef LLIR.Libraries
 nativeFunctionsHandler = IO.unsafePerformIO $ newIORef Map.empty
@@ -54,6 +58,7 @@ extractFrom (LLIR.Instruction instr) = [instr]
 
 instance Assemble Pre.DesugaredProgram where
   assemble (Pre.DPFunction name args body) = do
+    writeIORef isFunctionCurrently True
     glbs <- readIORef globals
     ntvs <- readIORef natives
     let reserved = glbs <> ntvs
@@ -71,6 +76,8 @@ instance Assemble Pre.DesugaredProgram where
 
     let locals = List.nub $ args <> Set.toList freed
         localSpace = zip locals [0..]
+
+    writeIORef isFunctionCurrently False
 
     pure [LLIR.Function name args localSpaceSize localSpace (finalBody <> [LLIR.ReturnUnit])]
 
@@ -118,11 +125,19 @@ instance Assemble Pre.DesugaredStatement where
 
   assemble (Pre.DSDeclaration name expr) = do
     expr' <- assemble expr
-    pure (expr' <> LLIR.storeLocal name)
+    
+    withinFunction <- readIORef isFunctionCurrently
+    let fun = if withinFunction then LLIR.storeLocal else LLIR.storeGlobal
+
+    pure (expr' <> fun name)
   
   assemble (Pre.DSMutDeclaration name expr) = do
     expr' <- assemble expr
-    pure (expr' <> [LLIR.Instruction LLIR.MakeMutable] <> LLIR.storeLocal name)
+
+    withinFunction <- readIORef isFunctionCurrently
+    let fun = if withinFunction then LLIR.storeLocal else LLIR.storeGlobal
+
+    pure (expr' <> [LLIR.Instruction LLIR.MakeMutable] <> fun name)
   
   assemble (Pre.DSMutUpdate update expr) = do
     update' <- assemble update

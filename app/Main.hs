@@ -12,7 +12,6 @@ import Plume.Compiler.Bytecode.Assembler
 import Plume.Compiler.Bytecode.Serialize
 import Plume.Compiler.Bytecode.Syntax (Instruction)
 import Plume.Compiler.Bytecode.Label hiding (labelPool)
-import Plume.Compiler.Dictionary
 import Plume.Compiler.ClosureConversion.Conversion
 import Plume.Compiler.Desugaring.Desugar
 import Plume.Compiler.SSA
@@ -26,7 +25,6 @@ import Plume.Syntax.Blocks
 import System.Directory
 import System.FilePath
 import System.IO.Pretty
-import Plume.Syntax.Translation.Generics
 import Prelude hiding (putStrLn, readFile)
 #if defined(mingw32_HOST_OS)
 import System.IO (hPutStrLn, hSetEncoding, stdout, utf8)
@@ -81,18 +79,17 @@ main = setEncoding $ do
       ppBuilding "Parsing file and dependencies..."
       runConcreteToAbstract env dir paths' file `with` \ast -> do
         let ast' = concatMap (removeUselessBlocks False) ast
-        -- memoryManaged <- transform ast'
         ppBuilding "Typechecking..."
         runSynthesize ast' `with` \tlir -> do
           -- ppPrint tlir
           ppBuilding "Compiling and optimizing..."
           erased <- erase tlir
           runClosureConversion erased `with` \closed -> do
-            cls <- concatMapM transform closed
-            desugared <- desugar cls
+            desugared <- desugar closed
             let ssa = runSSA desugared
             -- mapM_ print ssa
             (bytecode, natives', constants) <- runLLIRAssembler ssa
+            -- mapM_ print bytecode
             let nativeFuns = getNativeFunctions natives'
             (bytecode', labelPool) <- runUnlabelize bytecode
 

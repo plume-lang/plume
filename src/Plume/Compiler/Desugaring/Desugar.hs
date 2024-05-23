@@ -20,11 +20,21 @@ desugarExpr
 desugarExpr isTop = \case
   Pre.CESpecial -> return' Post.DESpecial
   Pre.CEVar x -> return' $ Post.DEVar x
+  Pre.CEApplication (Pre.CEVar ">") [x, Pre.CELiteral (LInt i)] -> do
+    (x', stmts) <- desugarExpr isTop x
+    return (Post.DEGreaterThan x' (fromInteger i), stmts)
+  Pre.CEApplication (Pre.CEVar "@list_length") [x] -> do
+    (x', stmts) <- desugarExpr isTop x
+    return (Post.DEListLength x', stmts)
   x@(Pre.CEApplication _ _) -> desugarANF isTop (desugarExpr isTop) x
   Pre.CELiteral x -> return' $ Post.DELiteral x
   Pre.CEList xs -> do
     (xs', stmts) <- mapAndUnzipM (desugarExpr isTop) xs
     return (Post.DEList xs', concat stmts)
+  Pre.CEEqualsTo x y -> do
+    (x', stmts1) <- desugarExpr isTop x
+    (y', stmts2) <- desugarExpr isTop y
+    return (Post.DEEqualsTo x' y', stmts1 ++ stmts2)
   Pre.CEProperty x i -> do
     (x', stmts) <- desugarExpr isTop x
     case readEither (toString i) of
@@ -38,7 +48,7 @@ desugarExpr isTop = \case
               Right idx -> do
                 (x', stmts) <- desugarExpr isTop x
                 return (M.singleton (idx :: Int) x', stmts)
-              Left _ -> error "Invalid dictionary index"
+              Left _ -> error $ "Invalid dictionary index, got: " <> show idxStr
         )
         (M.toList xs)
     let m = mconcat dicts
@@ -66,6 +76,10 @@ desugarExpr isTop = \case
   Pre.CEUnMut x -> do
     (x', stmts) <- desugarExpr isTop x
     return (Post.DEUnMut x', stmts)
+  Pre.CESlice x i -> do
+    (x', stmts) <- desugarExpr isTop x
+    return (Post.DESlice x' i, stmts)
+    
 
 desugarStatement
   :: (IsToplevel, IsReturned, IsExpression)

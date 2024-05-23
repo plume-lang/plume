@@ -43,8 +43,9 @@ discharge cenv p = do
   case getFirst $ mconcat x of
     Just (_ps, b, _) -> do
       let ps = List.nub $ removeQVars _ps
-      _ps <- removeDuplicatesQuals ps
-      _ps' <- removeSuperclassesQuals _ps
+      -- _ps <- removeDuplicatesQuals ps
+      _ps' <- removeSuperclassesQuals ps
+      -- print (_ps, _ps')
       (ps', mp, as, ds) <-
         fmap mconcat
           . mapM (discharge cenv)
@@ -301,15 +302,20 @@ isInSuperclassOf :: MonadChecker m => PlumeQualifier -> [PlumeQualifier] -> m Bo
 isInSuperclassOf p@(IsIn t n) ps = not . null <$> filterM (\case
     IsIn t' n' -> do
       MkClass _ (quals :=>: _) _ <- findClass n'
-      if null quals then liftIO $ do
-        _t <- compressPaths t
-        _t' <- compressPaths t'
-        bl <- doesUnifyWith _t _t'
-        pure $ bl && n == n'
+      if null quals then do
+        _t <- liftIO $ compressPaths t
+        _t' <- liftIO $ compressPaths t'
+        if _t /= _t' then do
+          bl <- doesMatch _t _t'
+          return (n == n' && bl)
+        else pure False
       else isInSuperclassOf p quals
     _ -> pure False
   ) ps
 isInSuperclassOf _ _ = pure False
+
+-- isPrimitive :: MonadChecker m => PlumeType -> m Bool
+-- isPrimitive (Type)
 
 removeSuperclassesQuals :: MonadChecker m => [PlumeQualifier] -> m [PlumeQualifier]
 removeSuperclassesQuals [] = pure []

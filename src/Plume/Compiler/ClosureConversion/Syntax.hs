@@ -21,6 +21,10 @@ data ClosedExpr
   | CEEqualsType ClosedExpr Text
   | CESpecial
   | CEUnMut ClosedExpr
+
+  -- Used for desugaring step
+  | CEEqualsTo ClosedExpr ClosedExpr
+  | CESlice ClosedExpr Int
   deriving (Eq, Show, Ord)
 
 data Update

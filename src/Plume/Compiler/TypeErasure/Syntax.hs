@@ -42,6 +42,7 @@ data UntypedStatement
 
 data UntypedProgram
   = UPFunction Text [Text] UntypedStatement
+  | UPADTFunction Text [Text] UntypedStatement
   | UPStatement UntypedStatement
   | UPNativeFunction Text Text Int IsStandard
   | UPDeclaration Text UntypedExpr

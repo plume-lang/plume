@@ -88,7 +88,7 @@ eraseType (Pre.EType tyName ts : xs) = do
     Just f -> return $ Post.UPDeclaration n (f [])
     Nothing -> compilerError "Type constructor not found"
   createFunction (Pre.TConstructor n vars) = case List.lookup n ts' of
-    Just f -> return $ Post.UPFunction n args (Post.USReturn (f args))
+    Just f -> return $ Post.UPADTFunction n args (Post.USReturn (f args))
      where
       args = map createVariant [0 .. length vars - 1]
     Nothing -> compilerError "Type constructor not found"
@@ -193,15 +193,15 @@ eraseExpr (Pre.EAnd e1 e2) = Post.UEAnd <$> eraseExpr e1 <*> eraseExpr e2
 eraseExpr (Pre.EIndex e i) = Post.UEIndex <$> eraseExpr e <*> eraseExpr i
 eraseExpr (Pre.EReturn e) = eraseExpr e
 eraseExpr (Pre.EType {}) = compilerError "Type isn't an expression"
-eraseExpr (Pre.EInstanceDict _ _ exprs) = do
-  exprs' <- mapM eraseExpr exprs
-  return (Post.UEList exprs')
 eraseExpr (Pre.EInstanceVariable name _) = pure $ Post.UEVar name
 eraseExpr (Pre.EInstanceAccess expr i) = do
   expr' <- eraseExpr expr
   pure (Post.UEIndex expr' (Post.UELiteral (LInt (toInteger i))))
 eraseExpr Pre.EEmpty = error "Should not encounter empty expressions"
 eraseExpr (Pre.ESpreadable _) = error "Should not encounter spreadable expressions"
+eraseExpr (Pre.EInstanceDict _ _ exprs) = do
+  exprs' <- mapM eraseExpr exprs
+  return (Post.UEList exprs')
 
 erasePattern :: Pre.TypedPattern PlumeType -> IO Post.UntypedPattern
 erasePattern (Pre.PVariable x _) = pure $ Post.UPVariable x
