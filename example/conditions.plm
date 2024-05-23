@@ -1,0 +1,10 @@
+x = 5
+
+if x == 5 {
+  println("test")
+} else {
+  println("test2")
+}
+
+nested = if (x == 5) println("test") else println("test2")
+
