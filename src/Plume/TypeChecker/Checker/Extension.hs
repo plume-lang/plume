@@ -108,11 +108,13 @@ synthExt
     let instH = IsIn ty tcName
     let pred' = gens :=>: instH
     
+    -- Checking if the instance is already defined
     possibleInst <- isInstanceAlreadyDefined instH
     when (isJust possibleInst) $ case possibleInst of
       Just ty' -> throw $ AlreadyDefinedInstance tcName ty'
       _ -> throw $ CompilerError "Instance already defined"
 
+    -- Pre-generating an instance dictionary only based on types
     cls@(MkClass _ _ meths) <- findClass tcName
     case cls of
       MkClass qs' quals methods' -> do
@@ -145,7 +147,7 @@ synthExt
     m1' <- liftIO . mapM (firstM compressQual) . List.nub $ concat m1
     let ass' = concat ass
     let args' = map (\(n :>: t') -> n :@: t') ass'
-    let tys'' = map getAssumpVal ass'
+    let tys'' = map (\(_ :>: t') -> t') ass'
 
     res' <- forM exprs $ \(ty', ps, h, name) -> do
       -- Generating the right local method constraints instances, for instance
@@ -158,6 +160,8 @@ synthExt
       -- Instance superclases should not interfere with method-local instances
       -- to avoid duplicate instances.
 
+      -- Removing common superclasses between user-given extensions and found
+      -- extensions in the inferred expression.
       (__ps, scs) <- case Map.lookup name schs of
         Just (Forall _ (ps2 :=>: _)) -> do
           p1 <- removeSuperclasses ps ps2
@@ -166,50 +170,56 @@ synthExt
           return (List.nub $ p1 <> p2, List.nub $ ps2 <> gens)
         Nothing -> pure ([], [])
 
+      -- Getting all the needed qualifiers to qualify further the expression
       res' <- traverse (discharge cenv) ps
       let (_ps, m2, as, _) = unzip4 res'
       let ps' = concatMap removeQVars _ps
 
       ps'' <- removeDuplicatesQuals ps'
-
       let ty''@(_ :=>: t) = List.nub ps'' :=>: ty'
 
+      -- Compressing types in the generated map
       m' <- liftIO $ mapM (firstM compressQual) $ List.nub $ concat m2
       let fstM1' = map fst m1'
       let m'' = filter ((`isQualNotDefined` fstM1') . fst) m'
+      let finalM = m'' <> m1'
 
+      -- Operating black magic to get the final assumptions
       let names = getMapNames m''
       let as' = keepAssumpWithName (concat as) names
-
       (sub, as'') <- removeDuplicatesAssumps as'
       (remainingSub, _) <- removeDuplicatesAssumps (as'' <> ass')
       as''' <- removeSuperclassAssumps as'' scs
 
-      let finalM = m'' <> m1'
-
+      -- Getting the final expressions
       let finalExprs = map (second getAllElements) finalM
       let finalExprs' = concatMap (\(_, e) -> map (\case
               Post.EVariable n t' -> (n, t')
               _ -> error "Not a variable"
             ) e) finalExprs
 
+      -- Getting the duplicates assumptions in order to remove and resolve
+      -- duplicatas.
       sub' <- unify finalExprs'
-
       let sub'' = Map.toList sub' <> sub <> remainingSub
 
+      -- Running the expression reader because we're toplevel or there are 
+      -- used-given generics.
       pos <- fetchPosition
-
       oldScs <- readIORef superclasses
       writeIORef superclasses scs
       h' <- liftIO $ runReaderT h $ getExpr pos finalM
       writeIORef superclasses oldScs
 
+      -- Substituting the duplicated assumptions in the expression
       let h'' = List.foldl substituteVar h' sub''
 
+      -- Checking if there are some remaining assumptions in the scope.
       unlessM (allIsSuperclass as''' scs) $ throw (UnresolvedTypeVariable as''')
 
+      -- Generating new types and expressions based on assumptions
       let args = map (\(n :>: t') -> n :@: t') as'''
-      let tys' = map getAssumpVal as'''
+      let tys' = map (\(_ :>: t') -> t') as'''
 
       cTy' <- liftIO $ compressPaths ty'
 
@@ -221,24 +231,35 @@ synthExt
     let (quals, exprs') = unzip res'
     let (funTys, _) = unzip quals
 
+
+    -- Creating instance dictionary
     let dict = Map.unions exprs'
     let dictFunTys = Map.unions funTys
 
+    -- Checking for missing methods in the extension (resp. instance)
     let meths' = Map.keys dict
-    let missingMeths = Map.keysSet meths `Set.difference` Set.fromList meths'
-
+    let areThereMissingMethods = Set.fromList meths' `Set.isSubsetOf` Map.keysSet meths
+    let missingMeths = 
+          if areThereMissingMethods 
+            then Set.fromList meths' Set.\\ Map.keysSet meths 
+            else Set.empty
+    
     unless (Set.null missingMeths) $ 
       throw $ MissingExtensionMethods tcName (Set.toList missingMeths)
 
+    -- Creating the new instance to insert it in the extend environment
     let inst = MkInstance qvars pred' dict dictFunTys
     let cls'' = (instH, void inst)
     addClassInstance cls''
 
+    -- Generating the instance dictionary by sorting the methods by name
     ty' <- liftIO $ compressPaths ty
     let name = tcName <> "_" <> createInstName ty'
     let methods' = Map.toList dict
     let methods'' = sortBy (\(a, _) (b, _) -> compare a b) methods'
 
+    -- Creating the instance expression and adding eventual super-interfaces
+    -- constraints
     let tapp = TypeApp (TypeId tcName) [ty]
     let funTy = if null args' then tapp else tys'' :->: ty
     let instDict = Post.EInstanceDict tcName ty (map snd methods'')
@@ -249,9 +270,6 @@ synthExt
     mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) generics
 
     pure (TUnit, [], pure (Post.EDeclaration (Annotation name funTy) dictE Nothing))
-    where
-      getAssumpVal :: Assumption a -> a
-      getAssumpVal (_ :>: val) = val
 synthExt _ _ = throw $ CompilerError "Only type extensions are supported"
 
 getExpr :: CST.Position -> [(PlumeQualifier, Post.Expression)] -> PlumeQualifier -> Post.Expression
@@ -278,6 +296,9 @@ removeSuperclassAssumps (x@(_ :>: TypeApp (TypeId tcName) [ty]) : xs) scs = do
     _ -> removeSuperclassAssumps xs scs
 removeSuperclassAssumps (x : xs) scs = (x:) <$> removeSuperclassAssumps xs scs
 
+-- | Inference for extension members. Extension members are just regular
+-- | expressions or functions, except that they are part of a type extension,
+-- | so they might have super-constraints implied by the upper extension.
 extMemberToDeclaration :: (MonadChecker m) => Infer -> PlumeScheme -> Pre.ExtensionMem -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression, Text)
 extMemberToDeclaration infer sch (Pre.ExtDeclaration gens (Annotation name ty) c) = do
   _ :: [PlumeQualifier] <- concatMapM convert gens
@@ -292,19 +313,7 @@ extMemberToDeclaration infer sch (Pre.ExtDeclaration gens (Annotation name ty) c
   mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) gens
   pure (bTy, ps', b, name)
 
-getExtMemberNames :: Pre.ExtensionMem -> Text
-getExtMemberNames (Pre.ExtDeclaration _ (Annotation name _) _) = name
-
-getConverted :: Converted -> PlumeType
-getConverted = \case
-  Left ty -> ty
-  Right ty -> ty
-
-convertMaybe :: (a `ConvertsTo` b) => Maybe a -> Checker (Either PlumeType b)
-convertMaybe = \case
-  Just x -> Right <$> convert x
-  Nothing -> Left <$> fresh
-
+-- | Checking if an interface is a included in a list of interfaces
 isSuperClass :: MonadIO m => PlumeQualifier -> [PlumeQualifier] -> m Bool
 isSuperClass p ps = do
   p' <- liftIO $ compressQual p
