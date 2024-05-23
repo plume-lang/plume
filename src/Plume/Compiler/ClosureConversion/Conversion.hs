@@ -18,13 +18,16 @@ type MonadClosure m = (MonadIO m, MonadError Text m)
 -- | to the original function.
 -- |
 -- | - All remaining closures should converted to named functions.
+-- |
 -- | - When encountering a native function or global variable, it should be
 -- |   added to the reserved stack, meaning that we shall not convert this 
 -- |   function. However, if the function is used as a variable name in a 
 -- |   call, it should be semi-converted.
+-- |
 -- | - Local stack is used to prevent name conflicts between reserved and locals
 -- |   variables. They're defined as a set of text containing the names of the 
 -- |   variables encountered in a block scope.
+-- |
 -- | - Special functions should not be converted, this especially includes 
 -- |   ADTs. They're recognized by a special and unique character at the 
 -- |   beginning of their name.
@@ -32,17 +35,24 @@ type MonadClosure m = (MonadIO m, MonadError Text m)
 -- | The conversion process is done by traversing the AST and converting each
 -- | expression and statement into a closed expression or statement.
 -- | When encountering a closure, the following algorithm is applied:
+-- |
 -- | - The free variables are calculated, to determine the environment.
+-- |
 -- | - Reserved functions are eliminated from environment, except for those
 -- |   that are used as variables in the closure.
+-- |
 -- | - A new environment dictionary is created, containing all the free
 -- |   variables (e.g. { x: x, y: y }).
+-- |
 -- | - A new environment variable is created, representing the closure
 -- |   environment.
+-- |
 -- | - The body of the closure is substituted with the environment dictionary
 -- |   and the closure environment variable.
+-- |
 -- | - The closure is converted into a named function, containing the
 -- |   environment as the first argument and the rest of the arguments.
+-- |
 -- | - A new object (resp. dictionary) is created, containing the closure's
 -- |   environment and the function reference (e.g. { f: <func>, env: <env> }).
 

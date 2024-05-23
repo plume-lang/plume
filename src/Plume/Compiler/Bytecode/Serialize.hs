@@ -11,6 +11,31 @@ import Prelude hiding (encodeUtf8)
 import Plume.Syntax.Common.Literal (Literal(..))
 import Plume.Compiler.LLIR.Syntax (Comparator(..), Libraries, NativeLibrary(..))
 
+-- | BYTECODE SERIALIZATION
+-- | Bytecode serialization is the process of transforming the bytecode AST into
+-- | a binary format that can be read by the virtual machine.
+-- |
+-- | The serialization process is done in multiple steps:
+-- |
+-- |  - Encode integer: This step encodes an integer into a binary format.
+-- |
+-- |  - Encode comparator: This step encodes a comparator into a binary format.
+-- |
+-- |  - Encode n null(s): This step encodes n null(s) value(s) into a 
+-- |    binary format.
+-- |
+-- |  - Encode instruction: This step encodes an instruction into a binary
+-- |    format. An instruction is just an int32 value.
+-- |
+-- |  - Encode text: This step encodes a text value into a binary format.
+-- |
+-- |  - Encode constant: This step encodes a constant value into a binary
+-- |    format.
+-- |
+-- |  - Encode native: This step encodes a native library into a binary format.
+-- |
+-- |  - Encode program: This step encodes a program into a binary format.
+
 encodeInteger :: (Integral a) => a -> Put
 encodeInteger = putInt32le . fromIntegral
 

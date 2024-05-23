@@ -25,12 +25,18 @@ synthesize :: (MonadChecker m) => Pre.Expression -> m (PlumeType, [PlumeQualifie
 
 -- | Some basic and primitive expressions
 synthesize (Pre.ELocated expr pos) = withPosition pos $ synthesize expr
+
+{-  
+ -  x : (β ⇒ σ) ∈ Γ
+ -  ---------------
+ -  Γ ⊦ x : (β ⇒ σ)
+ -}
 synthesize (Pre.EVariable name) = do
   -- Checking if the variable is a value
   searchEnv @"typeEnv" name >>= \case
     Just scheme -> instantiateFromName name scheme
     Nothing ->
-      -- Checking if the variable is a data-type constructor or variable
+      -- Checking if the variable is a data-type constructor
       searchEnv @"datatypeEnv" name >>= \case
         Just sch -> do
           (ty, qs) <- instantiate sch

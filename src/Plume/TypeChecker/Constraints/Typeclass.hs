@@ -7,21 +7,14 @@ import Data.Foldable qualified as Fold
 import Plume.Compiler.Desugaring.Monad (freshName)
 import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Constraints.Solver (unifiesWith)
-import Plume.TypeChecker.Constraints.Unification (compressPaths, doesUnifyWith, compressQual)
+import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (gets)
 
-instance Semigroup PlumeQualifier where
-  IsIn a b <> IsIn a' b' | b == b' = IsIn (a <> a') b
-  _ <> _ = error "Mismatched typeclasses"
-
-instance Semigroup PlumeType where
-  TypeId a <> TypeId b | a == b = TypeId a
-  TypeApp a b <> TypeApp a' b' | a == a' = TypeApp a (b <> b')
-  TypeVar a <> TypeVar b | a == b = TypeVar a
-  TypeQuantified a <> TypeQuantified b = TypeQuantified (a <> b)
-  _ <> _ = error "Mismatched types"
-
+-- | Discharging operation is a step that decompose a qualified type into smaller
+-- | extensions. This also generates the new dictionaries if no extensions is
+-- | is found for a given type. And this also generates the expressions that will
+-- | be used to create instance calls.
 discharge ::
   (MonadChecker m) =>
   ExtendEnv ->
@@ -33,6 +26,8 @@ discharge ::
       [Post.Expression]
     )
 discharge cenv p = do
+  -- Checking if some extension exists for the given qualifier and getting the
+  -- first to match.
   p' <- liftIO $ compressQual p
   x <- forM (getQuals cenv) $ \(qvs, sch) -> do
     sub <- Map.fromList <$> mapM (\c -> (c,) <$> fresh) qvs
@@ -42,15 +37,20 @@ discharge cenv p = do
 
   case getFirst $ mconcat x of
     Just (_ps, b, _) -> do
+      -- Removing already deduced superclasses, e.g. boolean_algebra A is a
+      -- superclass of equality A, so if both are presents, we can remove 
+      -- boolean_algebra qualifier.
       let ps = List.nub $ removeQVars _ps
-      -- _ps <- removeDuplicatesQuals ps
       _ps' <- removeSuperclassesQuals ps
-      -- print (_ps, _ps')
+
+      -- Recursively discharging environment in order to get smaller pieces of
+      -- qualifiers
       (ps', mp, as, ds) <-
         fmap mconcat
           . mapM (discharge cenv)
           $ _ps'
 
+      -- Getting dictionary stuffs for generating calls, map, assumptions..
       let ty = getDictTypeForPred p'
       t <- liftIO $ compressPaths ty
 
@@ -58,6 +58,8 @@ discharge cenv p = do
           e = if null ds then d else Post.EApplication d ds
       pure (ps', mp <> [(p', e)], as, pure e)
     Nothing -> do
+      -- If no exact extension is found, backing off and creating a new
+      -- dictionary for the extension. 
       param <- freshName
       let paramTy = getDictTypeForPred p'
       pure
@@ -67,6 +69,7 @@ discharge cenv p = do
           pure $ Post.EVariable param paramTy
         )
 
+-- SOME TEXT QUALIFIER RELATED FUNCTIONS
 getDictName :: Text -> PlumeType
 getDictName n = TypeId $ getDictName2 n
 
@@ -107,6 +110,7 @@ normalize (Forall qs t) = Forall qs $ normqual t
     normtype (TypeVar c) = TypeVar c
     normtype (TypeQuantified a) = TypeQuantified a
 
+-- SOME UNIFYING FUNCTIONS FOR DISCHARGING
 doesMatch :: (MonadChecker m) => PlumeType -> PlumeType -> m Bool
 doesMatch (TypeApp x xs) (TypeApp y ys) = do
   b <- doesMatch x y
@@ -152,6 +156,7 @@ matchMut' (IsIn a1 b) (IsIn a2 b') | b == b' = do
   Just <$> matchMut a1' a2'
 matchMut' _ _ = pure Nothing
 
+-- SOME QUALIFIER FUNCTIONS
 removeDuplicatesQuals :: (MonadChecker m) => [PlumeQualifier] -> m [PlumeQualifier]
 removeDuplicatesQuals [] = pure []
 removeDuplicatesQuals (x : xs) = do
@@ -277,21 +282,6 @@ findMatchingClass (IsIn t1 n1) qs = flip filterM qs $ \case
   _ -> pure False
 findMatchingClass _ _ = pure []
 
-liftPlaceholders ::
-  Text ->
-  PlumeType ->
-  [PlumeQualifier] ->
-  Placeholder Post.Expression
-liftPlaceholders name ty ps = do
-  -- scs <- readIORef superclasses
-  -- pss <- removeSuperclasses ps scs
-  f <- ask
-  let dicts = fmap f ps
-  pure $ case length dicts of
-    0 -> Post.EVariable name ty
-    _ | null dicts -> Post.EInstanceVariable name ty
-    _ -> Post.EApplication (Post.EInstanceVariable name ty) dicts
-
 instantiateFromName :: (MonadChecker m) => Text -> PlumeScheme -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression)
 instantiateFromName name sch = do
   (ty, qs) <- instantiate sch
@@ -314,9 +304,6 @@ isInSuperclassOf p@(IsIn t n) ps = not . null <$> filterM (\case
   ) ps
 isInSuperclassOf _ _ = pure False
 
--- isPrimitive :: MonadChecker m => PlumeType -> m Bool
--- isPrimitive (Type)
-
 removeSuperclassesQuals :: MonadChecker m => [PlumeQualifier] -> m [PlumeQualifier]
 removeSuperclassesQuals [] = pure []
 removeSuperclassesQuals [x] = pure [x]
@@ -326,3 +313,15 @@ removeSuperclassesQuals (x : xs) = do
   if b
     then pure xs'
     else pure (x : xs)
+
+-- SOME INSTANCES FOR DISCHARGING
+instance Semigroup PlumeQualifier where
+  IsIn a b <> IsIn a' b' | b == b' = IsIn (a <> a') b
+  _ <> _ = error "Mismatched typeclasses"
+
+instance Semigroup PlumeType where
+  TypeId a <> TypeId b | a == b = TypeId a
+  TypeApp a b <> TypeApp a' b' | a == a' = TypeApp a (b <> b')
+  TypeVar a <> TypeVar b | a == b = TypeVar a
+  TypeQuantified a <> TypeQuantified b = TypeQuantified (a <> b)
+  _ <> _ = error "Mismatched types"

@@ -451,40 +451,11 @@ interpretError (p, UnificationMismatch t t1' t2') =
       | null ts1 = "Type " <> showTy t <> " has no arguments, but should have" <> show (length ts2) <> " arguments"
       | length ts1 < length ts2 = "Expected more arguments, got " <> show (length ts1) <> " but expected " <> show (length ts2)
       | otherwise = "Expected less arguments, got " <> show (length ts1) <> " but expected " <> show (length ts2)
-interpretError (p, NoExtensionFound e t) =
-  printErrorFromString
-    mempty
-    ( "No extension named " <> show e <> " found for type " <> showTy t,
-      Nothing,
-      p
-    )
-    "while performing typechecking"
-interpretError (p, MultipleExtensionsFound e ts t) =
-  printErrorFromString
-    mempty
-    ( "Multiple extensions "
-        <> show e
-        <> " found for type "
-        <> showTy t
-        <> ": "
-        <> intercalate ", " (map showTy ts),
-      Nothing,
-      p
-    )
-    "while performing typechecking"
 interpretError (p, EmptyMatch) =
   printErrorFromString
     mempty
     ( "Empty switch expression",
       Just "Switch expression must have at least one branch",
-      p
-    )
-    "while performing typechecking"
-interpretError (p, UnboundTypeVariable i) =
-  printErrorFromString
-    mempty
-    ( "Unbound type variable " <> show i,
-      Nothing,
       p
     )
     "while performing typechecking"
@@ -517,14 +488,6 @@ interpretError (p, NoReturnFound t) =
     mempty
     ( "No return found in the expression for type " <> showTy t,
       Just "Every function must have a return in its body",
-      p
-    )
-    "while performing typechecking"
-interpretError (p, DeclarationReturn st) =
-  printErrorFromString
-    mempty
-    ( "Did not expect a return type in this expression",
-      Just $ toString (capitalize st) <> " must not have a return type",
       p
     )
     "while performing typechecking"
@@ -587,9 +550,6 @@ interpretError (p, FunctionAlreadyExists n s) =
       p
     )
     "while performing typechecking"
-
-capitalize :: Text -> Text
-capitalize = T.toTitle . T.toLower
 
 instance IOThrowable PlumeError where
   showErrorIO e = interpretError e >> exitFailure

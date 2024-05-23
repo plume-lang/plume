@@ -6,8 +6,6 @@ import Plume.TypeChecker.Monad
 import Plume.TypeChecker.TLIR qualified as Typed
 import System.IO.Pretty
 
--- infix 4 `unifiesTo`
-
 doesUnifyWith :: PlumeType -> PlumeType -> IO Bool
 doesUnifyWith t t' = do
   t1 <- compressPaths t
@@ -57,13 +55,6 @@ doesOccurQ q (TypeApp t ts) = do
   b' <- or <$> traverse (doesOccurQ q) ts
   pure (b || b')
 doesOccurQ _ _ = pure False
-
--- | Adding a constraint equivalence between two types onto
--- | the constraint stack
--- unifiesTo :: PlumeType -> PlumeType -> Checker ()
--- t1 `unifiesTo` t2 = do
---   p <- fetchPosition
---   pushConstraint @"tyConstraints" (p, t1 :~: t2)
 
 -- | Creating a constraint from a type constraint
 createConstraint :: MonadChecker m => TypeConstraint -> m PlumeConstraint
@@ -181,3 +172,20 @@ liftBlock block _ t = do
 
     isTVar (TypeVar _) = True
     isTVar _ = False
+
+
+-- | Lifting placeholder is used to create a reader monad from a variable name,
+-- | a type and a list of qualifiers. It resolves the qualifiers according to a 
+-- | given environment and creates the necessary calls.
+liftPlaceholders ::
+  Text ->
+  PlumeType ->
+  [PlumeQualifier] ->
+  Placeholder Typed.Expression
+liftPlaceholders name ty ps = do
+  f <- ask
+  let dicts = fmap f ps
+  pure $ case length dicts of
+    0 -> Typed.EVariable name ty
+    _ | null dicts -> Typed.EInstanceVariable name ty
+    _ -> Typed.EApplication (Typed.EInstanceVariable name ty) dicts

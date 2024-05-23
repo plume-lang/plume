@@ -74,53 +74,66 @@ synthDecl
     let ty' = mut exprTy
     convertedTy' `unifiesWith` ty'
 
+    -- If there are no user-quantified variables and if the declaration is not
+    -- toplevel, then just return the inferred expression as it was inferred.
     (clos, closTy, remainingPs, sch) <- if null qvars && not isToplevel then do
       ps' <- removeDuplicatesQuals ps
       return (h, ty', ps', scheme)
     else do
       cenv <- gets (extendEnv . environment)
+
+      -- Removing common superclasses between user-given extensions and found
+      -- extensions in the inferred expression.
       (__ps, scs) <- do
           p2 <- removeSuperclasses ps convertedGenerics
           return (List.nub p2, List.nub convertedGenerics)
 
+      -- Getting all the needed qualifiers to qualify further the expression
       res' <- traverse (discharge cenv) ps
       let (_ps, m2, as, _) = List.unzip4 res'
       let ps' = concatMap removeQVars _ps
 
-      ps'' <- removeDuplicatesQuals ps'
 
+      ps'' <- removeDuplicatesQuals ps'
       let ty''@(_ :=>: t) = List.nub ps'' :=>: ty'
 
+      -- Compressing types in the generated map
       m' <- liftIO $ mapM (firstM compressQual) $ List.nub $ concat m2
 
+      -- Operating black magic to get the final assumptions
       let names = getMapNames m'
       let as' = keepAssumpWithName (concat as) names
-
       (sub, as'') <- removeDuplicatesAssumps as'
       (remainingSub, _) <- removeDuplicatesAssumps as''
       as''' <- removeSuperclassAssumps as'' scs
 
+      -- Getting the final expressions
       let finalExprs = map (second getAllElements) m'
       let finalExprs' = concatMap (\(_, e) -> map (\case
               Post.EVariable n t' -> (n, t')
               _ -> error "Not a variable"
             ) e) finalExprs
 
+      -- Getting the duplicates assumptions in order to remove and resolve
+      -- duplicatas.
       sub' <- unify finalExprs'
-
       let sub'' = Map.toList sub' <> sub <> remainingSub
 
+      -- Running the expression reader because we're toplevel or there are 
+      -- used-given generics.
       pos <- fetchPosition
-
       oldScs <- readIORef superclasses
       writeIORef superclasses scs
       h' <- liftIO $ runReaderT h $ getExpr pos m'
       writeIORef superclasses oldScs
 
+      -- Substituting the duplicated assumptions in the expression
       let h'' = List.foldl substituteVar h' sub''
       
+      -- Checking if there are some remaining assumptions in the scope.
       unlessM (allIsSuperclass as''' scs) $ throw (UnresolvedTypeVariable as''')
       
+      -- Generating new types and expressions based on assumptions
       let args = map (\(n :>: t') -> n :@: t') as''
       let tys' = map (\(_ :>: t') -> t') as''
     

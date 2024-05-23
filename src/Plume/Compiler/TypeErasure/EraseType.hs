@@ -16,6 +16,28 @@ import Plume.TypeChecker.Monad
 import Plume.TypeChecker.TLIR qualified as Pre
 import Control.Monad.Exception (compilerError)
 
+-- | TYPE ERASURE
+-- | Type erasure is a simple process that aims at removing all type information
+-- | from the program as we don't need it anymore. This is done by converting
+-- | all typed expressions to untyped expressions.
+-- | 
+-- | But, we should take care of some things:
+-- |
+-- |  - We should transform ADTs in order just to extract functions and 
+-- |    declarations.
+-- |
+-- |  - We should transform extensions in order to remove every Instance
+-- |    expression
+-- |
+-- | Conventionnaly, we transform ADTs with type arguments into functions that
+-- | take the same number of arguments as the type arguments and return a
+-- | list of untyped expressions. To recognize ADTs, we look for a `special`
+-- | expression in the first position of the list. If it's not there, we
+-- | consider it as a variable.
+-- | 
+-- | Special values should not appear by default in the program, they should be
+-- | only available from that point.
+
 {-# NOINLINE dispatched #-}
 dispatched :: IORef [((PlumeType, Text), Text)]
 dispatched = unsafePerformIO $ newIORef mempty

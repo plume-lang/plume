@@ -5,6 +5,7 @@ module Plume.Compiler.Desugaring.Desugar where
 import Data.Map qualified as M 
 import Data.IntMap qualified as IM
 import Data.Set qualified as Set
+import Data.Tuple.Utils
 import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Compiler.Desugaring.Monad
 import Plume.Compiler.Desugaring.Syntax qualified as Post
@@ -13,6 +14,22 @@ import Plume.Syntax.Translation.Generics
 
 import Plume.Compiler.Desugaring.Modules.ANF
 import Plume.Compiler.Desugaring.Modules.Switch
+
+-- | DESUGARING
+-- | Desugaring is the process of transforming the AST into a simpler form.
+-- | This is done to simplify complex AST structures such as pattern matching.
+-- | The desugaring process is done in multiple steps, each step transforming
+-- | the AST into a simpler form.
+-- |
+-- | There are some generic steps:
+-- |
+-- |  - Desugar to ANF (A-normal form): This step transforms the AST into a
+-- |    simpler form where every expression is a variable or a literal.
+-- |    And there no more complex let-in expressions (let-in expressions are
+-- |    transformed into a sequence of statements).
+-- |
+-- |  - Desugar switch: This step transforms the switch expressions into a
+-- |    sequence of if-else expressions.
 
 desugarExpr
   :: (IsToplevel, IsReturned, IsExpression)
@@ -80,7 +97,6 @@ desugarExpr isTop = \case
     (x', stmts) <- desugarExpr isTop x
     return (Post.DESlice x' i, stmts)
     
-
 desugarStatement
   :: (IsToplevel, IsReturned, IsExpression)
   -> Desugar Pre.ClosedStatement [ANFResult (Maybe Post.DesugaredStatement)]
@@ -108,15 +124,6 @@ desugarStatement isTop = \case
   Pre.CSMutUpdate n e -> do
     (e', stmts) <- desugarExpr (False, False, True) e
     return [(Just $ Post.DSMutUpdate n e', stmts)]
-
-fst3 :: (a, b, c) -> a
-fst3 (x, _, _) = x
-
-snd3 :: (a, b, c) -> b
-snd3 (_, x, _) = x
-
-thd3 :: (a, b, c) -> c
-thd3 (_, _, x) = x
 
 desugarProgram :: Pre.ClosedProgram -> IO [Post.DesugaredProgram]
 desugarProgram = \case
