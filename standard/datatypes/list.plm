@@ -27,13 +27,13 @@ extend foldable<list> {
   }
 }
 
-fn len<T extends foldable, A>(x: T<A>) => 
+fn len<T extends foldable, A>(x: T<A>) =>
   x.foldl(fn (acc, _) => acc + 1, 0)
 
-fn filter<T extends foldable, A>(x: T<A>, f: fn(A): bool) => 
+fn filter<T extends foldable, A>(x: T<A>, f: fn(A): bool) =>
   x.foldl(fn (acc, y) => if (f(y)) acc.list_append(y) else acc, [])
 
-fn elem<T extends foldable, A extends equality>(x: T<A>, y: A) => 
+fn elem<T extends foldable, A extends equality>(x: T<A>, y: A) =>
   x.foldl(fn (acc, z) => acc or z == y, false)
 
 fn showListHelper<A extends show>(ls: list<A>): str => switch ls {
@@ -81,7 +81,7 @@ fn drop_while<A>(x: [A], f: fn(A): bool): [A] => switch x {
   case [y, ..ys] => if (f(y)) drop_while(ys, f) else x
 }
 
-fn span<A>(x: [A], f: fn(A): bool): ([A], [A]) => 
+fn span<A>(x: [A], f: fn(A): bool): ([A], [A]) =>
   (take_while(x, f), drop_while(x, f)[1..])
 
 fn split_on<A extends equality>(x: [A], y: A): [[A]] => switch x {
@@ -103,8 +103,4 @@ fn join<A>(x: [A], y: A): [A] => switch x {
   case [z, ..zs] => [z, y].list_concat(join(zs, y))
 }
 
-extend monoidal<list> {
-  fn empty<A>(): list<A> => []
-  fn concat<A>(x: [[A]]): [A] => 
-    x.foldl(fn (acc, y) => acc.list_concat(y), [])
-}
+fn ls_concat<A>(x: [[A]]): [A] => x.foldl(fn (acc, y) => acc.list_concat(y), [])
