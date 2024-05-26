@@ -59,6 +59,27 @@ Value print_int(int arg_n, Module* mod, Value* args) {
   return MAKE_INTEGER(0);
 }
 
+Value write_file(int arg_n, Module* mod, Value* args) {
+  if (arg_n != 2) THROW("WriteFile expects 2 arguments");
+  Value filename = args[0];
+  Value contents = args[1];
+
+  ASSERT(get_type(filename) == TYPE_STRING,
+         "WriteFile expects a string filename argument");
+  ASSERT(get_type(contents) == TYPE_STRING,
+         "WriteFile expects a string contents argument");
+
+  FILE* fp = fopen(GET_STRING(filename), "w");
+  if (fp == NULL) {
+    return MAKE_INTEGER(-1);
+  }
+
+  fprintf(fp, "%s", GET_STRING(contents));
+  fclose(fp);
+
+  return MAKE_INTEGER(0);
+}
+
 Value execute_command(int arg_n, Module* mod, Value* args) {
   if (arg_n != 1) THROW("ExecuteCommand expects 1 argument");
   Value cmd = args[0];
@@ -130,23 +151,21 @@ Value free_ref(int arg_n, Module* mod, Value* args) {
 
 
 // Function that reads a file and returns Option<str>
-Value read_file(int arg_n, Module* mod, Value* args) {
-  if (arg_n != 1) THROW("ReadFile expects 1 argument");
-  Value file = args[0];
-  ASSERT(get_type(file) == TYPE_STRING, "ReadFile expects a string argument");
+Value read_file(size_t argc, Module *mod, Value *args) {
+  ASSERT_FMT(argc == 1, "Expected 1 argument, but got %zu", argc);
 
-  FILE* fp = fopen(GET_STRING(file), "r");
-  if (fp == NULL) return make_none();
+  char *filename = GET_STRING(args[0]);
+  FILE *file = fopen(filename, "r");
+  if (file == NULL) return make_none();
 
-  fseek(fp, 0, SEEK_END);
-  long fsize = ftell(fp);
-  fseek(fp, 0, SEEK_SET);
+  fseek(file, 0, SEEK_END);
+  long length = ftell(file);
+  fseek(file, 0, SEEK_SET);
 
-  char* buffer = malloc(fsize + 1);
-  fread(buffer, 1, fsize, fp);
-  fclose(fp);
+  char *contents = malloc(length + 1);
+  fread(contents, 1, length, file);
+  contents[length] = '\0';
 
-  buffer[fsize] = 0;
-
-  return make_some(MAKE_STRING(buffer, fsize));
+  fclose(file);
+  return make_some(MAKE_STRING(contents, length));
 }

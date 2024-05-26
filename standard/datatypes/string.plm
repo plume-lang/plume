@@ -24,11 +24,11 @@ extend show<str> {
 
 // Inserting a `sep`arator between each element of the list
 // and concatenating the result into a single string.
-fn join(c: [str], sep: str) =>
+fn join_str(c: [str], sep: str) =>
   switch c {
     case [] => ""
     case [x] => x
-    case [x, ..xs] => x + sep + xs.join(sep)
+    case [x, ..xs] => x + sep + xs.join_str(sep)
   }
 
 
@@ -36,4 +36,4 @@ extend to_str<str> {
   fn to_str(x: str) => x
 }
 
-fn unlines(lines: [str]): str => lines.join("\n").to_str()
+fn unlines(lines: [str]): str => lines.join_str("\n").to_str()

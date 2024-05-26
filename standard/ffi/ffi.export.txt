@@ -44,5 +44,6 @@ print_int
 copy_ref
 free_ref
 read_file
+write_file
 
 ffi_fetch

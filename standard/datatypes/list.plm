@@ -27,7 +27,7 @@ extend foldable<list> {
   }
 }
 
-fn length<T extends foldable, A>(x: T<A>) => 
+fn len<T extends foldable, A>(x: T<A>) => 
   x.foldl(fn (acc, _) => acc + 1, 0)
 
 fn filter<T extends foldable, A>(x: T<A>, f: fn(A): bool) => 
@@ -70,3 +70,41 @@ fn find<T extends foldable, A, B>(x: T<(A, B)>, f: fn(A): bool): Option<B> =>
   x.foldl(fn (acc, tp) => switch tp {
     case tuple(a, b) => if (f(a)) Some(b) else acc
   }, None)
+
+fn take_while<A>(x: [A], f: fn(A): bool): [A] => switch x {
+  case [] => []
+  case [y, ..ys] => if (f(y)) take_while(ys, f).list_prepend(y) else []
+}
+
+fn drop_while<A>(x: [A], f: fn(A): bool): [A] => switch x {
+  case [] => []
+  case [y, ..ys] => if (f(y)) drop_while(ys, f) else x
+}
+
+fn span<A>(x: [A], f: fn(A): bool): ([A], [A]) => 
+  (take_while(x, f), drop_while(x, f)[1..])
+
+fn split_on<A extends equality>(x: [A], y: A): [[A]] => switch x {
+  case [] => []
+  case ? => switch span(x, fn (z) => z != y) {
+    case (a, b) => split_on(b, y).list_prepend(a)
+  }
+}
+
+fn init<A>(x: [A]): [A] => switch x {
+  case [] => []
+  case [y] => []
+  case [y, ..ys] => init(ys).list_prepend(y)
+}
+
+fn join<A>(x: [A], y: A): [A] => switch x {
+  case [] => []
+  case [z] => [z]
+  case [z, ..zs] => [z, y].list_concat(join(zs, y))
+}
+
+extend monoidal<list> {
+  fn empty<A>(): list<A> => []
+  fn concat<A>(x: [[A]]): [A] => 
+    x.foldl(fn (acc, y) => acc.list_concat(y), [])
+}

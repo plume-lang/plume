@@ -27,7 +27,7 @@ interface<A> coercible<A> {
   fn to<B>(a: A): B
 }
 
-interface<A extends boolean_algebra> equality<A> {
+interface<A> equality<A> {
   fn (==)(a: A, b: A): bool
 }
 
@@ -45,6 +45,15 @@ interface<A> product<A> {
 interface<A> ordering<A> {
   fn (<)(a: A, b: A): bool
 }
+
+fn (<=)<A extends (ordering, equality, boolean_algebra)>(a: A, b: A): bool => 
+  (a < b) or (a == b)
+
+fn (>=)<A extends (ordering, boolean_algebra)>(a: A, b: A): bool =>
+  not (a < b)
+
+fn (>)<A extends (ordering, boolean_algebra, equality)>(a: A, b: A): bool =>
+  not (a <= b)
 
 interface<T> traversable<T> {
   fn map<A, B>(self: T<A>, f: fn(A): B): T<B>
