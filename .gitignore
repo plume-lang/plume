@@ -40,6 +40,18 @@ build
 
 _*
 
+*.plmc
+
+# Compile Commands
+.cache/
 compile_commands.json
 
-*.plmc
+# Compile Flags
+compile_flags.txt
+
+# CMake
+cmake-build-debug/
+cmake-build-release/
+cmake_install.cmake
+CMakeCache.txt
+CMakeFiles/
