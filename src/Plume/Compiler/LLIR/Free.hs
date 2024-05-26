@@ -51,14 +51,16 @@ instance Free Pre.DesugaredProgram where
   free _ (Pre.DPDeclaration n _) = Set.singleton n
   free _ (Pre.DPMutDeclaration n _) = Set.singleton n
   free res (Pre.DPMutUpdate n _) = free res n
+  free _ _ = mempty
 
-instance Name Pre.DesugaredProgram where
+instance Name Pre.DesugaredProgram where  
   getNames (Pre.DPFunction {}) = Set.empty
   getNames (Pre.DPDeclaration _ _) = Set.empty
   getNames (Pre.DPMutDeclaration _ _) = Set.empty
   getNames (Pre.DPMutUpdate _ _) = Set.empty
   getNames (Pre.DPNativeFunction _ name _ _) = Set.singleton name
   getNames (Pre.DPStatement _) = mempty
+  getNames (Pre.DPDeclare n) = Set.singleton n
 
 instance Name Update where
   getNames (UVariable x) = Set.singleton x

@@ -289,6 +289,9 @@ closeProgram (Pre.UPADTFunction name args e) = do
   modifyIORef' reserved (M.insert name (length args))
   (stmts, e') <- closeStatement e
   pure $ stmts ++ [Post.CPFunction name args e']
+closeProgram (Pre.UPDeclare name arity) = do
+  modifyIORef' reserved (M.insert name arity)
+  pure [Post.CPDeclare name]
 closeProgram (Pre.UPFunction name args e) = do
   modifyIORef' reserved (M.insert name (length args))
   (stmts, e') <- closeStatement e

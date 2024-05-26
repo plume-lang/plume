@@ -48,4 +48,5 @@ data UntypedProgram
   | UPDeclaration Text UntypedExpr
   | UPMutDeclaration Text UntypedExpr
   | UPMutUpdate Text UntypedExpr
+  | UPDeclare Text Int
   deriving (Eq, Show, Ord)

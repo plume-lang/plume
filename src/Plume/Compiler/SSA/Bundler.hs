@@ -3,6 +3,7 @@ module Plume.Compiler.SSA.Bundler where
 import Plume.Compiler.Desugaring.Syntax
 
 bundleProg :: DesugaredProgram -> Maybe DesugaredProgram
+bundleProg (DPDeclare n) = Just $ DPDeclare n
 bundleProg (DPFunction name args stmts) =
   Just $ DPFunction name args stmts
 bundleProg (DPStatement (DSDeclaration n e)) =

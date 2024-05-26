@@ -57,4 +57,5 @@ data ClosedProgram
   | CPDeclaration Text ClosedExpr
   | CPMutDeclaration Text ClosedExpr
   | CPMutUpdate Update ClosedExpr
+  | CPDeclare Text
   deriving (Eq, Show, Ord)

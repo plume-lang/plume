@@ -145,6 +145,7 @@ desugarProgram = \case
   Pre.CPMutUpdate n e -> do
     (e', stmts) <- desugarExpr (False, False, True) e
     return (createBlockProg stmts ++ [Post.DPMutUpdate n e'])
+  Pre.CPDeclare n -> return [Post.DPDeclare n]
 
 desugar :: [Pre.ClosedProgram] -> IO [Post.DesugaredProgram]
 desugar = concatMapM desugarProgram

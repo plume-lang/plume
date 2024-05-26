@@ -49,6 +49,7 @@ data DesugaredProgram
   | DPNativeFunction LibraryPath FunctionName FunctionArity IsStandard
   | DPMutDeclaration Text DesugaredExpr
   | DPMutUpdate Update DesugaredExpr
+  | DPDeclare Text
   deriving (Eq, Ord)
 
 instance Show DesugaredExpr where
@@ -92,6 +93,7 @@ instance Show DesugaredProgram where
     "native function " <> toString lib <> "." <> toString name <> " " <> show arity
   show (DPMutDeclaration n e) = "mut " <> toString n <> " = " <> show e
   show (DPMutUpdate n e) = show n <> " = " <> show e
+  show (DPDeclare n) = "declare " <> toString n
 
 instance Substitutable DesugaredStatement DesugaredExpr where
   substitute s (DSExpr e) = DSExpr $ substitute s e

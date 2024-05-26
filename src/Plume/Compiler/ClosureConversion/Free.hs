@@ -81,6 +81,7 @@ instance Free ClosedProgram where
   free (CPDeclaration n e) = free e S.\\ S.singleton n
   free (CPMutDeclaration n e) = free e S.\\ S.singleton n
   free (CPMutUpdate n e) = (free e S.\\ free n) <> free n
+  free (CPDeclare n) = S.singleton n
 
 instance (Free a) => Free (Map k a) where
   free = foldMap free
@@ -163,6 +164,7 @@ instance Substitutable ClosedProgram ClosedExpr where
     | name == n = CPMutUpdate (convertToUpdate r) body
     | otherwise = CPMutUpdate (UVariable name) (substitute e body)
   substitute e (CPMutUpdate x body) = CPMutUpdate x (substitute e body)
+  substitute _ (CPDeclare name) = CPDeclare name
 
 instance Substitutable ClosedPattern ClosedExpr where
   substitute _ p = p

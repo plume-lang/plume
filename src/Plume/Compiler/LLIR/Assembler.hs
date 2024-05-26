@@ -144,6 +144,10 @@ instance Assemble Pre.DesugaredProgram where
       )
     pure []
 
+  assemble (Pre.DPDeclare name) = do
+    modifyIORef' globals (Set.insert name)
+    pure []
+
 instance Assemble Pre.DesugaredStatement where
   assemble (Pre.DSExpr expr) = assemble expr
 
@@ -183,7 +187,7 @@ instance Assemble Pre.DesugaredExpr where
       then pure [LLIR.Instruction (LLIR.LoadGlobal name)]
     else if name `Set.member` nats
       then pure [LLIR.Instruction (LLIR.LoadNative name)]
-    else error $ "Variable " <> show name <> " not found"
+    else pure [LLIR.Instruction (LLIR.LoadGlobal name)]
   
   assemble (Pre.DEApplication name args) = do
     args' <- concat <$> mapM assemble args
@@ -200,7 +204,7 @@ instance Assemble Pre.DesugaredExpr where
       then pure $ args' 
                 ++ LLIR.instr (LLIR.LoadNative name) 
                 ++ LLIR.instr (LLIR.Call argsLength)
-    else error $ "Function " <> show name <> " not found"
+    else pure $ args' ++ [LLIR.Instruction (LLIR.CallGlobal name argsLength)]
 
   assemble (Pre.DELiteral lit) = do
     i <- liftIO $ fetchConstant lit
@@ -274,12 +278,9 @@ instance Assemble Pre.DesugaredExpr where
 instance Assemble Pre.Update where
   assemble (Pre.UVariable name) = do
     locals <- ask
-    glbs <- readIORef globals
     if name `Set.member` locals
       then pure [LLIR.Instruction (LLIR.LoadLocal name)]
-    else if name `Set.member` glbs
-      then pure [LLIR.Instruction (LLIR.LoadGlobal name)]
-    else error $ "Variable " <> show name <> " not found"
+    else pure [LLIR.Instruction (LLIR.LoadGlobal name)]
   
   assemble (Pre.UProperty u i) = case readEither (toString i) of
     Right i' -> do

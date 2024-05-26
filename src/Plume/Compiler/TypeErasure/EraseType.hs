@@ -69,6 +69,9 @@ eraseType (Pre.EDeclaration (Annotation name _) (Pre.EClosure args _ body _) Not
   let fun = Post.UPFunction name args' b'
   modifyIORef' program (<> [fun])
   eraseType xs
+eraseType (Pre.EVariableDeclare name arity : xs) = do
+  modifyIORef' program (<> [Post.UPDeclare name arity])
+  eraseType xs
 eraseType (Pre.ENativeFunction fp n (args :->: _) st : xs) = do
   modifyIORef'
     program
@@ -126,6 +129,7 @@ eraseType (Pre.EMutUpdate (Annotation name _) e Nothing : xs) = do
   e' <- eraseExpr e
   modifyIORef' program (<> [Post.UPMutUpdate name e'])
   eraseType xs
+eraseType (Pre.EEmpty : xs) = eraseType xs
 eraseType (x : xs) = do
   x' <- eraseStatement x
   modifyIORef' program (<> [Post.UPStatement x'])
@@ -224,6 +228,7 @@ eraseExpr (Pre.ESpreadable _) = error "Should not encounter spreadable expressio
 eraseExpr (Pre.EInstanceDict _ _ exprs) = do
   exprs' <- mapM eraseExpr exprs
   return (Post.UEList exprs')
+eraseExpr (Pre.EVariableDeclare _ _) = error "Should not encounter variable declarations"
 
 erasePattern :: Pre.TypedPattern PlumeType -> IO Post.UntypedPattern
 erasePattern (Pre.PVariable x _) = pure $ Post.UPVariable x
