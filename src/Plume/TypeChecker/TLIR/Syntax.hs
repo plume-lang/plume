@@ -45,4 +45,5 @@ data TypedExpression t
   | EReturn (TypedExpression t)
   | ENativeFunction Text Text t IsStandard
   | EEmpty | ESpreadable [TypedExpression t]
+  | EVariableDeclare Text Int
   deriving (Show, Eq)

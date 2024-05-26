@@ -38,7 +38,6 @@ synthDecl
     -- type as the variable
     searchEnv @"typeEnv" name >>= \case
       Just (Forall _ (_ :=>: (TMut t))) -> convertedTy `unifiesWith` t
-      Just _ -> throw . CompilerError $ "Variable " <> name <> " already declared"
       _ -> pure ()
 
     -- Creating an utility function that shortens the code and a boolean
@@ -53,7 +52,7 @@ synthDecl
             if isMut
               then (Post.EMutDeclaration, isMut)
               else (Post.EDeclaration, isMut)
-        _ -> throw . CompilerError $ "Variable " <> name <> "  already declared"
+        Just _ -> return (Post.EDeclaration, isMut)
 
     let mut = if isMut' then TMut else id
     -- Creating the type of the variable based on mutability and adding it
@@ -93,8 +92,7 @@ synthDecl
       let (_ps, m2, as, _) = List.unzip4 res'
       let ps' = concatMap removeQVars _ps
 
-
-      ps'' <- removeDuplicatesQuals ps'
+      ps'' <- removeDuplicatesQuals =<< mapM (liftIO . compressQual) ps'
       let ty''@(_ :=>: t) = List.nub ps'' :=>: ty'
 
       -- Compressing types in the generated map

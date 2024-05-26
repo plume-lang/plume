@@ -159,23 +159,40 @@ matchMut' _ _ = pure Nothing
 -- SOME QUALIFIER FUNCTIONS
 removeDuplicatesQuals :: (MonadChecker m) => [PlumeQualifier] -> m [PlumeQualifier]
 removeDuplicatesQuals [] = pure []
+removeDuplicatesQuals (x@(IsIn (TypeQuantified _) tc) : xs) = do
+  xs' <- removeQualsWithTVar tc xs
+  pure (x : xs')
 removeDuplicatesQuals (x : xs) = do
   xs' <- removeDuplicatesQuals xs
-  b <- liftIO $ elemQual x xs'
+  b <- elemQual x xs'
   if b
     then pure xs'
     else pure (x : xs')
 
-elemQual :: PlumeQualifier -> [PlumeQualifier] -> IO Bool
+removeQualsWithTVar :: (MonadChecker m) => Text -> [PlumeQualifier] -> m [PlumeQualifier]
+removeQualsWithTVar _ [] = pure []
+removeQualsWithTVar n (x@(IsIn t@(TypeVar _) n') : xs) | n == n' = do
+  t' <- liftIO $ compressPaths t
+  case t' of
+    TypeVar _ -> removeQualsWithTVar n xs
+    _ -> pure (x : xs)
+removeQualsWithTVar n (x : xs) = (x :) <$> removeQualsWithTVar n xs
+
+elemQual :: MonadChecker m => PlumeQualifier -> [PlumeQualifier] -> m Bool
 elemQual (IsIn a1 b) =
   anyM
     ( \case
       (IsIn a2 b') -> do
-        a1' <- compressPaths a1
-        a2' <- compressPaths a2
-
-        bl <- doesUnifyWith a1' a2'
-
+        a1' <- liftIO $ compressPaths a1
+        a2' <- liftIO $ compressPaths a2
+        bl <- case a1' of
+          TypeQuantified _ -> pure False
+          TypeVar _ -> case a2' of
+            TypeQuantified _ -> pure True
+            TypeVar _ -> pure True
+            _ -> liftIO $ doesUnifyWith a1' a2'
+          _ -> liftIO $ doesUnifyWith a1' a2'
+        
         pure $ b == b' && bl
       _ -> pure False
     )
@@ -296,7 +313,7 @@ isInSuperclassOf p@(IsIn t n) ps = not . null <$> filterM (\case
         _t <- liftIO $ compressPaths t
         _t' <- liftIO $ compressPaths t'
         if _t /= _t' then do
-          bl <- doesMatch _t _t'
+          bl <- liftIO $ doesUnifyWith _t _t'
           return (n == n' && bl)
         else pure False
       else isInSuperclassOf p quals

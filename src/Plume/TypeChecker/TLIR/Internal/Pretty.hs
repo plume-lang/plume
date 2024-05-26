@@ -132,6 +132,7 @@ prettyExpr (EInstanceDict name args body) =
 prettyExpr EEmpty = pretty ("EMPTY" :: Text)
 prettyExpr (EInstanceAccess e n) = prettyExpr e <> "." <> pretty n
 prettyExpr (ESpreadable es) = anCol Blue "..." <> prettyExpr (EList es)
+prettyExpr (EVariableDeclare v _) = anCol Blue "declare" <+> pretty v
 
 instance ANSIPretty Pattern where ansiPretty = prettyPat
 

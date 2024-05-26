@@ -18,6 +18,7 @@ import Plume.TypeChecker.Constraints.Solver
 import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.Constraints.Typeclass
 import Plume.TypeChecker.Monad
+import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (gets, local)
 
@@ -73,6 +74,19 @@ synthesize (Pre.EList xs) = do
       xs
   forM_ tys $ unifiesWith tv
   pure (TList tv, concat pss, Post.EList <$> sequence xs')
+synthesize (Pre.EVariableDeclare gens name ty) = do
+  gens' <- concatMapM convert gens
+  let qvars = getQVars gens'
+  let quals = removeQVars gens'
+  ty' <- convert ty
+
+  insertEnv @"typeEnv" name (Forall qvars (quals :=>: ty'))
+
+  let arity = case ty' of
+        TFunction args _ -> length args
+        _ -> (-1)
+
+  pure (ty', [], pure (Post.EVariableDeclare name arity))
 -- \| Calling synthesis modules
 synthesize app@(Pre.EApplication {}) = synthApp synthesize app
 synthesize clos@(Pre.EClosure {}) = synthClosure synthesize clos
