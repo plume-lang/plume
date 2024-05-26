@@ -153,6 +153,12 @@ prettyExpr _ (EInterface (Annotation name gens) gs ms) =
     <> indent 2 (vsep . punctuate comma $ map ansiPretty ms)
 prettyExpr _ (EList es) = brackets (hsep . punctuate comma $ map (prettyExpr 0) es)
 prettyExpr _ (ETypeAlias ann t) = anCol Blue "type" <+> anItalic (pretty $ ann.annotationName) <+> "=" <+> ansiPretty t
+prettyExpr _ (EVariableDeclare gens n t) =
+  anCol Blue "declare"
+    <+> ansiPretty gens
+    <+> anItalic (pretty n)
+    <+> ":"
+    <+> ansiPretty t
 
 prettyExt :: ExtensionMember PlumeType -> Doc AnsiStyle
 prettyExt (ExtDeclaration gs a e1') =

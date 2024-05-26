@@ -119,6 +119,9 @@ reservedWords =
     , "extend"
     , "native"
     , "type"
+    , "declare"
+    , "extends"
+    , "interface"
     , -- Primitive types
       "int"
     , "str"

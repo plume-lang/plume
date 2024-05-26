@@ -77,6 +77,7 @@ substitute _ (AST.ENativeFunction fp n gens t st) =
 substitute _ (AST.EInterface ann gs ms) = AST.EInterface ann gs ms
 substitute e (AST.EList es) = AST.EList (map (substitute e) es)
 substitute _ (AST.EType ann ts) = AST.EType ann ts
+substitute _ (AST.EVariableDeclare g n t) = AST.EVariableDeclare g n t
 
 substituteExt
   :: (Text, AST.Expression)

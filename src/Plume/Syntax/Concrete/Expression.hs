@@ -115,6 +115,7 @@ data ConcreteExpression t
   | ETypeExtension [PlumeGeneric] (Annotation [t]) (Maybe Text) [ExtensionMember t]
   | ENativeFunction Text Text [Text] t
   | ETypeAlias (Annotation [PlumeGeneric]) t
+  | EVariableDeclare [PlumeGeneric] Text (Maybe t)
   deriving (Show)
 
 -- | A type constructor is a type that is used to construct a type.
@@ -170,6 +171,7 @@ instance Eq t => Eq (ConcreteExpression t) where
   EInterface x xs ys == EInterface x' xs' ys' = x == x' && xs == xs' && ys == ys'
   ETypeExtension xs x t ys == ETypeExtension xs' x' t' ys' = xs == xs' && x == x' && ys == ys' && t == t'
   ENativeFunction x y xs z == ENativeFunction x' y' xs' z' = x == x' && y == y' && xs == xs' && z == z'
+  EVariableDeclare xs x t == EVariableDeclare xs' x' t' = xs == xs' && x == x' && t == t'
   ELocated x _ == ELocated y _ = x == y
   ELocated x _ == y = x == y
   x == ELocated y _ = x == y

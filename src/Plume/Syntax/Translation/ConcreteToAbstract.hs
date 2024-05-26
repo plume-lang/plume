@@ -201,6 +201,9 @@ concreteToAbstract (CST.ETypeAlias ann t) = do
   modifyIORef' typeAliases (Map.insert ann.annotationName (gens, t'))
 
   bireturn Empty
+concreteToAbstract (CST.EVariableDeclare gens n t) = do
+  t' <- mapM transformType t
+  bireturn . Single $ AST.EVariableDeclare gens n t'
 
 transformSch :: MonadIO m => Common.PlumeScheme -> m Common.PlumeScheme
 transformSch (Common.MkScheme gens t) = do

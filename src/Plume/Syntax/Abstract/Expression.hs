@@ -41,6 +41,7 @@ data AbstractExpression t
   | EInterface (Annotation [t]) [PlumeGeneric] [Annotation PlumeScheme]
   | ETypeExtension [PlumeGeneric] (Annotation [t]) (Maybe Text) [ExtensionMember t]
   | ENativeFunction Text Text [Text] t IsStandard
+  | EVariableDeclare [PlumeGeneric] Text (Maybe t)
   deriving (Show)
 
 type IsStandard = Bool

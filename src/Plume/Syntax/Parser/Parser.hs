@@ -736,6 +736,20 @@ tMacro = do
     body <- L.symbol "=" *> parseExpression
     return ([], body, False)
 
+-- | Parses a variable declaration
+-- | A variable declaration is a statement that is used to declare a variable type
+-- | It is generally used to permit forward declarations
+-- |
+-- | SYNTAX:
+-- |  - declare name<generics>: Type
+tDeclare :: P.Parser [CST.Expression]
+tDeclare = do
+  void $ L.reserved "declare"
+  name <- L.identifier
+  gens <- P.option [] $ L.angles (Typ.parseGeneric `P.sepBy` L.comma)
+  ty <- P.optional $ L.symbol ":" *> Typ.tType
+  return [CST.EVariableDeclare gens name ty]
+
 -- | Parses a toplevel expression
 -- | A toplevel expression is an expression that is at the top-level of the
 -- | source code. It may be a statement, a require statement, a native
@@ -748,6 +762,7 @@ parseToplevel =
   eLocatedMany $
     P.choice
       [ tNative
+      , tDeclare
       , tInterface
       , tRequire
       , tType
