@@ -43,3 +43,5 @@ _*
 compile_commands.json
 
 *.plmc
+
+CMakeFiles
