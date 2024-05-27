@@ -50,6 +50,8 @@ data BinaryOperator
   | BinarySlice
   deriving (Show, Eq)
 
+type LibraryType = Text
+
 -- | A prefix operator is an operator that takes one operand.
 -- | The operand is placed on the right side of the operator.
 data PrefixOperator
@@ -113,7 +115,7 @@ data ConcreteExpression t
     }
   | EReturn (ConcreteExpression t)
   | ETypeExtension [PlumeGeneric] (Annotation [t]) (Maybe Text) [ExtensionMember t]
-  | ENativeFunction Text Text [Text] t
+  | ENativeFunction Text Text [Text] t LibraryType
   | ETypeAlias (Annotation [PlumeGeneric]) t
   | EVariableDeclare [PlumeGeneric] Text (Maybe t)
   deriving (Show)
@@ -170,7 +172,7 @@ instance Eq t => Eq (ConcreteExpression t) where
   EReturn x == EReturn y = x == y
   EInterface x xs ys == EInterface x' xs' ys' = x == x' && xs == xs' && ys == ys'
   ETypeExtension xs x t ys == ETypeExtension xs' x' t' ys' = xs == xs' && x == x' && ys == ys' && t == t'
-  ENativeFunction x y xs z == ENativeFunction x' y' xs' z' = x == x' && y == y' && xs == xs' && z == z'
+  ENativeFunction x y xs z t == ENativeFunction x' y' xs' z' t' = x == x' && y == y' && xs == xs' && z == z' && t == t'
   EVariableDeclare xs x t == EVariableDeclare xs' x' t' = xs == xs' && x == x' && t == t'
   ELocated x _ == ELocated y _ = x == y
   ELocated x _ == y = x == y

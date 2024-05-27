@@ -134,7 +134,7 @@ prettyExpr _ (ETypeExtension gens a var es) =
       <+> "with" <+> pretty var
       <+> line
     <> indent 2 (vsep (map prettyExt es))
-prettyExpr _ (ENativeFunction fp n gens (args :->: ret)) =
+prettyExpr _ (ENativeFunction fp n gens (args :->: ret) _) =
   anCol Blue "native"
     <+> anCol Green (pretty fp)
     <+> anBold (pretty n)

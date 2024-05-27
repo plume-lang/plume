@@ -586,8 +586,15 @@ tInterface = do
 tNative :: P.Parser [CST.Expression]
 tNative = do
   void $ L.reserved "native"
+  libTy <- ((:[]) <$> Lit.stringLiteral) <|> L.parens (Lit.stringLiteral `P.sepBy1` L.comma)
+  extTy <- readIORef P.extensionType
+
   path <- Lit.stringLiteral
-  P.choice [nativeGroup path, nativeOne path]
+  xs <- P.choice [nativeGroup path, nativeOne path]
+  
+  if extTy `elem` libTy
+    then return (map ($ extTy) xs)
+    else return []
   where
     nativeGroup p = L.braces (P.many (parseNative p))
     nativeOne p = (: []) <$> parseNative p
