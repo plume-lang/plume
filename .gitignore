@@ -45,3 +45,5 @@ compile_commands.json
 *.plmc
 
 CMakeFiles
+
+node_modules
