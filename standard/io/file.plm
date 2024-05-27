@@ -1,6 +1,6 @@
 require "std:datatypes/option"
 
-native "std:native" {
+native ("native", "js") "std:native" {
   read_file(path: str): Option<str>
   write_file(path: str, content: str): bool
   append_file(path: str, content: str): bool

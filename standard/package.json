@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "child_process": "^1.0.2",
+    "deasync": "^0.1.29",
+    "node-fetch": "^2.7.0",
+    "readline-sync": "^1.4.10"
+  }
+}

@@ -1,7 +1,7 @@
 require "number"
 require "tuple"
 
-native "std:native" {
+native ("native", "js") "std:native" {
   list_append<A>(x: [A], y: A): [A]
   list_prepend<A>(x: [A], y: A): [A]
   list_concat<A>(x: [A], y: [A]): [A]

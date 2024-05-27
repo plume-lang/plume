@@ -1,3 +1,5 @@
-native "std:native" get_args(): [str]
-native "std:native" execute_command(path: str): int
-native "std:native" input(pre: str): str
+native ("native", "js") "std:native" {
+  get_args(): [str]
+  execute_command(path: str): int
+  input(pre: str): str
+}

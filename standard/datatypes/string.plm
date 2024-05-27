@@ -1,6 +1,6 @@
 require "bool"
 
-native "std:native" {
+native ("native", "js") "std:native" {
   add_str(x: str, y: str): str
   mul_str(x: str, y: int): str
   string_length(x: str): int
