@@ -7,11 +7,6 @@ import Control.Monad.Exception
 import Control.Monad.Parser
 import Data.Either
 import Data.Text.IO hiding (putStr)
-import Plume.Compiler.LLIR.Assembler
-import Plume.Compiler.Bytecode.Assembler
-import Plume.Compiler.Bytecode.Serialize
-import Plume.Compiler.Bytecode.Syntax (Instruction)
-import Plume.Compiler.Bytecode.Label hiding (labelPool)
 import Plume.Compiler.ClosureConversion.Conversion
 import Plume.Compiler.Desugaring.Desugar
 import Plume.Compiler.SSA
@@ -19,6 +14,7 @@ import Plume.Compiler.TypeErasure.EraseType
 import Plume.Syntax.Abstract.Internal.Pretty ()
 import Plume.Syntax.Parser.Modules.ParseImports
 import Plume.Syntax.Translation.ConcreteToAbstract
+import Plume.Compiler.Javascript.Translate
 import Plume.TypeChecker.Checker
 -- import Plume.Syntax.Memory
 import Plume.Syntax.Blocks
@@ -77,6 +73,7 @@ main = setEncoding $ do
             Nothing -> paths
 
       ppBuilding "Parsing file and dependencies..."
+      writeIORef extensionType "js"
       runConcreteToAbstract env dir paths' file `with` \ast -> do
         let ast' = concatMap (removeUselessBlocks False) ast
         ppBuilding "Typechecking..."
@@ -86,26 +83,18 @@ main = setEncoding $ do
           erased <- erase tlir
           runClosureConversion erased `with` \closed -> do
             desugared <- desugar closed
-            let ssa = runSSA desugared
-            -- mapM_ print ssa
-            (bytecode, natives', constants) <- runLLIRAssembler ssa
-            -- mapM_ print bytecode
-            let nativeFuns = getNativeFunctions natives'
-            (bytecode', labelPool) <- runUnlabelize bytecode
-
-            finalBytecode <- runBytecodeAssembler (labelPool, nativeFuns) bytecode'
-
-            sbc <- serialize (finalBytecode, natives', constants)
-            let new_path = file -<.> "bin"
-            writeFileLBS new_path sbc
-            ppSuccess ("Bytecode written to " <> fromString new_path)
+            let ssa  = runSSA desugared
+                js   = runTranslateJS ssa
+                code = show js
+            writeFileText (replaceExtension file ".js") code
+            ppSuccess ("Bytecode written to " <> fromString (replaceExtension file ".js"))
     Nothing -> ppFailure "No input file provided"
 
-printBytecode :: [Instruction] -> IO ()
-printBytecode bytecode =
-  mapM_
-    ( \(i, instr) -> do
-        putStr (show i <> ": ")
-        print instr
-    )
-    (zip [0 :: Int ..] bytecode)
+-- printBytecode :: [Instruction] -> IO ()
+-- printBytecode bytecode =
+--   mapM_
+--     ( \(i, instr) -> do
+--         putStr (show i <> ": ")
+--         print instr
+--     )
+--     (zip [0 :: Int ..] bytecode)
