@@ -108,6 +108,9 @@ library
         Plume.Compiler.Bytecode.Syntax
         Plume.Compiler.Bytecode.Serialize
 
+        Plume.Compiler.Javascript.Syntax
+        Plume.Compiler.Javascript.Translate
+
         System.IO.Pretty
         System.IO.Color
 
@@ -141,7 +144,7 @@ library
         template-haskell,
         MissingH,
         sorted-list,
-        diagnose
+        diagnose,
 
     mixins:
         base hiding (Prelude),
