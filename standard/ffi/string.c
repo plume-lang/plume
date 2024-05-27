@@ -16,11 +16,11 @@ Value add_str(int arg_n, Module* mod, Value* args) {
   HeapValue* str2 = GET_PTR(args[1]);
 
   char* new_str =
-      malloc(str1->length + str2->length + 1);
+      gc_malloc(&mod->gc, str1->length + str2->length + 1);
   strcpy(new_str, str1->as_string);
   strcat(new_str, str2->as_string);
 
-  return MAKE_STRING(new_str, str1->length + str2->length + 1);
+  return MAKE_STRING(mod->gc, new_str);
 }
 
 Value mul_str(int arg_n, Module* mod, Value* args) {
@@ -30,14 +30,14 @@ Value mul_str(int arg_n, Module* mod, Value* args) {
 
   HeapValue* str = GET_PTR(args[0]);
 
-  char* new_str = malloc(str->length * GET_INT(args[1]) + 1);
+  char* new_str = gc_malloc(&mod->gc, str->length * GET_INT(args[1]) + 1);
   new_str[0] = '\0';
 
   for (int i = 0; i < GET_INT(args[1]); i++) {
     strcat(new_str, GET_STRING(args[0]));
   }
 
-  return MAKE_STRING(new_str, str->length * GET_INT(args[1]));
+  return MAKE_STRING(mod->gc, new_str);
 }
 
 Value int_to_str(int arg_n, Module* mod, Value* args) {
@@ -47,11 +47,11 @@ Value int_to_str(int arg_n, Module* mod, Value* args) {
 
   int x = GET_INT(args[0]);
   int length = snprintf(NULL, 0, "%d", x);
-  char* str = malloc(length + 1);
+  char* str = gc_malloc(&mod->gc, length + 1);
 
   snprintf(str, length + 1, "%d", x);
 
-  return MAKE_STRING(str, length + 1);
+  return MAKE_STRING(mod->gc, str);
 }
 
 Value to_string(int arg_n, Module* mod, Value* args) {
@@ -61,32 +61,32 @@ Value to_string(int arg_n, Module* mod, Value* args) {
       Value v = GET_MUTABLE(args[0]);
       HeapValue* str = GET_PTR(to_string(1, mod, &v));
       size_t sz = str->length + 5;
-      char* new_str = malloc(sz * sizeof(char));
+      char* new_str = gc_malloc(&mod->gc, sz * sizeof(char));
       strcpy(new_str, "mut ");
       strcpy(new_str + 4, str->as_string);
-      return MAKE_STRING(new_str, sz);
+      return MAKE_STRING(mod->gc, new_str);
     }
     case TYPE_INTEGER: {
       size_t sz = snprintf(NULL, 0, "%d", (int32_t) GET_INT(args[0]));
-      char* new_str = malloc((sz + 1) * sizeof(char));
+      char* new_str = gc_malloc(&mod->gc, (sz + 1) * sizeof(char));
       sprintf(new_str, "%d", (int32_t) args[0]);
-      return MAKE_STRING(new_str, sz);
+      return MAKE_STRING(mod->gc, new_str);
     }
     case TYPE_FLOAT: {
       size_t sz = snprintf(NULL, 0, "%f", GET_FLOAT(args[0]));
-      char* new_str = malloc((sz + 1) * sizeof(char));
+      char* new_str = gc_malloc(&mod->gc, (sz + 1) * sizeof(char));
       sprintf(new_str, "%f", GET_FLOAT(args[0]));
-      return MAKE_STRING(new_str, sz);
+      return MAKE_STRING(mod->gc, new_str);
     }
     case TYPE_STRING: {
       HeapValue* hp = GET_PTR(args[0]);
       char* str = hp->as_string;
       size_t sz = hp->length;
-      char* new_str = malloc(sz + 3);
+      char* new_str = gc_malloc(&mod->gc, sz + 3);
       new_str[0] = '"';
       strcpy(new_str + 1, str);
       new_str[sz + 1] = '"';
-      return MAKE_STRING(new_str, sz + 2);
+      return MAKE_STRING(mod->gc, new_str);
     }
     case TYPE_LIST: {
       size_t sz = 2;
@@ -108,20 +108,20 @@ Value to_string(int arg_n, Module* mod, Value* args) {
       res = realloc(res, sz);
       strcat(res, "]");
 
-      return MAKE_STRING(res, sz);
+      return MAKE_STRING(mod->gc, res);
     }
     case TYPE_SPECIAL: {
-      return MAKE_STRING("<special>", 9);
+      return MAKE_STRING(mod->gc, "<special>");
     }
     case TYPE_FUNCTION: case TYPE_FUNCENV: {
-      return MAKE_STRING("<function>", 10);
+      return MAKE_STRING(mod->gc, "<function>");
     }
     case TYPE_UNKNOWN: {
-      return MAKE_STRING("<unknown>", 9);
+      return MAKE_STRING(mod->gc, "<unknown>");
     }
   }
 
-  return MAKE_STRING("<unknown>", 9);
+  return MAKE_STRING(mod->gc, "<unknown>");
 }
 
 Value string_length(int arg_n, Module* mod, Value* args) {
@@ -154,7 +154,7 @@ Value list_append(int arg_n, Module* mod, Value* args) {
 
   HeapValue* hp = GET_PTR(list);
 
-  Value* new_list = malloc((hp->length + 1) * sizeof(Value));
+  Value* new_list = gc_malloc(&mod->gc, (hp->length + 1) * sizeof(Value));
 
   for (int i = 0; i < hp->length; i++) {
     new_list[i] = hp->as_ptr[i];
@@ -162,7 +162,7 @@ Value list_append(int arg_n, Module* mod, Value* args) {
 
   new_list[hp->length] = value;
 
-  return MAKE_LIST(new_list, hp->length + 1);
+  return MAKE_LIST(mod->gc, new_list, hp->length + 1);
 }
 
 Value list_prepend(int arg_n, Module* mod, Value* args) {
@@ -175,14 +175,14 @@ Value list_prepend(int arg_n, Module* mod, Value* args) {
 
   HeapValue* hp = GET_PTR(list);
 
-  Value* new_list = malloc((hp->length + 1) * sizeof(Value));
+  Value* new_list = gc_malloc(&mod->gc, (hp->length + 1) * sizeof(Value));
 
   new_list[0] = value;
   for (int i = 0; i < hp->length; i++) {
     new_list[i + 1] = hp->as_ptr[i];
   }
 
-  return MAKE_LIST(new_list, hp->length + 1);
+  return MAKE_LIST(mod->gc, new_list, hp->length + 1);
 }
 
 Value list_concat(int arg_n, Module* mod, Value* args) {
@@ -193,7 +193,7 @@ Value list_concat(int arg_n, Module* mod, Value* args) {
   HeapValue* hp1 = GET_PTR(args[0]);
   HeapValue* hp2 = GET_PTR(args[1]);
 
-  Value* new_list = malloc((hp1->length + hp2->length) * sizeof(Value));
+  Value* new_list = gc_malloc(&mod->gc, (hp1->length + hp2->length) * sizeof(Value));
 
   size_t sz = hp1->length;
 
@@ -205,7 +205,7 @@ Value list_concat(int arg_n, Module* mod, Value* args) {
     new_list[i + sz] = hp2->as_ptr[i];
   }
 
-  return MAKE_LIST(new_list, hp1->length + hp2->length);
+  return MAKE_LIST(mod->gc, new_list, hp1->length + hp2->length);
 }
 
 Value get_index_str(int arg_n, Module* mod, Value* args) {
@@ -217,9 +217,9 @@ Value get_index_str(int arg_n, Module* mod, Value* args) {
   HeapValue* hp = GET_PTR(args[0]);
   char* str = hp->as_string;
 
-  if (idx < 0 || idx >= hp->length) return make_none();
+  if (idx < 0 || idx >= hp->length) return make_none(mod->gc);
 
-  return make_some(MAKE_CHAR(str[idx]));
+  return make_some(mod->gc, MAKE_CHAR(mod->gc, str[idx]));
 }
 
 Value char_to_string(int arg_n, Module* mod, Value* args) {
@@ -261,10 +261,10 @@ Value str_slice(size_t argc, Module* mod, Value* args) {
   size_t final_len = end - start;
   if (final_len < 0) final_len = 0;
 
-  char* slice = malloc((final_len + 1) * sizeof(char));
+  char* slice = gc_malloc(&mod->gc, (final_len + 1) * sizeof(char));
   strncpy(slice, str + start, final_len);
 
-  return MAKE_STRING(slice, final_len + 1);
+  return MAKE_STRING(mod->gc, slice);
 }
 
 Value ffi_slice_list(size_t argc, Module* mod, Value* args) {
@@ -276,11 +276,11 @@ Value ffi_slice_list(size_t argc, Module* mod, Value* args) {
   int end = GET_INT(args[2]);
 
   size_t sz = end - start;
-  Value* new_list = malloc(sz * sizeof(Value));
+  Value* new_list = gc_malloc(&mod->gc, sz * sizeof(Value));
 
   for (int i = 0; i < sz; i++) {
     new_list[i] = list_values[start + i];
   }
 
-  return MAKE_LIST(new_list, sz);
+  return MAKE_LIST(mod->gc, new_list, sz);
 }

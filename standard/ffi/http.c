@@ -28,7 +28,7 @@ Value ffi_fetch(size_t argc, Module* mod, Value* args) {
   const char* url_str = GET_STRING(url);
 
   CURL* curl = curl_easy_init();
-  if (!curl) return make_err(MAKE_STRING("Failed to initialize curl", 25));
+  if (!curl) return make_err(mod->gc, MAKE_STRING(mod->gc, "Failed to initialize curl"));
   
   data_size = 0;
 
@@ -43,9 +43,9 @@ Value ffi_fetch(size_t argc, Module* mod, Value* args) {
   if (res != CURLE_OK) {
     curl_easy_cleanup(curl);
     char* err = (char*) curl_easy_strerror(res);
-    return make_err(MAKE_STRING(err, strlen(err)));
+    return make_err(mod->gc, MAKE_STRING(mod->gc, err));
   }
 
   curl_easy_cleanup(curl);
-  return make_ok(MAKE_STRING(response, data_size));
+  return make_ok(mod->gc, MAKE_STRING(mod->gc, response));
 }

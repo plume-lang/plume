@@ -47,7 +47,7 @@ Value does_file_exist(int arg_n, Module* mod, Value* args) {
 }
 
 Value get_args(int arg_n, Module* mod, Value* args) {
-  return MAKE_LIST(mod->argv, mod->argc);
+  return MAKE_LIST(mod->gc, mod->argv, mod->argc);
 }
 
 Value print_int(int arg_n, Module* mod, Value* args) {
@@ -101,9 +101,9 @@ Value ffi_get_index(int arg_n, Module* mod, Value* args) {
   int idx = GET_INT(idx_v);
   HeapValue* l = GET_PTR(ls);
 
-  if (idx < 0 || idx >= l->length) return make_none();
+  if (idx < 0 || idx >= l->length) return make_none(mod->gc);
 
-  return make_some(l->as_ptr[idx]);
+  return make_some(mod->gc, l->as_ptr[idx]);
 }
 
 Value input(int arg_n, Module* mod, Value* args) {
@@ -116,7 +116,7 @@ Value input(int arg_n, Module* mod, Value* args) {
   printf("%s", GET_STRING(prompt));
   scanf("%s", buffer);
 
-  return MAKE_STRING(buffer, strlen(buffer));
+  return MAKE_STRING(mod->gc, buffer);
 }
 
 Value copy_ref(int arg_n, Module* mod, Value* args) {
@@ -156,7 +156,7 @@ Value read_file(size_t argc, Module *mod, Value *args) {
 
   char *filename = GET_STRING(args[0]);
   FILE *file = fopen(filename, "r");
-  if (file == NULL) return make_none();
+  if (file == NULL) return make_none(mod->gc);
 
   fseek(file, 0, SEEK_END);
   long length = ftell(file);
@@ -167,5 +167,5 @@ Value read_file(size_t argc, Module *mod, Value *args) {
   contents[length] = '\0';
 
   fclose(file);
-  return make_some(MAKE_STRING(contents, length));
+  return make_some(mod->gc, MAKE_STRING(mod->gc, contents));
 }

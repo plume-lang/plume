@@ -3,14 +3,14 @@
 
 #include <value.h>
 
-Value make_some(Value v);
-Value make_none();
-Value MAKE_CHAR(char c);
+Value make_some(GarbageCollector gc, Value v);
+Value make_none(GarbageCollector gc);
+Value MAKE_CHAR(GarbageCollector gc, char c);
 
-Value make_unit();
+Value make_unit(GarbageCollector gc);
 
-Value make_ok(Value v);
-Value make_err(Value v);
+Value make_ok(GarbageCollector gc, Value v);
+Value make_err(GarbageCollector gc, Value v);
 
 void print_helper(Value v);
 
