@@ -7,6 +7,7 @@ import Data.SortedList qualified as SL
 import Control.Monad.Parser
 import Data.Foldable hiding (elem)
 import Plume.Syntax.Concrete
+import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Parser.Lexer
 import Control.Monad.Exception (compilerError)
 
@@ -40,27 +41,27 @@ operators :: [[Operator Parser Expression]]
 operators =
   reverse
     [
-      [ binary "and" (EBinary And)
-      , binary "or" (EBinary Or)
+      [ binary "and" (EBinary "and")
+      , binary "or" (EBinary "or")
       ]
-    , [prefix "not" (EPrefix Not)]
+    , [prefix "not" (EPrefix "not")]
     ,
-      [ binary "==" (EBinary Equals)
-      , binary "!=" (EBinary NotEquals)
-      , binary ">=" (EBinary GreaterThan)
-      , binary "<=" (EBinary LesserThan)
-      , binary ">" (EBinary StrictlyGreatherThan)
-      , binary "<" (EBinary StrictlyLesserThan)
-      ]
-    ,
-      [ binary "+" (EBinary Plus)
-      , binary "-" (EBinary Minus)
+      [ binary "==" (EBinary "==")
+      , binary "!=" (EBinary "!=")
+      , binary ">=" (EBinary ">=")
+      , binary "<=" (EBinary "<=")
+      , binary ">" (EBinary ">")
+      , binary "<" (EBinary "<")
       ]
     ,
-      [ binary "*" (EBinary Times)
-      , binary "/" (EBinary Division)
+      [ binary "+" (EBinary "+")
+      , binary "-" (EBinary "-")
       ]
-    , [binary "%" (EBinary Mod)]
+    ,
+      [ binary "*" (EBinary "*")
+      , binary "/" (EBinary "/")
+      ]
+    , [binary "%" (EBinary "%")]
     , [prefix "*" EUnMut]
     ]
 
@@ -83,9 +84,12 @@ sortCustomOperators ops = map ((: []) . parseOperator) (SL.fromSortedList ops)
     | otherwise =
         compilerError "Invalid operator type"
 
+pattern MkVar :: Text -> Expression
+pattern MkVar name = EVariable (MkIdentifier name False) Nothing
+
 pattern CustomInfix :: Text -> Expression -> Expression -> Expression
-pattern CustomInfix name e1 e2 = EApplication (EVariable name) [e1, e2]
+pattern CustomInfix name e1 e2 = EApplication (MkVar name) [e1, e2]
 
 pattern CustomPrefix, CustomPostfix :: Text -> Expression -> Expression
-pattern CustomPrefix name e = EApplication (EVariable name) [e]
-pattern CustomPostfix name e = EApplication (EVariable name) [e]
+pattern CustomPrefix name e = EApplication (MkVar name) [e]
+pattern CustomPostfix name e = EApplication (MkVar name) [e]

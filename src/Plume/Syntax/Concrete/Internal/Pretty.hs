@@ -128,6 +128,7 @@ prettyExpr _ (EVariableDeclare gens n t) =
     <+> ":"
     <+> ansiPretty t
 prettyExpr _ (EAwait e) = anCol Blue "await" <+> prettyExpr 0 e
+prettyExpr _ e = show e
 
 prettyExt :: ExtensionMember -> Doc AnsiStyle
 prettyExt (ExtDeclaration gs a e1') =

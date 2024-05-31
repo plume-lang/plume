@@ -22,10 +22,10 @@ removeUselessBlocks isInner (AST.ESwitch e cases) = do
   e' <- removeUselessBlocks True e
   let cases' = map (second (removeUselessBlocksIf isInner)) cases
   [AST.ESwitch e' cases']
-removeUselessBlocks isInner (AST.EDeclaration isMut gens n e1 e2) = do
+removeUselessBlocks isInner (AST.EDeclaration gens n e1 e2) = do
   e1' <- removeUselessBlocks True e1
   e2' <- mapM (removeUselessBlocks isInner) e2
-  [AST.EDeclaration isMut gens n e1' e2']
+  [AST.EDeclaration gens n e1' e2']
 removeUselessBlocks _ (AST.EClosure args ret body) = do
   let b = removeUselessBlocks False body
   case b of
@@ -35,7 +35,7 @@ removeUselessBlocks _ (AST.EClosure args ret body) = do
 removeUselessBlocks isInner (AST.EUnMut e) = do
   e' <- removeUselessBlocks isInner e
   [AST.EUnMut e']
-removeUselessBlocks _ (AST.EVariable n) = [AST.EVariable n]
+removeUselessBlocks _ (AST.EVariable n t) = [AST.EVariable n t]
 removeUselessBlocks _ (AST.ELiteral l) = [AST.ELiteral l]
 removeUselessBlocks isInner (AST.EReturn e) = do
   e' <- removeUselessBlocks isInner e
@@ -49,7 +49,7 @@ removeUselessBlocks isInner (AST.ETypeExtension gens ann var mems) = do
   [AST.ETypeExtension gens ann var mems']
 removeUselessBlocks _ e = [e]
 
-removeUselessBlocksExt :: Bool -> AST.ExtensionMem -> AST.ExtensionMem
+removeUselessBlocksExt :: Bool -> AST.ExtensionMember -> AST.ExtensionMember
 removeUselessBlocksExt isInner (AST.ExtDeclaration gens n e) = do
   let e' = removeUselessBlocks isInner e
   case e' of
