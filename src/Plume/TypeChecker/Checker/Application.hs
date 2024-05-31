@@ -5,7 +5,7 @@ import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Checker.Switch (mapAndUnzip3M)
 import Plume.TypeChecker.Constraints.Solver (unifiesWith)
 import Plume.TypeChecker.TLIR qualified as Post
-import Prelude hiding (local)
+import Prelude hiding (local, modify)
 
 synthApp :: Infer -> Infer
 synthApp infer (Pre.EApplication f xs) = local id $ do

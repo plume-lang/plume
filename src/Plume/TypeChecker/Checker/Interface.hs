@@ -36,13 +36,12 @@ synthInterface _ (Pre.EInterface (Annotation name [ty]) generics methods) = do
   let instTy = TypeApp (TypeId name) [ty']
   let genTy = ([instTy] :->:)
   let getIdx n = fromMaybe (-1) (Map.lookup n mappedMethods)
-  pos <- fetchPosition
   let genFuns =
         map
           ( \(n, Forall _ (_ :=>: funTy)) ->
               Post.EDeclaration
                 (n :@: genTy funTy)
-                (Post.EClosure ["$inst" :@: instTy] funTy (Post.EInstanceAccess (Post.EVariable "$inst" instTy) (getIdx n)) pos)
+                (Post.EClosure ["$inst" :@: instTy] funTy (Post.EInstanceAccess (Post.EVariable "$inst" instTy) (getIdx n)) False)
                 Nothing
           )
           methods'

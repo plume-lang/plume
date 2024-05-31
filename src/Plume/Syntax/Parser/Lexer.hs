@@ -122,6 +122,7 @@ reservedWords =
     , "declare"
     , "extends"
     , "interface"
+    , "await"
     , -- Primitive types
       "int"
     , "str"

@@ -81,7 +81,7 @@ extractFrom (LLIR.Function {}) = error "Not implemented"
 extractFrom (LLIR.Instruction instr) = [instr]
 
 instance Assemble Pre.DesugaredProgram where
-  assemble (Pre.DPFunction name args body) = do
+  assemble (Pre.DPFunction name args body _) = do
     writeIORef isFunctionCurrently True
     glbs <- readIORef globals
     ntvs <- readIORef natives

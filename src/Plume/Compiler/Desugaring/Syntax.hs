@@ -43,7 +43,7 @@ type Argument = Text
 type FunctionArity = Int
 
 data DesugaredProgram
-  = DPFunction FunctionName [Argument] [DesugaredStatement]
+  = DPFunction FunctionName [Argument] [DesugaredStatement] Bool
   | DPStatement DesugaredStatement
   | DPDeclaration Text DesugaredExpr
   | DPNativeFunction LibraryPath FunctionName FunctionArity IsStandard
@@ -83,7 +83,7 @@ instance Show DesugaredStatement where
   show (DSMutUpdate n e) = show n <> " = " <> show e
 
 instance Show DesugaredProgram where
-  show (DPFunction name args body) =
+  show (DPFunction name args body _) =
     "function " <> toString name <> "(" <> intercalate ", " (map toString args) <> ") {\n"
       <> intercalate "\n" (map (("  " <>) . show) body)
       <> "\n}"

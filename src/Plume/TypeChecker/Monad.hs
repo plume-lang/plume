@@ -7,6 +7,11 @@ module Plume.TypeChecker.Monad
     Placeholder,
     Substitution,
     fetchPositionIO,
+    modify,
+    get,
+    put,
+    gets,
+    local,
     throw,
     throwRaw,
     insertWith,
@@ -33,8 +38,6 @@ module Plume.TypeChecker.Monad
     removeLink,
     removeNewEntries,
     interpretError,
-    local,
-    gets,
     tryOr,
   )
 where

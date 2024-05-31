@@ -51,7 +51,7 @@ data ClosedStatement
   deriving (Eq, Show, Ord)
 
 data ClosedProgram
-  = CPFunction Text [Text] ClosedStatement
+  = CPFunction Text [Text] ClosedStatement Bool
   | CPStatement ClosedStatement
   | CPNativeFunction Text Text Int IsStandard
   | CPDeclaration Text ClosedExpr

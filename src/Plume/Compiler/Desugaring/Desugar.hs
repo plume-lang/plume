@@ -127,9 +127,9 @@ desugarStatement isTop = \case
 
 desugarProgram :: Pre.ClosedProgram -> IO [Post.DesugaredProgram]
 desugarProgram = \case
-  Pre.CPFunction x xs y -> do
+  Pre.CPFunction x xs y isAsync -> do
     ys <- desugarStatement (True, False, False) y
-    return [Post.DPFunction x xs (createBlock ys)]
+    return [Post.DPFunction x xs (createBlock ys) isAsync]
   Pre.CPStatement x -> do
     x' <- desugarStatement (False, False, False) x
     return $ createBlockProg' x'

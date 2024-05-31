@@ -7,7 +7,7 @@ import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Constraints.Solver (unifiesWith)
 import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
-import Prelude hiding (local)
+import Prelude hiding (local, gets, modify)
 
 synthClosure :: Infer -> Infer
 synthClosure infer (Pre.EClosure args ret body) = local id $ do
@@ -18,19 +18,26 @@ synthClosure infer (Pre.EClosure args ret body) = local id $ do
   let argSchemes = createEnvFromAnnotations convertedArgs
   insertEnvWith @"typeEnv" (<>) argSchemes
 
+  old <- gets isAsynchronous
+  modify (\s -> s {isAsynchronous = False})
+
   -- Type checking the body of the closure with the new environment
   -- and the return type of the closure
-  (retTy, ps, body') <-
-    local (\s -> s {returnType = Just convertedRet}) $ infer body
+  (isAsync, (retTy, ps, body')) <-
+    local (\s -> s {returnType = Just convertedRet}) $ do
+      res <- infer body
+      isAsync <- gets isAsynchronous
+      return (isAsync, res)
+
+  modify (\s -> s {isAsynchronous = old})
 
   -- Unifying specified return type with the inferred return type
   convertedRet `unifiesWith` retTy
 
   -- Creating the closure type
   let closureTy = map (.annotationValue) convertedArgs :->: retTy
-  pos <- fetchPosition
-
-  pure (closureTy, ps, Post.EClosure convertedArgs retTy <$> body' <*> pure pos)
+  
+  pure (closureTy, ps, Post.EClosure convertedArgs retTy <$> body' <*> pure isAsync)
 synthClosure _ _ = throw $ CompilerError "Only closures are supported"
 
 -- | Function that create a new environment from a list of converted

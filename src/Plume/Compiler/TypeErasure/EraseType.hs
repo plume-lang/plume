@@ -62,11 +62,11 @@ isNotDecl (Pre.EMutUpdate {}) = False
 isNotDecl _ = True
 
 eraseType :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]
-eraseType (Pre.EDeclaration (Annotation name _) (Pre.EClosure args _ body _) Nothing : xs) = do
+eraseType (Pre.EDeclaration (Annotation name _) (Pre.EClosure args _ body isA) Nothing : xs) = do
   let args' = map (\(Annotation n _) -> n) args
   let b = insertReturnStmt body
   b' <- eraseStatement b
-  let fun = Post.UPFunction name args' b'
+  let fun = Post.UPFunction name args' b' isA
   modifyIORef' program (<> [fun])
   eraseType xs
 eraseType (Pre.EVariableDeclare name arity : xs) = do
@@ -186,13 +186,14 @@ eraseExpr (Pre.ESwitch e cases) = do
   cases' <- mapM (bimapM erasePattern eraseExpr) cases
   return $ Post.UESwitch e' cases'
 eraseExpr (Pre.EBlock es) = Post.UEBlock <$> mapM eraseStatement es
-eraseExpr (Pre.EClosure args _ body _) = do
+eraseExpr (Pre.EClosure args _ body isA) = do
   let b' = insertReturnStmt body
   b <- eraseExpr b'
   return $
     Post.UEClosure
       (map (\(Annotation n _) -> n) args)
       (Post.USExpr b)
+      isA
 eraseExpr (Pre.EExtVariable x fun t) = do
   let err = compilerError $
           "Invalid function type for extension variable: "

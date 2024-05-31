@@ -102,7 +102,7 @@ freeProgList xs = fst $ go xs (S.empty, S.empty)
     :: [DesugaredProgram]
     -> Variables
     -> Variables
-  go (DPFunction n args stmts : rest) s =
+  go (DPFunction n args stmts _ : rest) s =
     let (freeStmts, bound) = freeStmtList stmts
         freeE = freeStmts S.\\ (S.fromList args <> S.singleton n)
         bound' = S.insert n bound
@@ -124,7 +124,7 @@ freeProgList xs = fst $ go xs (S.empty, S.empty)
   go [] s = s
 
 instance Free DesugaredProgram where
-  free (DPFunction n args stmts) = free stmts S.\\ (S.fromList args <> S.singleton n)
+  free (DPFunction n args stmts _) = free stmts S.\\ (S.fromList args <> S.singleton n)
   free (DPStatement s) = free s
   free (DPNativeFunction {}) = S.empty
   free (DPDeclaration n e) = free e S.\\ S.singleton n
@@ -140,13 +140,13 @@ removeDeadCode
 removeDeadCode s d (DPDeclare n : rest) = do
   let rest' = removeDeadCode s (S.insert n d) rest
   DPDeclare n : rest'
-removeDeadCode s d (DPFunction n args stmts : rest) =
+removeDeadCode s d (DPFunction n args stmts async : rest) =
   let bound = S.fromList args <> S.singleton n
       rest' = removeDeadCode (S.insert n s) d rest
       freeVars = freeProgList rest'
       stmts' = removeDeadCodeStmt bound stmts
    in if n `S.member` freeVars || n `S.member` d
-        then DPFunction n args (removeNilReturn stmts') : rest'
+        then DPFunction n args (removeNilReturn stmts') async : rest'
         else rest'
 removeDeadCode s d (DPStatement stmt : rest) =
   let (_, b) = freeStmtList [stmt]

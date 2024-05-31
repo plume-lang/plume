@@ -2,7 +2,7 @@ module Plume.TypeChecker.TLIR.Syntax where
 
 import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Literal
-import Plume.Syntax.Concrete.Expression (Position, TypeConstructor)
+import Plume.Syntax.Concrete.Expression (TypeConstructor)
 import Plume.TypeChecker.TLIR.Modules.Pattern
 import Plume.Syntax.Abstract.Expression (IsStandard)
 
@@ -39,7 +39,7 @@ data TypedExpression t
       [Annotation t]
       t
       (TypedExpression t)
-      Position
+      Bool
   | EBlock [TypedExpression t]
   | ESwitch (TypedExpression t) [(TypedPattern t, TypedExpression t)]
   | EReturn (TypedExpression t)

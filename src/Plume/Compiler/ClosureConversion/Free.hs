@@ -75,7 +75,7 @@ instance Free ClosedStatement where
   free (CSMutUpdate x e) = (free e S.\\ free x) <> free x
 
 instance Free ClosedProgram where
-  free (CPFunction n args e) = free e S.\\ (S.fromList args <> S.singleton n)
+  free (CPFunction n args e _) = free e S.\\ (S.fromList args <> S.singleton n)
   free (CPStatement s) = free s
   free (CPNativeFunction {}) = S.empty
   free (CPDeclaration n e) = free e S.\\ S.singleton n
@@ -151,8 +151,8 @@ instance Substitutable ClosedStatement ClosedExpr where
 
 instance Substitutable ClosedProgram ClosedExpr where
   substitute e (CPStatement s) = CPStatement (substitute e s)
-  substitute e (CPFunction name args body) =
-    CPFunction name args (substitute e body)
+  substitute e (CPFunction name args body isAsync) =
+    CPFunction name args (substitute e body) isAsync
   substitute _ p@(CPNativeFunction {}) = p
   substitute e (CPDeclaration name body)
     | name == fst e = CPDeclaration name body

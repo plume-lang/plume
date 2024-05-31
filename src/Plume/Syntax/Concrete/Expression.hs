@@ -118,6 +118,7 @@ data ConcreteExpression t
   | ENativeFunction Text Text [Text] t LibraryType
   | ETypeAlias (Annotation [PlumeGeneric]) t
   | EVariableDeclare [PlumeGeneric] Text (Maybe t)
+  | EAwait (ConcreteExpression t)
   deriving (Show)
 
 -- | A type constructor is a type that is used to construct a type.

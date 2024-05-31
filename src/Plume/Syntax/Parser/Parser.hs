@@ -13,6 +13,7 @@ import Plume.Syntax.Parser.Modules.Slice qualified as Slc
 import Plume.Syntax.Parser.Modules.Type qualified as Typ
 import Text.Megaparsec qualified as P
 import Text.Megaparsec.Char qualified as P
+import Plume.Syntax.Common.Type qualified as Typ
 
 type Argument = Cmm.Annotation (Maybe Cmm.PlumeType, CST.IsMutable)
 type TypedArg = Cmm.Annotation (Cmm.PlumeType, CST.IsMutable)
@@ -193,6 +194,18 @@ eList :: P.Parser CST.Expression
 eList =
   CST.EList <$> L.brackets (parseExpression `P.sepBy` L.comma)
 
+-- | Parses an await expression
+-- | An await expression is a special kind of expression that is used to
+-- | wait for an asynchronous expression to complete.
+-- |
+-- | SYNTAX:
+-- |  - await expr
+-- | where `expr` is an expression that returns an asynchronous value.
+eAwait :: P.Parser CST.Expression
+eAwait = do
+  void $ L.reserved "await"
+  CST.EAwait <$> parseExpression
+
 -- | Parses a macro expression
 -- | A macro expression is a special kind of expression that is used to
 -- | reference a macro variable or a macro function.
@@ -266,6 +279,7 @@ parseTerm =
   P.choice
     [ Lit.parseLiteral
     , eIf
+    , eAwait
     , eSwitch
     , eList
     , eMacroExpr
@@ -752,10 +766,23 @@ tMacro = do
 tDeclare :: P.Parser [CST.Expression]
 tDeclare = do
   void $ L.reserved "declare"
-  name <- L.identifier
-  gens <- P.option [] $ L.angles (Typ.parseGeneric `P.sepBy` L.comma)
-  ty <- P.optional $ L.symbol ":" *> Typ.tType
-  return [CST.EVariableDeclare gens name ty]
+  P.choice [declFun, declVar]
+
+  where
+    declFun = do
+      void $ L.reserved "fn"
+      name <- L.identifier <|> L.parens L.operator
+      gens <- P.option [] $ L.angles $ Typ.parseGeneric  `P.sepBy` L.comma
+      args <- L.parens $ typeAnnot' `P.sepBy` L.comma
+      retTy <- L.symbol ":" *> Typ.tType
+
+      let fun = Typ.TFunction args retTy
+      return [CST.EVariableDeclare gens name (Just fun)]
+
+    declVar = do
+      name <- L.identifier
+      ty <- L.symbol ":" *> Typ.tType
+      return [CST.EVariableDeclare [] name (Just ty)]
 
 -- | Parses a toplevel expression
 -- | A toplevel expression is an expression that is at the top-level of the

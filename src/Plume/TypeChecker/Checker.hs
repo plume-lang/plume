@@ -20,7 +20,7 @@ import Plume.TypeChecker.Constraints.Typeclass
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
-import Prelude hiding (gets, local)
+import Prelude hiding (gets, local, modify)
 
 synthesize :: (MonadChecker m) => Pre.Expression -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression)
 
@@ -87,6 +87,18 @@ synthesize (Pre.EVariableDeclare gens name ty) = do
         _ -> (-1)
 
   pure (ty', [], pure (Post.EVariableDeclare name arity))
+synthesize (Pre.EAwait e) = do
+  (ty, ps, e') <- synthesize e
+
+  tv <- fresh
+  ty `unifiesWith` TypeApp (TypeId "async") [tv]
+
+  modify (\s -> s {isAsynchronous = True})
+
+  let awaitSig = [ty] :->: tv
+  let call ex = Post.EApplication (Post.EVariable "wait" awaitSig) [ex]
+
+  pure (tv, ps, call <$> e')
 -- \| Calling synthesis modules
 synthesize app@(Pre.EApplication {}) = synthApp synthesize app
 synthesize clos@(Pre.EClosure {}) = synthClosure synthesize clos

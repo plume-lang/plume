@@ -96,6 +96,7 @@ prettyExpr (EInterface (Annotation name tys) gens ms) =
     <+> line
     <> indent 2 (vsep (map ansiPretty ms))
 prettyExpr (EList es) = brackets (hsep . punctuate comma $ map prettyExpr es)
+prettyExpr (EVariableDeclare g n t) = anCol Blue "let" <+> ansiPretty g <+> "=" <+> pretty n <+> ":" <+> ansiPretty t
 
 prettyExtMember :: ExtensionMember PlumeType -> Doc AnsiStyle
 prettyExtMember (ExtDeclaration g ann e) =

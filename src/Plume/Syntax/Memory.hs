@@ -179,6 +179,10 @@ instance (Memory a) => Memory (AST.AbstractExpression a) where
     pure $ AST.ENativeFunction fp n gens t st
   transform (AST.EInterface ann gs ms) = pure $ AST.EInterface ann gs ms
 
+  transform (AST.EVariableDeclare g n t) = do
+    modifyIORef' allocatedVariables (Set.insert (n, 0))
+    pure $ AST.EVariableDeclare g n t
+
 instance Memory AST.PlumeType where transform = pure
 
 instance (Memory a) => Memory (TypeConstructor a) where

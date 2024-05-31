@@ -17,7 +17,7 @@ data UntypedExpr
   | UEAnd UntypedExpr UntypedExpr
   | UEBlock [UntypedStatement]
   | UEEqualsType UntypedExpr Text
-  | UEClosure [Text] UntypedStatement
+  | UEClosure [Text] UntypedStatement IsAsync
   | UESpecial
   | UEUnMut UntypedExpr
   deriving (Eq, Show, Ord)
@@ -40,8 +40,10 @@ data UntypedStatement
   | USMutUpdate Text UntypedExpr
   deriving (Eq, Show, Ord)
 
+type IsAsync = Bool
+
 data UntypedProgram
-  = UPFunction Text [Text] UntypedStatement
+  = UPFunction Text [Text] UntypedStatement IsAsync
   | UPADTFunction Text [Text] UntypedStatement
   | UPStatement UntypedStatement
   | UPNativeFunction Text Text Int IsStandard
