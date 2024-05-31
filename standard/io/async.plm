@@ -1,6 +1,7 @@
-type Async<A> { }
+type async<A> { }
 
 native "js" "std:native" {
-  wait<A>(a: Async<A>): A
-  async<A>(a: A): Async<A>
+  async<A>(a: A): async<A>
 }
+
+declare fn wait<A>(a: async<A>): A
