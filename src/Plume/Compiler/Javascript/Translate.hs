@@ -1,4 +1,3 @@
-{-# LANGUAGE FunctionalDependencies #-}
 module Plume.Compiler.Javascript.Translate where
 
 import Plume.Compiler.Javascript.Syntax qualified as Post
@@ -12,7 +11,8 @@ class Assemble a b where
 
 instance Assemble Pre.DesugaredProgram Post.Program where
   assemble (Pre.DPDeclaration name expr) = Post.Program [Post.JSVariableDeclaration name (assemble expr)]
-  assemble (Pre.DPFunction name args body) = Post.Program [Post.JSFunction name args (assemble body)]
+  assemble (Pre.DPFunction name args body isAsync) = Post.Program [fun name args (assemble body)]
+    where fun = if isAsync then Post.JSAsyncFunction else Post.JSFunction
   assemble (Pre.DPMutDeclaration name expr) = Post.Program [Post.JSVariableDeclaration name (assemble expr)]
   assemble (Pre.DPMutUpdate name expr) = Post.Program [Post.JSUpdate (assemble name) (assemble expr)]
   assemble (Pre.DPStatement st) = Post.Program [assemble st]
@@ -28,11 +28,11 @@ assembleNative :: Pre.DesugaredProgram -> [Post.Statement]
 assembleNative (Pre.DPNativeFunction lib name _ isStd) = do
   [Post.JSVariableDeclaration name nameCall]
   where
-    requireCall = (Post.JSCall (Post.JSIdentifier "require") [
+    requireCall = Post.JSCall (Post.JSIdentifier "require") [
         if isStd then 
           createStandardPath lib 
         else Post.JSLiteral (Cmm.LString lib)
-      ])
+      ]
     nameCall = Post.JSMember requireCall name
 assembleNative _ = []
 
@@ -51,6 +51,7 @@ blockToExpr xs = Post.JSCall (Post.JSAnnFunction [] (assemble xs)) []
 
 instance Assemble Pre.DesugaredExpr Post.Expression where
   assemble (Pre.DEAnd e1 e2) = Post.JSBinary "&&" (assemble e1) (assemble e2)
+  assemble (Pre.DEApplication "wait" [e]) = Post.JSAwait (assemble e)
   assemble (Pre.DEApplication f args) = Post.JSCall (Post.JSIdentifier f) (assemble args)
   assemble (Pre.DEDictionary fields) = Post.JSObject (assemble fields)
   assemble (Pre.DEEqualsTo e1 e2) = Post.JSBinary "===" (assemble e1) (assemble e2)
@@ -82,3 +83,6 @@ instance Assemble a b => Assemble (IntMap a) [(Post.Field, b)] where
 
 runTranslateJS :: [Pre.DesugaredProgram] -> Post.Program
 runTranslateJS = mconcat . fmap assemble
+
+createMainJSApp :: Post.Program -> Text
+createMainJSApp (Post.Program stmts) = show (Post.JSCall (Post.JSAsyncAnnFunction [] stmts) [])

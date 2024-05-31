@@ -17,6 +17,7 @@ data Statement
   | JSFunction Name [Name] [Statement]
   | JSReturn Expression
   | JSUpdate Update Expression
+  | JSAsyncFunction Name [Name] [Statement]
 
 data Update
   = JSFieldUpdate Field Update
@@ -36,6 +37,8 @@ data Expression
   | JSTernary Expression Expression Expression
   | JSNull
   | JSAnnFunction [Name] [Statement]
+  | JSAwait Expression
+  | JSAsyncAnnFunction [Name] [Statement]
 
 pattern JSMember :: Expression -> Field -> Expression
 pattern JSMember e f = JSArrayIndex e (JSLiteral (LString f))
@@ -56,6 +59,7 @@ instance Show Statement where
   show (JSFunction n args body) = "function " <> varify (toString n) <> "(" <> intercalate ", " (fmap (varify . toString) args) <> ") {\n" <> intercalate "\n" (fmap show body) <> "\n}"
   show (JSReturn e) = "return " <> show e <> ";"
   show (JSUpdate u e) = show u <> " = " <> show e <> ";"
+  show (JSAsyncFunction n args body) = "async function " <> varify (toString n) <> "(" <> intercalate ", " (fmap (varify . toString) args) <> ") {\n" <> intercalate "\n" (fmap show body) <> "\n}"
 
 instance Show Update where
   show (JSFieldUpdate f u) = show u <> "." <> toString f
@@ -89,7 +93,7 @@ instance Show Expression where
   show (JSIdentifier n) = varify $ toString n
   show (JSBinary o e1 e2) = "(" <> show e1 <> " " <> toString o <> " " <> show e2 <> ")"
   show (JSUnary o e) = "(" <> toString o <> show e <> ")"
-  show (JSCall e args) = "(" <> show e <> "(" <> intercalate ", " (fmap show args) <> "))"
+  show (JSCall e args) = show e <> "(" <> intercalate ", " (fmap show args) <> ")"
   show (JSObject fields) = "({ " <> intercalate ", " (fmap (\(f, e) -> show f <> ": " <> show e) fields) <> " })"
   show (JSArray es) = "[ " <> intercalate ", " (fmap show es) <> " ]"
   show (JSArrayIndex e i) = show e <> "[" <> show i <> "]"
@@ -97,3 +101,5 @@ instance Show Expression where
   show JSNull = "null"
   show (JSSlice e i) = show e <> "[" <> show i <> ":]"
   show (JSAnnFunction args body) = "(function(" <> intercalate ", " (fmap show args) <> ") {\n" <> intercalate "\n" (fmap show body) <> "\n})"
+  show (JSAwait e) = "(await " <> show e <> ")"
+  show (JSAsyncAnnFunction args body) = "(async function(" <> intercalate ", " (fmap show args) <> ") {\n" <> intercalate "\n" (fmap show body) <> "\n})"
