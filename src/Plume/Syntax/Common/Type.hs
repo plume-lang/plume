@@ -39,6 +39,10 @@ getGenericName :: PlumeGeneric -> Text
 getGenericName (GVar name) = name
 getGenericName (GExtends name _) = name
 
+getTypeName :: PlumeType -> Text
+getTypeName (TId name) = name
+getTypeName _ = ""
+
 -- TYPE SYNONYMS SHORTCUTS
 
 -- | A type that represents a mutable reference to another type

@@ -8,16 +8,18 @@ module Plume.Syntax.Concrete.Expression where
 -- variable to a complex function application.
 
 import Data.Text hiding (map)
+import GHC.Records (HasField (..))
 import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Literal
 import Plume.Syntax.Common.Pattern
 import Plume.Syntax.Common.Type
 import Text.Megaparsec.Pos
 import Prelude hiding (intercalate)
-import GHC.Records (HasField(..))
+
+type IsStandard = Bool
 
 -- | A position is a tuple of two source positions.
--- | The first position is the start position and the second position 
+-- | The first position is the start position and the second position
 -- | is the end position.
 type Position = (SourcePos, SourcePos)
 
@@ -65,66 +67,40 @@ data PostfixOperator
   = PostfixSlice
   deriving (Show, Eq)
 
-type IsMutable = Bool
-
 -- | A concrete expression is an expression that is used to represent
 -- | a program. It is a more concrete representation of a program than
 -- | an abstract syntax tree. It is used to represent the program in a
 -- | way that is easier to understand for the user and especially more
 -- | natural.
-data ConcreteExpression t
-  = EVariable Text
+data Expression t f 
+  = EVariable Identifier (f t)
   | ELiteral Literal
-  | EList [ConcreteExpression t]
-  | EApplication (ConcreteExpression t) [ConcreteExpression t]
-  | EBinary BinaryOperator (ConcreteExpression t) (ConcreteExpression t)
-  | EPrefix PrefixOperator (ConcreteExpression t)
-  | EPostfix PostfixOperator (ConcreteExpression t)
-  | EType (Annotation [PlumeGeneric]) [TypeConstructor t]
-  | EDeclaration
-      [PlumeGeneric]
-      IsMutable
-      (Annotation (Maybe t))
-      (ConcreteExpression t)
-      (Maybe (ConcreteExpression t))
-  | EConditionBranch
-      (ConcreteExpression t)
-      (ConcreteExpression t)
-      (Maybe (ConcreteExpression t))
-  | EClosure
-      [Annotation (Maybe t, IsMutable)]
-      (Maybe t)
-      (ConcreteExpression t)
-  | EUnMut (ConcreteExpression t)
-  | EBlock [ConcreteExpression t]
-  | EProperty Text (ConcreteExpression t)
-  | EListIndex (ConcreteExpression t) (ConcreteExpression t)
+  | EList [Expression t f]
+  | EApplication (Expression t f) [Expression t f]
+  | EType (Annotation [Text]) [TypeConstructor t]
+  | EDeclaration [PlumeGeneric] (Annotation (f t)) (Expression t f) (Maybe (Expression t f))
+  | EMutUpdate (Annotation (f t)) (Expression t f) (Maybe (Expression t f))
+  | EConditionBranch (Expression t f) (Expression t f) (Maybe (Expression t f))
+  | EClosure [Annotation (f t)] (f t) (Expression t f)
+  | EBlock [Expression t f]
   | ERequire Text
-  | ELocated (ConcreteExpression t) Position
-  | EMacro Text (ConcreteExpression t)
-  | EMacroFunction Text [Text] (ConcreteExpression t)
-  | EMacroVariable Text
-  | EMacroApplication Text [ConcreteExpression t]
-  | ESwitch
-      (ConcreteExpression t)
-      [(Pattern, ConcreteExpression t)]
-  | EInterface {
-      interfaceType :: Annotation [t],
-      interfaceGenerics :: [PlumeGeneric],
-      interfaceMembers :: [Annotation PlumeScheme]
-    }
-  | EReturn (ConcreteExpression t)
-  | ETypeExtension [PlumeGeneric] (Annotation [t]) (Maybe Text) [ExtensionMember t]
-  | ENativeFunction Text Text [Text] t LibraryType
-  | ETypeAlias (Annotation [PlumeGeneric]) t
-  | EVariableDeclare [PlumeGeneric] Text (Maybe t)
-  | EAwait (ConcreteExpression t)
-  deriving (Show)
+  | ELocated (Expression t f) Position
+  | ESwitch (Expression t f) [(Pattern t f, Expression t f)]
+  | EInterface { interfaceType :: Annotation [t], interfaceGenerics :: [PlumeGeneric], interfaceMembers :: [Annotation PlumeScheme] }
+  | EReturn (Expression t f)
+  | ETypeExtension [PlumeGeneric] (Annotation [t]) (Maybe Text) [ExtensionMember t f]
+  | ENativeFunction Text Text [Text] t LibraryType IsStandard
+  | ETypeAlias (Annotation [Text]) t
+  | EVariableDeclare [PlumeGeneric] Text (f t)
+  | EAwait (Expression t f)
+  | EInstanceVariable Identifier (f t)
+  | EInstanceAccess (Expression t f) Int
+  | EInstanceDict Text (f t) [Expression t f]
 
 -- | A type constructor is a type that is used to construct a type.
--- | It may be either a type-constructor function or a type-constructor 
+-- | It may be either a type-constructor function or a type-constructor
 -- | variable.
--- | For instance `unit` is a type-constructor variable whereas 
+-- | For instance `unit` is a type-constructor variable whereas
 -- | `Ok` is a type-constructor function.
 data TypeConstructor t
   = TConstructor Text [t]
@@ -133,57 +109,49 @@ data TypeConstructor t
 
 -- | An extension member is a member that is used to extend a type.
 -- | It is currently only a declaration that may be a function.
-data ExtensionMember t
+data ExtensionMember t f
   = ExtDeclaration
       [PlumeGeneric]
-      (Annotation (Maybe t))
-      (ConcreteExpression t)
-  deriving (Show)
+      (Annotation (f t))
+      (Expression t f)
+
+deriving instance (Show t, Show (f t)) => Show (ExtensionMember t f)
+deriving instance (Show t, Show (f t)) => Show (Expression t f)
 
 -- | Shorthand for a located expression
 -- | x :>: p is equivalent to ELocated x p
-pattern (:>:) :: ConcreteExpression t -> Position -> ConcreteExpression t
+pattern (:>:) :: Expression t f -> Position -> Expression t f
 pattern e :>: p = ELocated e p
 
 -- CONCRETE EXPRESSION INSTANCES
 
-instance Eq t => Eq (ConcreteExpression t) where
-  EVariable x == EVariable y = x == y
+instance (Eq t, Eq (f t)) => Eq (Expression t f) where
+  EVariable x t == EVariable y t' = x == y && t == t'
   ELiteral x == ELiteral y = x == y
   EList xs == EList ys = xs == ys
   EApplication f xs == EApplication g ys = f == g && xs == ys
-  EBinary op x y == EBinary op' x' y' = op == op' && x == x' && y == y'
-  EPrefix op x == EPrefix op' x' = op == op' && x == x'
-  EPostfix op x == EPostfix op' x' = op == op' && x == x'
   EType _ xs == EType _ ys = xs == ys
-  EDeclaration _ m t x y == EDeclaration _ m' t' x' y' =
-    m == m' && t == t' && x == x' && y == y'
+  EDeclaration _ t x y == EDeclaration _ t' x' y' =
+    t == t' && x == x' && y == y'
   EConditionBranch x y z == EConditionBranch x' y' z' = x == x' && y == y' && z == z'
   EClosure xs t x == EClosure xs' t' x' = xs == xs' && t == t' && x == x'
-  EUnMut x == EUnMut y = x == y
   EBlock xs == EBlock ys = xs == ys
-  EProperty x y == EProperty x' y' = x == x' && y == y'
-  EListIndex x y == EListIndex x' y' = x == x' && y == y'
   ERequire x == ERequire y = x == y
-  EMacro x y == EMacro x' y' = x == x' && y == y'
-  EMacroFunction x xs y == EMacroFunction x' xs' y' = x == x' && xs == xs' && y == y'
-  EMacroVariable x == EMacroVariable y = x == y
-  EMacroApplication x xs == EMacroApplication x' xs' = x == x' && xs == xs'
   ESwitch x xs == ESwitch x' xs' = x == x' && xs == xs'
   EReturn x == EReturn y = x == y
   EInterface x xs ys == EInterface x' xs' ys' = x == x' && xs == xs' && ys == ys'
   ETypeExtension xs x t ys == ETypeExtension xs' x' t' ys' = xs == xs' && x == x' && ys == ys' && t == t'
-  ENativeFunction x y xs z t == ENativeFunction x' y' xs' z' t' = x == x' && y == y' && xs == xs' && z == z' && t == t'
+  ENativeFunction x y xs z t isStd == ENativeFunction x' y' xs' z' t' isStd' = x == x' && y == y' && xs == xs' && z == z' && t == t' && isStd == isStd'
   EVariableDeclare xs x t == EVariableDeclare xs' x' t' = xs == xs' && x == x' && t == t'
   ELocated x _ == ELocated y _ = x == y
   ELocated x _ == y = x == y
   x == ELocated y _ = x == y
   _ == _ = False
 
-instance Eq t => Eq (TypeConstructor t) where
+instance (Eq t) => Eq (TypeConstructor t) where
   TConstructor x xs == TConstructor y ys = x == y && xs == ys
   TVariable x == TVariable y = x == y
   _ == _ = False
 
-instance Eq t => Eq (ExtensionMember t) where
+instance (Eq t, Eq (f t)) => Eq (ExtensionMember t f) where
   ExtDeclaration xs x y == ExtDeclaration xs' x' y' = xs == xs' && x == x' && y == y'
