@@ -78,4 +78,4 @@ instance (a `ConvertsTo` b) => [a] `ConvertsTo` [b] where
   convert = mapM convert
 
 instance (a `ConvertsTo` b) => Annotation a `ConvertsTo` Annotation b where
-  convert (Annotation n ty) = Annotation n <$> convert ty
+  convert (Annotation n ty b) = Annotation n <$> convert ty <*> pure b

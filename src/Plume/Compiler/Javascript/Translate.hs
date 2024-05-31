@@ -42,6 +42,13 @@ instance Assemble Pre.DesugaredStatement Post.Statement where
   assemble (Pre.DSMutUpdate name expr) = Post.JSUpdate (assemble name) (assemble expr)
   assemble (Pre.DSReturn e) = Post.JSReturn (assemble e)
   assemble (Pre.DSExpr e) = Post.JSExpression (assemble e)
+  assemble (Pre.DSIf e1 e2 e3) = Post.JSIfStatement (assemble e1) (assemble e2) (if doesContainReturn e3 then Just (assemble e3) else Nothing)
+
+doesContainReturn :: [Pre.DesugaredStatement] -> Bool
+doesContainReturn = any isReturn
+  where
+    isReturn (Pre.DSReturn _) = True
+    isReturn _ = False
 
 blockToExpr :: [Pre.DesugaredStatement] -> Post.Expression
 blockToExpr [Pre.DSExpr e] = assemble e

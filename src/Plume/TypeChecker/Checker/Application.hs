@@ -31,6 +31,6 @@ synthApp infer (Pre.EApplication f xs) = local id $ do
 synthApp _ _ = throw $ CompilerError "Only applications are supported"
 
 isAsyncCall :: Pre.Expression -> Bool
-isAsyncCall (Pre.EVariable "wait") = True
+isAsyncCall (Pre.EVariable "wait" _) = True
 isAsyncCall (Pre.ELocated e _) = isAsyncCall e
 isAsyncCall _ = False

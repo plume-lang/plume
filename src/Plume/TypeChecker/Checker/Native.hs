@@ -8,7 +8,7 @@ import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (gets)
 
 synthNative :: Infer
-synthNative (Pre.ENativeFunction fp name generics ty st) = do
+synthNative (Pre.ENativeFunction fp name generics ty st isStd) = do
   nats <- gets natives
   case Map.lookup name nats of
     Just (sch, pos) -> throwRaw (pos, DuplicateNative name sch)
@@ -26,6 +26,6 @@ synthNative (Pre.ENativeFunction fp name generics ty st) = do
   pure
     ( TUnit
     , []
-    , pure $ Post.ENativeFunction fp name convertedTy st
+    , pure $ Post.ENativeFunction fp name gens convertedTy st isStd
     )
 synthNative _ = throw $ CompilerError "Only native functions are supported"

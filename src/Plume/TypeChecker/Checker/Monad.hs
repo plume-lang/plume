@@ -13,9 +13,9 @@ import qualified Plume.Syntax.Common as Pre
 type Infer = forall m. MonadChecker m => Pre.Expression -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression)
 
 isAnnotated :: Pre.Expression -> Bool
-isAnnotated (Pre.EClosure args (Just _) _) = all (isJust . fst . Pre.annotationValue) args
-isAnnotated (Pre.EDeclaration _ _ ann _ _) = isJust ann.annotationValue
+isAnnotated (Pre.EClosure args (Just _) _) = all (isJust . Pre.annotationValue) args
+isAnnotated (Pre.EDeclaration _ ann _ _) = isJust ann.annotationValue
 isAnnotated _ = False
 
-isExtAnnotated :: Pre.ExtensionMem -> Bool
+isExtAnnotated :: Pre.ExtensionMember -> Bool
 isExtAnnotated (Pre.ExtDeclaration _ ann _) = isJust ann.annotationValue

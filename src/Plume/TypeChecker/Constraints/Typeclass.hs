@@ -9,6 +9,7 @@ import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Constraints.Solver (unifiesWith)
 import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.TLIR qualified as Post
+import Plume.Syntax.Common.Annotation qualified as Cmm
 import Prelude hiding (gets)
 
 -- | Discharging operation is a step that decompose a qualified type into smaller
@@ -54,7 +55,7 @@ discharge cenv p = do
       let ty = getDictTypeForPred p'
       t <- liftIO $ compressPaths ty
 
-      let d = Post.EVariable (getDict b) t
+      let d = Post.EVariable (Cmm.fromText (getDict b)) (Identity t)
           e = if null ds then d else Post.EApplication d ds
       pure (ps', mp <> [(p', e)], as, pure e)
     Nothing -> do
@@ -64,9 +65,9 @@ discharge cenv p = do
       let paramTy = getDictTypeForPred p'
       pure
         ( pure p,
-          List.singleton (p', Post.EVariable param paramTy),
+          List.singleton (p', Post.EVariable (Cmm.fromText param) (Identity paramTy)),
           pure $ param :>: paramTy,
-          pure $ Post.EVariable param paramTy
+          pure $ Post.EVariable (Cmm.fromText param) (Identity paramTy)
         )
 
 -- SOME TEXT QUALIFIER RELATED FUNCTIONS

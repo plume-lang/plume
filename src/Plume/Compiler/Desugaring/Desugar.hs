@@ -108,6 +108,7 @@ desugarStatement isTop = \case
       _ -> return [(Just $ Post.DSExpr x', stmts)]
   Pre.CSReturn x -> do
     (x', stmts) <- desugarExpr (False, True, True) x
+    print x'
     return [(Just $ Post.DSReturn x', stmts)]
   Pre.CSDeclaration n e -> do
     (e', stmts) <- desugarExpr (False, False, True) e

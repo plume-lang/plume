@@ -4,6 +4,7 @@ module Plume.TypeChecker.Constraints.Unification where
 import Plume.TypeChecker.Constraints.Definition
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.TLIR qualified as Typed
+import Plume.Syntax.Common.Annotation qualified as Cmm
 import System.IO.Pretty
 
 doesUnifyWith :: PlumeType -> PlumeType -> IO Bool
@@ -186,6 +187,6 @@ liftPlaceholders name ty ps = do
   f <- ask
   let dicts = fmap f ps
   pure $ case length dicts of
-    0 -> Typed.EVariable name ty
-    _ | null dicts -> Typed.EInstanceVariable name ty
-    _ -> Typed.EApplication (Typed.EInstanceVariable name ty) dicts
+    0 -> Typed.EVariable (Cmm.fromText name) (Identity ty)
+    _ | null dicts -> Typed.EInstanceVariable (Cmm.fromText name) (Identity ty)
+    _ -> Typed.EApplication (Typed.EInstanceVariable (Cmm.fromText name) (Identity ty)) dicts

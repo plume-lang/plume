@@ -23,7 +23,7 @@ synthDecl :: Bool -> Infer -> Infer
 synthDecl
   isToplevel
   infer
-  (Pre.EDeclaration isMut generics (Annotation name ty) expr body) = do
+  (Pre.EDeclaration generics (Annotation name ty isMut) expr body) = do
     convertedGenerics :: [PlumeQualifier] <- concatMapM convert generics
     convertedTy :: PlumeType <- convert ty
 
@@ -36,23 +36,20 @@ synthDecl
     -- Check if the variable is already declared, if it is and it is mutable
     -- then it should be an update and the update type should have the same
     -- type as the variable
-    searchEnv @"typeEnv" name >>= \case
+    searchEnv @"typeEnv" name.identifier >>= \case
       Just (Forall _ (_ :=>: (TMut t))) -> convertedTy `unifiesWith` t
       _ -> pure ()
 
     -- Creating an utility function that shortens the code and a boolean
     -- that indicates if the variable is mutable
     (declFun, isMut') <-
-      searchEnv @"typeEnv" name >>= \case
+      searchEnv @"typeEnv" name.identifier >>= \case
         Just (Forall _ (_ :=>: (TMut t))) -> do
           t `unifiesWith` convertedTy
           return (Post.EMutUpdate, True)
         Nothing ->
-          return $
-            if isMut
-              then (Post.EMutDeclaration, isMut)
-              else (Post.EDeclaration, isMut)
-        Just _ -> return (Post.EDeclaration, isMut)
+          return (Post.EDeclaration [], isMut)
+        Just _ -> return (Post.EDeclaration [], isMut)
 
     let mut = if isMut' then TMut else id
     -- Creating the type of the variable based on mutability and adding it
@@ -60,7 +57,7 @@ synthDecl
     let convertedTy' = mut convertedTy
 
     let scheme = Forall qvars $ convertedGenerics :=>: convertedTy'
-    insertEnv @"typeEnv" name scheme
+    insertEnv @"typeEnv" name.identifier scheme
 
     enterLevel
     (exprTy, ps, h) <- case convertedGenerics of
@@ -114,7 +111,8 @@ synthDecl
 
       -- Getting the duplicates assumptions in order to remove and resolve
       -- duplicatas.
-      sub' <- unify finalExprs'
+      let finalExprs'' = map (\(MkIdentifier n _, Identity t') -> (n, t')) finalExprs'
+      sub' <- unify finalExprs''
       let sub'' = Map.toList sub' <> sub <> remainingSub
 
       -- Running the expression reader because we're toplevel or there are 
@@ -132,12 +130,12 @@ synthDecl
       unlessM (allIsSuperclass as''' scs) $ throw (UnresolvedTypeVariable as''')
       
       -- Generating new types and expressions based on assumptions
-      let args = map (\(n :>: t') -> n :@: t') as''
+      let args = map (\(n :>: t') -> fromText n :@: Identity t') as''
       let tys' = map (\(_ :>: t') -> t') as''
     
       cTy' <- liftIO $ compressPaths ty'
 
-      let clos = if null args then h'' else Post.EClosure args cTy' h'' False
+      let clos = if null args then h'' else Post.EClosure args (Identity cTy') h''
       let closTy = if null args then t else tys' :->: t
 
       let scheme' = Forall qvars ty''
@@ -148,7 +146,7 @@ synthDecl
   
     -- Creating a new scheme for the variable based on the substitution
     -- newScheme <- liftIO $ compressPaths t
-    insertEnv @"typeEnv" name sch
+    insertEnv @"typeEnv" name.identifier sch
 
     -- Removing the generic types from the environment
     mapM_ (deleteEnv @"genericsEnv" . getGenericName) generics
@@ -159,7 +157,9 @@ synthDecl
     let body' = mapM thd3 b
     let psb = maybe [] snd3 b
 
-    pure (retTy, psb <> remainingPs, declFun (Annotation name closTy) <$> clos <*> body')
+    let closTy' = Identity closTy
+
+    pure (retTy, psb <> remainingPs, declFun (Annotation name closTy' isMut') <$> clos <*> body')
 synthDecl _ _ _ = throw $ CompilerError "Only declarations are supported"
 
 removeGeneralizedQuals :: [PlumeQualifier] -> [QuVar] -> IO [PlumeQualifier]

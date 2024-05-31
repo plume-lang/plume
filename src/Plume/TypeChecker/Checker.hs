@@ -4,6 +4,7 @@ module Plume.TypeChecker.Checker where
 
 import Data.List qualified as List
 import Plume.Syntax.Abstract qualified as Pre
+import Plume.Syntax.Common.Annotation qualified as Cmm
 import Plume.Syntax.Translation.Generics (concatMapM)
 import Plume.TypeChecker.Checker.Application
 import Plume.TypeChecker.Checker.Closure
@@ -32,17 +33,17 @@ synthesize (Pre.ELocated expr pos) = withPosition pos $ synthesize expr
  -  ---------------
  -  Γ ⊦ x : (β ⇒ σ)
  -}
-synthesize (Pre.EVariable name) = do
+synthesize (Pre.EVariable name _) = do
   -- Checking if the variable is a value
-  searchEnv @"typeEnv" name >>= \case
-    Just scheme -> instantiateFromName name scheme
+  searchEnv @"typeEnv" name.identifier >>= \case
+    Just scheme -> instantiateFromName name.identifier scheme
     Nothing ->
       -- Checking if the variable is a data-type constructor
-      searchEnv @"datatypeEnv" name >>= \case
+      searchEnv @"datatypeEnv" name.identifier >>= \case
         Just sch -> do
           (ty, qs) <- instantiate sch
-          pure (ty, qs, pure (Post.EVariable name ty))
-        Nothing -> throw (UnboundVariable name)
+          pure (ty, qs, pure (Post.EVariable name (Identity ty)))
+        Nothing -> throw (UnboundVariable name.identifier)
 synthesize (Pre.ELiteral lit) = do
   let (ty, lit') = typeOfLiteral lit
   pure (ty, [], pure (Post.ELiteral lit'))
@@ -82,11 +83,8 @@ synthesize (Pre.EVariableDeclare gens name ty) = do
 
   insertEnv @"typeEnv" name (Forall qvars (quals :=>: ty'))
 
-  let arity = case ty' of
-        TFunction args _ -> length args
-        _ -> (-1)
 
-  pure (ty', [], pure (Post.EVariableDeclare name arity))
+  pure (ty', [], pure (Post.EVariableDeclare gens name (Identity ty')))
 -- \| Calling synthesis modules
 synthesize app@(Pre.EApplication {}) = synthApp synthesize app
 synthesize clos@(Pre.EClosure {}) = synthClosure synthesize clos
@@ -97,6 +95,7 @@ synthesize ty@(Pre.EType {}) = synthDataType ty
 synthesize sw@(Pre.ESwitch {}) = synthSwitch synthesize sw
 synthesize int@(Pre.EInterface {}) = synthInterface synthesize int
 synthesize nat@(Pre.ENativeFunction {}) = synthNative nat
+synthesize _ = throw (CompilerError "Unsupported expression")
 
 synthesizeToplevel :: (MonadChecker m) => Pre.Expression -> m (PlumeScheme, [Post.Expression])
 synthesizeToplevel (Pre.ELocated e pos) = withPosition pos $ synthesizeToplevel e

@@ -65,6 +65,12 @@ instance Show Update where
   show (JSFieldUpdate f u) = show u <> "." <> toString f
   show (JSVariable n) = varify $ toString n
 
+doesContainReturn :: [Statement] -> Bool
+doesContainReturn = any isReturn
+  where
+    isReturn (JSReturn _) = True
+    isReturn _ = False
+
 isIdent :: Char -> Bool
 isIdent x = isLetter x || x == '_' || x == '$'
 

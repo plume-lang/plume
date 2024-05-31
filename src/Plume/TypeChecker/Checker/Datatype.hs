@@ -4,7 +4,6 @@ import Data.Map qualified as M
 import GHC.IO
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Common.Annotation
-import Plume.Syntax.Common.Type qualified as Pre
 import Plume.Syntax.Concrete.Expression (TypeConstructor (..))
 import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Monad.Conversion
@@ -36,32 +35,34 @@ list =
     ]
 
 synthDataType :: Infer
-synthDataType (Pre.EType (Annotation name generics) cons) = do
-  convertedGenerics :: [PlumeType] <- mapM convert generics
-
-  let isGeneric (TypeQuantified _) = True
-      isGeneric _ = False
-
-      getQVar (TypeQuantified name') = name'
+synthDataType (Pre.EType (Annotation name _generics _) cons) = do
+  let generics = map Pre.GVar _generics
+  convertedGenerics :: [PlumeQualifier] <- concat <$> mapM convert generics
+  
+  let getQVar (IsQVar name') = name'
       getQVar _ = error "This should not happen"
 
-  let generics' = if all isGeneric convertedGenerics then map getQVar convertedGenerics else []
+  let generics' = map getQVar convertedGenerics
+
+  let convertedGenerics' = map TypeQuantified generics'
 
   -- Creating the header of the data type: if there are no generics
   -- the header is just the type name, otherwise it becomes a type
   -- constructor.
   let header =
         if null generics
-          then TypeId name
-          else TypeApp (TypeId name) convertedGenerics
+          then TypeId name.identifier
+          else TypeApp (TypeId name.identifier) convertedGenerics'
 
   -- Synthesizing the constructors of the data type
   (cons', m) <- mapAndUnzipM (synthCons generics' ([], header)) cons
 
   -- Inserting the data type in the metadata
-  modifyIORef datatypes (M.insert name (M.unions m))
+  modifyIORef datatypes (M.insert name.identifier (M.unions m))
 
-  return (TUnit, [], pure $ Post.EType name cons')
+  let ann = Annotation name generics' False
+
+  return (TUnit, [], pure $ Post.EType ann cons')
 synthDataType _ = throw $ CompilerError "Only data types are supported"
 
 -- | Used to generate the type constructors of a data type

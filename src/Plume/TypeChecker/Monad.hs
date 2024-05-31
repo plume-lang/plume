@@ -54,7 +54,6 @@ import Plume.TypeChecker.Monad.Error as Monad
 import Plume.TypeChecker.Monad.State as Monad
 import Plume.TypeChecker.Monad.Type as Monad
 import Plume.TypeChecker.TLIR qualified as Typed
-import Plume.TypeChecker.TLIR.Internal.Pretty (prettyToString, prettyTy)
 import System.IO.Pretty (ppFailure, printErrorFromString)
 import Prelude hiding (get, gets, local, modify, put)
 
@@ -413,17 +412,14 @@ removeLink (TypeApp t ts) = do
   pure $ TypeApp t' ts'
 removeLink t = pure t
 
-showTy :: PlumeType -> String
-showTy = prettyToString . prettyTy
-
 interpretError :: PlumeError -> IO ()
 interpretError (p, UnificationFail t1 t2) =
   printErrorFromString
     mempty
     ( "Expected type "
-        <> prettyToString (prettyTy t1)
+        <> show t1
         <> " but received type "
-        <> prettyToString (prettyTy t2),
+        <> show t2,
       Nothing,
       p
     )
@@ -440,7 +436,7 @@ interpretError (p, InfiniteType i t) =
     )
     "while performing typechecking"
   where
-    pp = prettyToString (prettyTy t)
+    pp = show t
 interpretError (p, UnificationMismatch t t1' t2') =
   printErrorFromString
     mempty
@@ -451,7 +447,7 @@ interpretError (p, UnificationMismatch t t1' t2') =
     "while performing typechecking"
   where
     getMissingError ts1 ts2
-      | null ts1 = "Type " <> showTy t <> " has no arguments, but should have" <> show (length ts2) <> " arguments"
+      | null ts1 = "Type " <> show t <> " has no arguments, but should have" <> show (length ts2) <> " arguments"
       | length ts1 < length ts2 = "Expected more arguments, got " <> show (length ts1) <> " but expected " <> show (length ts2)
       | otherwise = "Expected less arguments, got " <> show (length ts1) <> " but expected " <> show (length ts2)
 interpretError (p, EmptyMatch) =
@@ -489,7 +485,7 @@ interpretError (p, DuplicateNative n s) =
 interpretError (p, NoReturnFound t) =
   printErrorFromString
     mempty
-    ( "No return found in the expression for type " <> showTy t,
+    ( "No return found in the expression for type " <> show t,
       Just "Every function must have a return in its body",
       p
     )
@@ -517,14 +513,14 @@ interpretError (p, UnresolvedTypeVariable as) =
       showAssump x <> ", " <> showAssumps xs
 
     showAssump (_ :>: TypeApp (TypeId tcName) [ty]) = 
-      toString (T.drop 1 tcName) <> " for " <> showTy ty
+      toString (T.drop 1 tcName) <> " for " <> show ty
     showAssump (_ :>: TypeId tcName) = 
       toString (T.drop 1 tcName)
     showAssump _ = error "Not a type application"
 interpretError (p, AlreadyDefinedInstance n t) =
   printErrorFromString
     mempty
-    ( "Instance " <> toString n <> " already defined for " <> showTy t,
+    ( "Instance " <> toString n <> " already defined for " <> show t,
       Nothing,
       p
     )

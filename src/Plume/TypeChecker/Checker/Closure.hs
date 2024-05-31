@@ -36,12 +36,15 @@ synthClosure infer (Pre.EClosure args ret body) = local id $ do
 
   -- Creating the closure type
   let closureTy = map (.annotationValue) convertedArgs :->: retTy
+
+  let convertedArgs' = map (fmap Identity) convertedArgs
+  let retTy' = Identity retTy
   
-  pure (closureTy, ps, Post.EClosure convertedArgs retTy <$> body' <*> pure isAsync)
+  pure (closureTy, ps, Post.EClosure convertedArgs' retTy' <$> body')
 synthClosure _ _ = throw $ CompilerError "Only closures are supported"
 
 -- | Function that create a new environment from a list of converted
 -- | arguments.
 createEnvFromAnnotations :: [Annotation PlumeType] -> Map Text PlumeScheme
 createEnvFromAnnotations xs =
-  Map.fromList $ map (\(Annotation n ty) -> (n, Forall [] ([] :=>: ty))) xs
+  Map.fromList $ map (\(Annotation n ty _) -> (n.identifier, Forall [] ([] :=>: ty))) xs
