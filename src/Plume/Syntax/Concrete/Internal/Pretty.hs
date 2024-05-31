@@ -159,6 +159,7 @@ prettyExpr _ (EVariableDeclare gens n t) =
     <+> anItalic (pretty n)
     <+> ":"
     <+> ansiPretty t
+prettyExpr _ (EAwait e) = anCol Blue "await" <+> prettyExpr 0 e
 
 prettyExt :: ExtensionMember PlumeType -> Doc AnsiStyle
 prettyExt (ExtDeclaration gs a e1') =
