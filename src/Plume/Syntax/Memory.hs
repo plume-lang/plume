@@ -183,10 +183,6 @@ instance (Memory a) => Memory (AST.AbstractExpression a) where
     modifyIORef' allocatedVariables (Set.insert (n, 0))
     pure $ AST.EVariableDeclare g n t
 
-  transform (AST.EAwait e) = do
-    e' <- transform e
-    pure $ AST.EAwait e'
-
 instance Memory AST.PlumeType where transform = pure
 
 instance (Memory a) => Memory (TypeConstructor a) where

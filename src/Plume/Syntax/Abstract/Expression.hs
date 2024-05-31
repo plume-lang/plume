@@ -42,7 +42,6 @@ data AbstractExpression t
   | ETypeExtension [PlumeGeneric] (Annotation [t]) (Maybe Text) [ExtensionMember t]
   | ENativeFunction Text Text [Text] t IsStandard
   | EVariableDeclare [PlumeGeneric] Text (Maybe t)
-  | EAwait (AbstractExpression t)
   deriving (Show)
 
 type IsStandard = Bool

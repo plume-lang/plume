@@ -208,7 +208,7 @@ concreteToAbstract (CST.EVariableDeclare gens n t) = do
   bireturn . Single $ AST.EVariableDeclare gens n t'
 concreteToAbstract (CST.EAwait e) = do
   e' <- shouldBeAlone <$> concreteToAbstract e
-  transRet $ AST.EAwait <$> e'
+  transRet $ AST.EApplication (AST.EVariable "wait") . (: []) <$> e'
 
 transformSch :: MonadIO m => Common.PlumeScheme -> m Common.PlumeScheme
 transformSch (Common.MkScheme gens t) = do
