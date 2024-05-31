@@ -1,8 +1,20 @@
-const fetch = require('node-fetch');
 const fs = require('fs/promises');
-const readlineSync = require('readline-sync');
+const readline = require('node:readline');
 const childProcess = require('child_process');
-const deasync = require('deasync');
+
+function parseVersion(ver) {
+  const [major, minor, patch] = ver.split('.').map(Number);
+
+  return {
+    major,
+    minor,
+    patch
+  }
+}
+const {major} = parseVersion(process.version.slice(1));
+
+if (major < 20) 
+  throw new Error("Node.js version 20 or higher is required.");
 
 async function doesFileExist(path) {
   try {
@@ -62,7 +74,18 @@ module.exports = {
   println: (s) => console.log(s),
   get_args: () => process.argv.slice(2),
   execute_command: (cmd) => childProcess.execSync(cmd).toString(),
-  input: () => readlineSync.question(),
+  input: (prompt) => new Promise((resolve, reject) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    rl.question(prompt, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  
+  }),
   add_int: (a, b) => a + b,
   sub_int: (a, b) => a - b,
   mul_int: (a, b) => a * b,
@@ -105,20 +128,4 @@ module.exports = {
       return [null, "Result", "Error", e.toString()];
     }
   }
-}
-
-function blockForPromiseSync(p) {
-    let result= undefined;
-    let error= undefined;
-
-    p.then(value => { result = value })
-        .catch(err => { error = err })
-
-    deasync.loopWhile(() =>
-        result === undefined && error === undefined)
-
-    if (error !== undefined) {
-        throw error
-    }
-    return result
 }
