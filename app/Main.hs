@@ -83,9 +83,11 @@ main = setEncoding $ do
           erased <- erase tlir
           runClosureConversion erased `with` \closed -> do
             desugared <- desugar closed
+
             let ssa  = runSSA desugared
                 js   = runTranslateJS ssa
-                code = show js
+                code = createMainJSApp js
+                
             writeFileText (replaceExtension file ".js") code
             ppSuccess ("Bytecode written to " <> fromString (replaceExtension file ".js"))
     Nothing -> ppFailure "No input file provided"
