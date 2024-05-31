@@ -1,8 +1,17 @@
 const fetch = require('node-fetch');
-const fs = require('fs');
+const fs = require('fs/promises');
 const readlineSync = require('readline-sync');
 const childProcess = require('child_process');
 const deasync = require('deasync');
+
+async function doesFileExist(path) {
+  try {
+    await fs.access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 module.exports = {
   to_string: (e) => e.toString(),
@@ -13,14 +22,42 @@ module.exports = {
   get_index_str: (s, i) => s[i],
   str_slice: (s, start, end) => s.slice(start, end),
   show_bool: (b) => b ? "true" : "false",
-  read_file: (path) => fs.readFileSync(path, 'utf-8'),
-  write_file: (path, content) => fs.writeFileSync(path, content),
-  append_file(path, content) {
-    return fs.appendFileSync(path, content)
+
+  async read_file(path) {
+    if (await doesFileExist(path)) {
+      return [null, "Option", "Some", await fs.readFile(path, 'utf-8')];
+    }
+
+    return [null, "Option", "None"];
   },
-  does_file_exist(path) {
-    return fs.existsSync(path)
+  async write_file(path, content) {
+    if (await doesFileExist(path)) {
+      try {
+        await fs.writeFile(path, content);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    return false;
   },
+  async append_file(path, content) {
+    if (await doesFileExist(path)) {
+      try {
+        await fs.appendFile(path, content);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    return false;
+  },
+  does_file_exist: (path) => fs.access(path)
+    .then(() => true)
+    .catch(() => false),
+
   print: (s) => process.stdout.write(s),
   println: (s) => console.log(s),
   get_args: () => process.argv.slice(2),
@@ -56,7 +93,6 @@ module.exports = {
   char_to_string: (c) => c,
   eq_char: (a, b) => a === b,
 
-  wait: blockForPromiseSync,
   'async': async (f) => await f,
 
   fetch: async(url) => {
