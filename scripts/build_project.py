@@ -8,13 +8,8 @@ from sys import argv
 is_root = argv[1] == '--root' if len(argv) > 1 else False
 
 # Check for Cabal and XMake 
-if not which('cabal') or not which('xmake'):
-  print('Please install cabal and xmake')
-  exit(1)
-
-# Check for submodules
-if not os.path.isdir('runtime'):
-  print('Please initialize submodules')
+if not which('cabal') or not which('node'):
+  print('Please install cabal, node.js')
   exit(1)
 
 # Build the compiler project
@@ -38,16 +33,9 @@ if not os.path.isdir('bin'): os.mkdir('bin')
 
 system(f"cp {executable} bin/{executable_out}")
 
-# Build the runtime project
+# Testing the compiler
 
-runtime_executable = f"plume-vm{ext}"
-runtime_executable_out = f"plume{ext}"
+system('bin/plumec example/closure.plm')
+system('node example/closure.js')
 
-xmake_root = '--root' if is_root else ''
-system(f'xmake b {xmake_root} -P runtime')
-system(f"cp runtime/bin/{runtime_executable} bin/{runtime_executable_out}")
-
-system(f'xmake config {xmake_root} -P standard --ccache=n -y')
-system(f'xmake b {xmake_root} -P standard')
-
-print('Build ran successfully')
+print("Build succeeded!")
