@@ -16,7 +16,7 @@ extend indexable<list> {
 extend traversable<list> {
   fn map<A, B>(self: list<A>, f: fn(A): B): list<B> => switch self {
     case [] => []
-    case [x, ..xs] => xs.map(f).list_prepend(f(x))
+    case [x, ..xs] => [f(x)].list_concat(xs.map(f))
   }
 }
 
