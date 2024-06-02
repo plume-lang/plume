@@ -258,7 +258,7 @@ eClosure = do
                 *> parseExpression
             )
 
-  return $ CST.EClosure args retTy body
+  return $ CST.EClosure args retTy body False
 
 -- | Parses a tuple expression
 -- | A tuple expression is a collection of expressions that are separated by
@@ -430,7 +430,7 @@ sFunction = do
   retTy <- P.optional $ L.symbol ":" *> Typ.tType
   body <- L.symbol "=>" *> parseExpression <|> eBlock
 
-  let cl = CST.EClosure args retTy body
+  let cl = CST.EClosure args retTy body False
 
   return $
     CST.EDeclaration
@@ -501,7 +501,7 @@ eExtFunction = do
     CST.ExtDeclaration
       gens
       (Cmm.fromText name Cmm.:@: Nothing)
-      (CST.EClosure args ret body)
+      (CST.EClosure args ret body False)
 
 -- TOP-LEVEL DECLARATIONS
 
@@ -682,7 +682,7 @@ tMacro = do
   void $ L.reserved "macro"
   name <- L.identifier
   (args, body, isFun) <- P.choice [macroFun, macroVar]
-  let body' = if isFun then CST.EClosure args Nothing body else body
+  let body' = if isFun then CST.EClosure args Nothing body False else body
   return
     [CST.EDeclaration [] (Cmm.MkIdentifier name True Cmm.:@: Nothing) body' Nothing]
  where

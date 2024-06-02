@@ -71,7 +71,7 @@ prettyExpr _ (EConditionBranch e1' e2' e3') =
     <+> anCol Blue "then "
     <> prettyExpr 0 e2'
     <> anCol Blue "\nelse " <> prettyExpr 0 e3'
-prettyExpr _ (EClosure as t e) =
+prettyExpr _ (EClosure as t e _) =
   ppArgs as t
     <+> "=>\n"
     <+> indent 2 (prettyExpr 0 e)

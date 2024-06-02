@@ -62,10 +62,10 @@ arity (Identity (a :->: _)) = length a
 arity _ = -1
 
 eraseType :: [Pre.TypedExpression] -> IO [Post.UntypedProgram]
-eraseType (Pre.EDeclaration _ (Annotation name _ _) (Pre.EClosure args _ body) Nothing : xs) = do
+eraseType (Pre.EDeclaration _ (Annotation name _ _) (Pre.EClosure args _ body isAsync) Nothing : xs) = do
   let args' = map (\(Annotation n _ _) -> n.identifier) args
   b' <- eraseStatement body
-  let fun = Post.UPFunction name.identifier args' b' False
+  let fun = Post.UPFunction name.identifier args' b' isAsync
   modifyIORef' program (<> [fun])
   eraseType xs
 eraseType (Pre.EVariableDeclare _ name t : xs) = do
@@ -183,14 +183,14 @@ eraseExpr (Pre.ESwitch e cases) = do
   cases' <- mapM (bimapM erasePattern eraseExpr) cases
   return $ Post.UESwitch e' cases'
 eraseExpr (Pre.EBlock es) = Post.UEBlock <$> mapM eraseStatement es
-eraseExpr (Pre.EClosure args _ body) = do
+eraseExpr (Pre.EClosure args _ body isAsync) = do
   let b' = insertReturnStmt body
   b <- eraseExpr b'
   return $
     Post.UEClosure
       (map (\(Annotation n _ _) -> n.identifier) args)
       (Post.USExpr b)
-      False
+      isAsync
 eraseExpr (Pre.EEqualsType e t) = Post.UEEqualsType <$> eraseExpr e <*> pure t
 eraseExpr (Pre.ENativeFunction {}) = compilerError "Native functions aren't expressions"
 eraseExpr (Pre.EAnd e1 e2) = Post.UEAnd <$> eraseExpr e1 <*> eraseExpr e2

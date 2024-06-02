@@ -20,8 +20,8 @@ substituteVar (EDeclaration gens ann e1 e2) r@(n, _)
   | ann.annotationName.identifier /= n = EDeclaration gens ann (substituteVar e1 r) (substituteVar <$> e2 <*> pure r)
 substituteVar (EUnMut e) r = EUnMut $ substituteVar e r
 substituteVar (EConditionBranch c t e) r = EConditionBranch (substituteVar c r) (substituteVar t r) (substituteVar e r)
-substituteVar (EClosure anns ret body) r@(n, _)
-  | n `notElem` names = EClosure anns ret (substituteVar body r)
+substituteVar (EClosure anns ret body isA) r@(n, _)
+  | n `notElem` names = EClosure anns ret (substituteVar body r) isA
   where names = map (.annotationName.identifier) anns
 substituteVar (EBlock es) r = EBlock (map (`substituteVar` r) es)
 substituteVar (ESwitch e cases) r = ESwitch (substituteVar e r) (map (`substitutePat` r) cases)

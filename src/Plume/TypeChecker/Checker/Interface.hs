@@ -41,7 +41,7 @@ synthInterface _ (Pre.EInterface (Annotation name [ty] _) generics methods) = do
               Post.EDeclaration
                 []
                 (fromText n :@: Identity (genTy funTy))
-                (Post.EClosure ["$inst" :@: Identity instTy] (Identity funTy) (Post.EInstanceAccess (Post.EVariable "$inst" (Identity instTy)) (getIdx n)))
+                (Post.EClosure ["$inst" :@: Identity instTy] (Identity funTy) (Post.EInstanceAccess (Post.EVariable "$inst" (Identity instTy)) (getIdx n)) False)
                 Nothing
           )
           methods'

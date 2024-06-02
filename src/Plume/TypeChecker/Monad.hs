@@ -87,7 +87,8 @@ local f action = do
   old <- get
   put (f old)
   a <- action
-  put old
+  new <- get
+  modify $ \s -> s { isAsynchronous = isAsynchronous new}
   pure a
 
 -- | Throwing an error onto the error stack if a position is

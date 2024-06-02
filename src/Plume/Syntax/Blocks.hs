@@ -50,14 +50,14 @@ removeUselessBlocks isInner (AST.EDeclaration gens n e1 e2) = do
   e1' <- removeUselessBlocks True e1
   e2' <- mapM (removeUselessBlocks isInner) e2
   [AST.EDeclaration gens n e1' e2']
-removeUselessBlocks _ (AST.EClosure args ret body) = do
+removeUselessBlocks _ (AST.EClosure args ret body isA) = do
   let isBl = isItBlock body
   let isEx = isExhaustiveReturn body
   let b = removeUselessBlocks False body
   case b of
-    [AST.EBlock es] -> [AST.EClosure args ret (AST.EBlock es)]
-    [x] | isEx || not isBl -> [AST.EClosure args ret x]
-    _ -> [AST.EClosure args ret (AST.EBlock b)]
+    [AST.EBlock es] -> [AST.EClosure args ret (AST.EBlock es) isA]
+    [x] | isEx || not isBl -> [AST.EClosure args ret x isA]
+    _ -> [AST.EClosure args ret (AST.EBlock b) isA]
 removeUselessBlocks isInner (AST.EUnMut e) = do
   e' <- removeUselessBlocks isInner e
   [AST.EUnMut e']

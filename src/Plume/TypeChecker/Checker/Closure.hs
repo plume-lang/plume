@@ -10,7 +10,7 @@ import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (local, gets, modify)
 
 synthClosure :: Infer -> Infer
-synthClosure infer (Pre.EClosure args ret body) = local id $ do
+synthClosure infer (Pre.EClosure args ret body _) = local id $ do
   convertedArgs :: [Annotation PlumeType] <- convert args
   convertedRet :: PlumeType <- convert ret
 
@@ -31,16 +31,18 @@ synthClosure infer (Pre.EClosure args ret body) = local id $ do
 
   modify (\s -> s {isAsynchronous = old})
 
+  let retTy' = if isAsync then TypeApp (TypeId "async") [retTy] else retTy
+
   -- Unifying specified return type with the inferred return type
   convertedRet `unifiesWith` retTy
-
+  
   -- Creating the closure type
-  let closureTy = map (.annotationValue) convertedArgs :->: retTy
+  let closureTy = map (.annotationValue) convertedArgs :->: retTy'
 
   let convertedArgs' = map (fmap Identity) convertedArgs
-  let retTy' = Identity retTy
+  let retTy'' = Identity retTy'
   
-  pure (closureTy, ps, Post.EClosure convertedArgs' retTy' <$> body')
+  pure (closureTy, ps, Post.EClosure convertedArgs' retTy'' <$> body' <*> pure isAsync)
 synthClosure _ _ = throw $ CompilerError "Only closures are supported"
 
 -- | Function that create a new environment from a list of converted

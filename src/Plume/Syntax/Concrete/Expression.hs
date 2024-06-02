@@ -53,6 +53,7 @@ data BinaryOperator
   deriving (Show, Eq)
 
 type LibraryType = Text
+type IsAsync = Bool
 
 -- | A prefix operator is an operator that takes one operand.
 -- | The operand is placed on the right side of the operator.
@@ -81,7 +82,7 @@ data Expression t f
   | EDeclaration [PlumeGeneric] (Annotation (f t)) (Expression t f) (Maybe (Expression t f))
   | EMutUpdate (Annotation (f t)) (Expression t f) (Maybe (Expression t f))
   | EConditionBranch (Expression t f) (Expression t f) (Expression t f)
-  | EClosure [Annotation (f t)] (f t) (Expression t f)
+  | EClosure [Annotation (f t)] (f t) (Expression t f) IsAsync
   | EBlock [Expression t f]
   | ERequire Text
   | ELocated (Expression t f) Position
@@ -134,7 +135,7 @@ instance (Eq t, Eq (f t)) => Eq (Expression t f) where
   EDeclaration _ t x y == EDeclaration _ t' x' y' =
     t == t' && x == x' && y == y'
   EConditionBranch x y z == EConditionBranch x' y' z' = x == x' && y == y' && z == z'
-  EClosure xs t x == EClosure xs' t' x' = xs == xs' && t == t' && x == x'
+  EClosure xs t x isA == EClosure xs' t' x' isA' = xs == xs' && t == t' && x == x' && isA == isA'
   EBlock xs == EBlock ys = xs == ys
   ERequire x == ERequire y = x == y
   ESwitch x xs == ESwitch x' xs' = x == x' && xs == xs'

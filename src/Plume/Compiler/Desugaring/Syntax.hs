@@ -83,7 +83,7 @@ instance Show DesugaredStatement where
   show (DSMutDeclaration n e) = "mut " <> toString n <> " = " <> show e
   show (DSMutUpdate n e) = show n <> " = " <> show e
   show (DSIf e1 e2 e3) =
-    "sif " <> show e1 <> " then " <> intercalate ", " (map show e2)
+    "sif (" <> show e1 <> ") then " <> intercalate ", " (map show e2)
       <> " else "
       <> intercalate ", " (map show e3)
 

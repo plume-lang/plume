@@ -87,7 +87,7 @@ concreteToAbstract (CST.EConditionBranch e1 e2 e3) = do
   e3' <-
     fmap interpretSpreadable <$> concreteToAbstract e3
   transRet $ AST.EConditionBranch <$> e1' <*> e2' <*> e3'
-concreteToAbstract (CST.EClosure anns t e) = do
+concreteToAbstract (CST.EClosure anns t e isA) = do
   anns' <- mapM (\(Common.Annotation name ty mut) -> do
     ty' <- mapM transformType ty
     return $ Common.Annotation name ty' mut
@@ -95,7 +95,7 @@ concreteToAbstract (CST.EClosure anns t e) = do
   t' <- mapM transformType t
   -- Same method as described for condition branches
   e' <- fmap interpretSpreadable <$> concreteToAbstract e
-  transRet $ AST.EClosure anns' t' <$> e'
+  transRet $ AST.EClosure anns' t' <$> e' <*> pure isA
 concreteToAbstract (CST.EBlock es) = do
   -- Blocks can be composed of spread elements, so we need to flatten
   -- the list of expressions into a single expression.

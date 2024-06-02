@@ -135,7 +135,7 @@ synthDecl
     
       cTy' <- liftIO $ compressPaths ty'
 
-      let clos = if null args then h'' else Post.EClosure args (Identity cTy') h''
+      let clos = if null args then h'' else Post.EClosure args (Identity cTy') h'' False
       let closTy = if null args then t else tys' :->: t
 
       let scheme' = Forall qvars ty''

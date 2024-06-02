@@ -150,6 +150,7 @@ desugarProgram = \case
     ys <- desugarStatement (True, shouldReturn y, False) y
     let bl = createBlock ys
     let bl' = insertReturn bl (shouldReturn y)
+
     return [Post.DPFunction x xs bl' isAsync]
   Pre.CPStatement x -> do
     x' <- desugarStatement (False, False, False) x

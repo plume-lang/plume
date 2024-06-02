@@ -67,7 +67,7 @@ pattern EMacroVariable :: Text -> Expression
 pattern EMacroVariable n = CST.EVariable (Cmm.MkIdentifier n True) Nothing
 
 pattern EMacroFunction :: Text -> [Cmm.Annotation (Maybe Cmm.PlumeType)] -> Expression -> Expression
-pattern EMacroFunction n a e = CST.EDeclaration [] (Cmm.Annotation (Cmm.MkIdentifier n True) Nothing False) (CST.EClosure a Nothing e) Nothing
+pattern EMacroFunction n a e = CST.EDeclaration [] (Cmm.Annotation (Cmm.MkIdentifier n True) Nothing False) (CST.EClosure a Nothing e False) Nothing
 
 pattern EMacro :: Text -> Expression -> Expression
 pattern EMacro n e = CST.EDeclaration [] (Cmm.Annotation (Cmm.MkIdentifier n True) Nothing False) e Nothing
