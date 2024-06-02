@@ -28,6 +28,8 @@ doesUnifyWithScheme t (Forall _ (_ :=>: t')) = do
 
 doesUnifyWithH :: PlumeType -> PlumeType -> IO Bool
 doesUnifyWithH t1 t2 | t1 == t2 = pure True
+doesUnifyWithH (TypeId "variable") (TypeId "list") = pure True
+doesUnifyWithH (TypeId "list") (TypeId "variable") = pure True
 doesUnifyWithH (TypeVar tv) t = do
   tv' <- readIORef tv
   case tv' of
@@ -94,6 +96,8 @@ mgu t t' = do
   if t1 == t2
     then pure ()
     else case (t1, t2) of
+      (TypeId "variable", TypeId "list") -> pure ()
+      (TypeId "list", TypeId "variable") -> pure ()
       (TypeVar tv1, _) -> readIORef tv1 >>= \case
         Link tl -> mgu tl t2
         Unbound _ _ -> liftIO $ do

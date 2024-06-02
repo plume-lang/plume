@@ -19,6 +19,7 @@ synthClosure infer (Pre.EClosure args ret body _) = local id $ do
   insertEnvWith @"typeEnv" (<>) argSchemes
 
   old <- gets isAsynchronous
+  oldRet <- gets returnType
   modify (\s -> s {isAsynchronous = False})
 
   -- Type checking the body of the closure with the new environment
@@ -42,6 +43,8 @@ synthClosure infer (Pre.EClosure args ret body _) = local id $ do
   let convertedArgs' = map (fmap Identity) convertedArgs
   let retTy'' = Identity retTy'
   
+  modify (\s -> s {returnType = oldRet})
+
   pure (closureTy, ps, Post.EClosure convertedArgs' retTy'' <$> body' <*> pure isAsync)
 synthClosure _ _ = throw $ CompilerError "Only closures are supported"
 

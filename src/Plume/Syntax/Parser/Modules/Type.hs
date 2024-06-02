@@ -85,6 +85,11 @@ tId = TId <$> identifier
 tMut :: Parser PlumeType
 tMut = TMut <$> (reserved "mut" *> tType)
 
+tVariableType :: Parser PlumeType
+tVariableType = do
+  void $ symbol ".."
+  TCon "variable" . (:[]) <$> tType
+
 -- | Parse a type
 -- | A type is a type that can be used in the language
 -- | A type can be a primitive type, a function type, a tuple type, a list type,
@@ -95,6 +100,7 @@ tType =
     [ tFunction
     , tTuple
     , tMut
+    , tVariableType
     , tPrimitive
     , tList
     , -- Try may be used here because type application starts with an identifier

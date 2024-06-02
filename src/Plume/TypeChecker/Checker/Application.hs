@@ -11,7 +11,12 @@ synthApp :: Infer -> Infer
 synthApp infer (Pre.EApplication f xs) = local id $ do
   -- Type checking the function and its arguments
   (t, ps, f'') <- infer f
-  (ts, pss, xs') <- mapAndUnzip3M infer xs
+
+  let orderedArgs = case t of
+        args :->: _ -> checkVariableArg args xs
+        _ -> xs
+
+  (ts, pss, xs') <- mapAndUnzip3M infer orderedArgs
 
   -- Generating a new fresh type variable for the return type and
   -- unifying the function type given from `f` with the built type from
@@ -34,3 +39,11 @@ isAsyncCall :: Pre.Expression -> Bool
 isAsyncCall (Pre.EVariable "wait" _) = True
 isAsyncCall (Pre.ELocated e _) = isAsyncCall e
 isAsyncCall _ = False
+
+checkVariableArg :: [PlumeType] -> [Pre.Expression] -> [Pre.Expression]
+checkVariableArg [] [] = []
+checkVariableArg [] _ = []
+checkVariableArg _ [] = []
+checkVariableArg (t : ts) (x : xs) = case t of
+  TVarArg _ -> [Pre.EList (x:xs)]
+  _ -> x : checkVariableArg ts xs

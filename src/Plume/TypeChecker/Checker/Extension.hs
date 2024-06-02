@@ -247,6 +247,11 @@ synthExt
     
     unless (Set.null missingMeths) $ 
       throw $ MissingExtensionMethods tcName.identifier (Set.toList missingMeths)
+    
+    let unknown = filter (`Map.notMember` meths) meths'
+  
+    unless (null unknown) $ 
+      throw $ UnknownExtensionMethods tcName.identifier unknown
 
     -- Creating the new instance to insert it in the extend environment
     let inst = MkInstance qvars pred' dict dictFunTys

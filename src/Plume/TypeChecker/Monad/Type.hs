@@ -84,6 +84,9 @@ pattern TChar = TypeId "char"
 pattern TFloat = TypeId "float"
 pattern TUnit = TypeId "unit"
 
+pattern TVarArg :: PlumeType -> PlumeType 
+pattern TVarArg t = TypeApp (TypeId "variable") [t]
+
 -- | A way to get extension constraints from a list of qualifiers.
 getQVars :: [PlumeQualifier] -> [QuVar]
 getQVars [] = []

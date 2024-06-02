@@ -113,6 +113,8 @@ normalize (Forall qs t) = Forall qs $ normqual t
 
 -- SOME UNIFYING FUNCTIONS FOR DISCHARGING
 doesMatch :: (MonadChecker m) => PlumeType -> PlumeType -> m Bool
+doesMatch (TypeId "variable") (TypeId "list") = pure True
+doesMatch (TypeId "list") (TypeId "variable") = pure True
 doesMatch (TypeApp x xs) (TypeApp y ys) = do
   b <- doesMatch x y
   if b
@@ -138,6 +140,8 @@ doesMatchQual (IsIn a b) (IsIn a' b') = do
 doesMatchQual _ _ = pure False
 
 matchMut :: (MonadChecker m) => PlumeType -> PlumeType -> m ()
+matchMut (TypeId "variable") (TypeId "list") = pure ()
+matchMut (TypeId "list") (TypeId "variable") = pure ()
 matchMut (TypeApp x xs) (TypeApp y ys) = do
   matchMut x y
   mconcat <$> zipWithM matchMut xs ys

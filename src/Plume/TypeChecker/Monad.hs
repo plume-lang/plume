@@ -550,6 +550,14 @@ interpretError (p, FunctionAlreadyExists n s) =
       p
     )
     "while performing typechecking"
+interpretError (p, UnknownExtensionMethods n ms) = 
+  printErrorFromString
+    mempty
+    ( "Unknown methods for " <> toString n <> ": " <> intercalate ", " (map toString ms),
+      Nothing,
+      p
+    )
+    "while performing typechecking"
 
 instance IOThrowable PlumeError where
   showErrorIO e = interpretError e >> exitFailure

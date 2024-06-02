@@ -52,6 +52,7 @@ data TypeError
   | AlreadyDefinedInstance Text PlumeType
   | ClassMismatch Text PlumeQualifier PlumeQualifier
   | MissingExtensionMethods Text [Text]
+  | UnknownExtensionMethods Text [Text]
   | FunctionAlreadyExists Text PlumeScheme
   deriving (Eq, Show)
 
