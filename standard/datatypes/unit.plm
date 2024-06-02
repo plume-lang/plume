@@ -1,5 +1,5 @@
 type unit { unit }
 
 extend show<unit> {
-  fn show(): str => "()"
+  fn show_prec(_, _): str => "()"
 }

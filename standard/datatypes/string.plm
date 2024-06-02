@@ -19,7 +19,10 @@ extend equality<str> {
 }
 
 extend show<str> {
-  fn show(x: str) => "\"" + x + "\""
+  fn show_prec(x: str, prec: int) => switch prec {
+    case 0 => x
+    case ? => "\"" + x + "\""
+  }
 }
 
 // Inserting a `sep`arator between each element of the list

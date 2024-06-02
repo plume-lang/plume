@@ -36,14 +36,15 @@ fn filter<T extends foldable, A>(x: T<A>, f: fn(A): bool) =>
 fn elem<T extends foldable, A extends equality>(x: T<A>, y: A) => 
   x.foldl(fn (acc, z) => acc or z == y, false)
 
-fn showListHelper<A extends show>(ls: list<A>): str => switch ls {
+fn showListHelper<A extends show>(ls: list<A>, prec: int): str => switch ls {
   case [] => ""
-  case [x] => x.show()
-  case [x, ..xs] => x.show() + ", " + showListHelper(xs)
+  case [x] => x.show_prec(prec + 1)
+  case [x, ..xs] => x.show_prec(prec + 1) + ", " + showListHelper(xs, prec)
 }
 
 extend<A extends show> show<list<A>> {
-  fn show(self: list<A>): str => "[" + showListHelper(self) + "]"
+  fn show_prec(self: list<A>, prec): str => 
+    "[" + showListHelper(self, prec) + "]"
 }
 
 extend<A extends equality> numeric<list<A>> {

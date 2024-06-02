@@ -70,8 +70,8 @@ module.exports = {
     .then(() => true)
     .catch(() => false),
 
-  print: (s) => process.stdout.write(s),
-  println: (s) => console.log(s),
+  ffi_print: (s) => process.stdout.write(s),
+  ffi_println: (s) => console.log(s),
   get_args: () => process.argv.slice(2),
   execute_command: (cmd) => childProcess.execSync(cmd).toString(),
   input: (prompt) => new Promise((resolve, reject) => {

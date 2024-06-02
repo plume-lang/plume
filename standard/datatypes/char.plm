@@ -6,7 +6,10 @@ native ("native", "js") "std:native" {
 }
 
 extend show<char> {
-  fn show(self) => "'" + char_to_string(self) + "'"
+  fn show_prec(c: char, prec: int) => switch prec {
+    case 0 => char_to_string(c)
+    case _ => "'" + char_to_string(c) + "'"
+  }
 }
 
 extend to_str<char> {

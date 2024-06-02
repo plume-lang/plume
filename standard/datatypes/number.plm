@@ -43,7 +43,7 @@ extend product<int> {
 }
 
 extend show<int> {
-  fn show(c: int) => to_string(c)
+  fn show_prec(c: int, _) => to_string(c)
 }
 
 fn (%) (c: int, d: int) => mod_int(c, d)
@@ -87,7 +87,7 @@ extend ordering<float> {
 }
 
 extend show<float> {
-  fn show(c: float) => to_string(c)
+  fn show_prec(c: float, _) => to_string(c)
 }
 
 extend to_str<float> {

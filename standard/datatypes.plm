@@ -1,13 +1,13 @@
 require "datatypes/unit"
+require "datatypes/number"
 require "datatypes/bool"
 require "datatypes/option"
 require "datatypes/list"
 require "datatypes/string"
 require "datatypes/tuple"
-require "datatypes/number"
 require "datatypes/char"
 // require "datatypes/complex"
 
 extend<A extends show> show<mut A> {
-  fn show(c: mut A): str => "mut " + c->show()
+  fn show_prec(c: mut A, prec: int): str => "mut " + c->show_prec(prec + 1)
 }
