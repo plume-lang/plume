@@ -1,0 +1,5 @@
+type unit { unit }
+
+extend show<unit> {
+  fn show(): str => "()"
+}

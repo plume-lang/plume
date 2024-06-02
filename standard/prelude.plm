@@ -1,4 +1,4 @@
 require "classes.plm"
 
-require "io"
 require "datatypes"
+require "io"
