@@ -4,4 +4,13 @@ fn facto (n: int): int =>
     case ? => n * facto(n - 1)
   }
 
-@println(facto(5))
+fn range(from: int, to: int): [int] {
+  if from == to {
+    return []
+  } else {
+    return [from] + range(from + 1, to)
+  }
+}
+
+
+@println(range(1, 11).map(facto))
