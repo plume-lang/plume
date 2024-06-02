@@ -296,6 +296,7 @@ closeProgram (Pre.UPDeclare name arity) = do
   pure [Post.CPDeclare name]
 closeProgram (Pre.UPFunction name args e isAsync) = do
   modifyIORef' reserved (M.insert name (length args))
+  modifyIORef' locals (<> S.fromList args)
   (stmts, e') <- closeStatement e
   pure $ stmts ++ [Post.CPFunction name args e' isAsync]
 closeProgram (Pre.UPNativeFunction fp name arity st) = do

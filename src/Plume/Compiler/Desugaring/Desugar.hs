@@ -5,6 +5,7 @@ module Plume.Compiler.Desugaring.Desugar where
 import Data.Map qualified as M 
 import Data.IntMap qualified as IM
 import Data.Set qualified as Set
+import Data.List qualified as List
 import Data.Tuple.Utils
 import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Compiler.Desugaring.Monad
@@ -108,7 +109,6 @@ desugarStatement isTop = \case
       _ -> return [(Just $ Post.DSExpr x', stmts)]
   Pre.CSReturn x -> do
     (x', stmts) <- desugarExpr (False, True, True) x
-    print x'
     return [(Just $ Post.DSReturn x', stmts)]
   Pre.CSDeclaration n e -> do
     (e', stmts) <- desugarExpr (False, False, True) e
@@ -118,7 +118,7 @@ desugarStatement isTop = \case
     ys <- desugarStatement isTop y
     zs <- desugarStatement isTop z
     return
-      [(Just . Post.DSExpr $ Post.DEIf x' (createBlock ys) (createBlock zs), stmts1)]
+      [(Just $ Post.DSIf x' (createBlock ys) (createBlock zs), stmts1)]
   Pre.CSMutDeclaration n e -> do
     (e', stmts) <- desugarExpr (False, False, True) e
     return [(Just $ Post.DSMutDeclaration n e', stmts)]
@@ -126,11 +126,31 @@ desugarStatement isTop = \case
     (e', stmts) <- desugarExpr (False, False, True) e
     return [(Just $ Post.DSMutUpdate n e', stmts)]
 
+shouldReturn :: Pre.ClosedStatement -> Bool
+shouldReturn = \case
+  Pre.CSReturn _ -> False
+  Pre.CSExpr (Pre.CEBlock es) -> maybe False helper (viaNonEmpty last es)
+  Pre.CSExpr _ -> True
+  _ -> False
+
+  where
+    helper (Pre.CSReturn _) = True
+    helper _ = False
+
+insertReturn :: [Post.DesugaredStatement] -> IsReturned -> [Post.DesugaredStatement]
+insertReturn e False = e
+insertReturn e True = case List.unsnoc e of
+  Just (_, Post.DSReturn _) -> e
+  Just (xs, Post.DSExpr x) -> xs <> [Post.DSReturn x]
+  _ -> e
+
 desugarProgram :: Pre.ClosedProgram -> IO [Post.DesugaredProgram]
 desugarProgram = \case
   Pre.CPFunction x xs y isAsync -> do
-    ys <- desugarStatement (True, False, False) y
-    return [Post.DPFunction x xs (createBlock ys) isAsync]
+    ys <- desugarStatement (True, shouldReturn y, False) y
+    let bl = createBlock ys
+    let bl' = insertReturn bl (shouldReturn y)
+    return [Post.DPFunction x xs bl' isAsync]
   Pre.CPStatement x -> do
     x' <- desugarStatement (False, False, False) x
     return $ createBlockProg' x'

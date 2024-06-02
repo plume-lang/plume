@@ -64,8 +64,7 @@ arity _ = -1
 eraseType :: [Pre.TypedExpression] -> IO [Post.UntypedProgram]
 eraseType (Pre.EDeclaration _ (Annotation name _ _) (Pre.EClosure args _ body) Nothing : xs) = do
   let args' = map (\(Annotation n _ _) -> n.identifier) args
-  let b = insertReturnStmt body
-  b' <- eraseStatement b
+  b' <- eraseStatement body
   let fun = Post.UPFunction name.identifier args' b' False
   modifyIORef' program (<> [fun])
   eraseType xs
@@ -146,10 +145,10 @@ eraseStatement (Pre.EDeclaration _ (Annotation n _ _) e Nothing) = Post.USDeclar
 eraseStatement (Pre.EMutUpdate (Annotation n _ _) e1 Nothing) =
   Post.USMutUpdate n.identifier <$> eraseExpr e1
 eraseStatement (Pre.EConditionBranch e1 e2 e3) = do
-  e3' <- maybeM e3 eraseStatement
-  case e3' of
-    Just e3'' -> Post.USConditionBranch <$> eraseExpr e1 <*> eraseStatement e2 <*> pure e3''
-    Nothing -> compilerError "Condition branch without a body"
+  Post.USConditionBranch 
+    <$> eraseExpr e1
+    <*> eraseStatement e2
+    <*> eraseStatement e3
 eraseStatement e = Post.USExpr <$> eraseExpr e
 
 eraseExpr :: Pre.TypedExpression -> IO Post.UntypedExpr
@@ -174,13 +173,11 @@ eraseExpr (Pre.EList es) = Post.UEList <$> mapM eraseExpr es
 eraseExpr (Pre.EDeclaration _ (Annotation n _ _) e1 e2) = case e2 of
   Just e2' -> Post.UEDeclaration n.identifier <$> eraseExpr e1 <*> eraseExpr e2'
   Nothing -> compilerError "Declaration without a body"
-eraseExpr (Pre.EConditionBranch e1 e2 e3) = case e3 of
-  Just e3' ->
-    Post.UEConditionBranch
-      <$> eraseExpr e1
-      <*> eraseExpr e2
-      <*> eraseExpr e3'
-  Nothing -> compilerError "Condition branch without a body"
+eraseExpr (Pre.EConditionBranch e1 e2 e3) = 
+  Post.UEConditionBranch
+    <$> eraseExpr e1
+    <*> eraseExpr e2
+    <*> eraseExpr e3
 eraseExpr (Pre.ESwitch e cases) = do
   e' <- eraseExpr e
   cases' <- mapM (bimapM erasePattern eraseExpr) cases
