@@ -22,7 +22,6 @@ sharedLibExt :: Text -> String
 sharedLibExt "js" = "js"
 sharedLibExt _ = "plmc"
 
-
 {-# NOINLINE initialCWD #-}
 initialCWD :: IORef FilePath
 initialCWD = unsafePerformIO $ newIORef ""
@@ -86,7 +85,7 @@ concreteToAbstract (CST.EConditionBranch e1 e2 e3) = do
   -- into a block.
   e2' <- fmap interpretSpreadable <$> concreteToAbstract e2
   e3' <-
-    fmap (fmap interpretSpreadable) . sequence <$> maybeM concreteToAbstract e3
+    fmap interpretSpreadable <$> concreteToAbstract e3
   transRet $ AST.EConditionBranch <$> e1' <*> e2' <*> e3'
 concreteToAbstract (CST.EClosure anns t e) = do
   anns' <- mapM (\(Common.Annotation name ty mut) -> do

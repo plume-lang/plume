@@ -70,9 +70,7 @@ prettyExpr _ (EConditionBranch e1' e2' e3') =
     <+> prettyExpr 0 e1'
     <+> anCol Blue "then "
     <> prettyExpr 0 e2'
-    <> case e3' of
-      Nothing -> ""
-      Just e3'' -> anCol Blue "\nelse " <> prettyExpr 0 e3''
+    <> anCol Blue "\nelse " <> prettyExpr 0 e3'
 prettyExpr _ (EClosure as t e) =
   ppArgs as t
     <+> "=>\n"

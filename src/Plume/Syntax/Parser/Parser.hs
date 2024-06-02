@@ -158,11 +158,9 @@ eIf = do
   void $ L.reserved "if"
   cond <- parseExpression
   thenBlock <- eBlock
-  elseBlock <- P.optional $ do
-    void $ L.reserved "else"
-    eBlock
+  void $ L.reserved "else"
 
-  return $ CST.EConditionBranch cond thenBlock elseBlock
+  CST.EConditionBranch cond thenBlock <$> eBlock
 
 -- | Parses a switch expression
 -- | A switch expression is a conditional expression that may have multiple

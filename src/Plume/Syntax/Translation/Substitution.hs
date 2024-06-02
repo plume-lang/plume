@@ -55,7 +55,7 @@ substitute (name, expr) (AST.EConditionBranch e1 e2 e3) =
   AST.EConditionBranch
     (substitute (name, expr) e1)
     (substitute (name, expr) e2)
-    (substitute (name, expr) <$> e3)
+    (substitute (name, expr) e3)
 substitute (name, expr) (AST.EClosure anns t e)
   | name `S.notMember` ftv anns = AST.EClosure anns t (substitute (name, expr) e)
   | otherwise = AST.EClosure anns t e
