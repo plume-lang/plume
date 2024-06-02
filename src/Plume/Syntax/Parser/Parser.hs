@@ -2,6 +2,7 @@ module Plume.Syntax.Parser.Parser where
 
 import Control.Monad.Combinators.Expr qualified as P
 import Control.Monad.Parser qualified as P
+import GHC.IO qualified as IO
 import Data.SortedList qualified as SL
 import Plume.Syntax.Common qualified as Cmm
 import Plume.Syntax.Concrete qualified as CST
@@ -17,6 +18,17 @@ import Plume.Syntax.Common.Type qualified as Typ
 
 type Argument = Cmm.Annotation (Maybe Cmm.PlumeType)
 type TypedArg = Cmm.Annotation Cmm.PlumeType
+
+-- | Reference used to count the numbers of generated fn cases
+{-# NOINLINE fnCaseRef #-}
+fnCaseRef :: IORef Int
+fnCaseRef = IO.unsafePerformIO $ newIORef 0
+
+freshRef :: IO Text
+freshRef = do
+  i <- readIORef fnCaseRef
+  modifyIORef' fnCaseRef (+1)
+  return $ "fn_case_" <> show i
 
 -- SOME UTILITY FUNCTIONS
 
@@ -260,6 +272,26 @@ eClosure = do
 
   return $ CST.EClosure args retTy body False
 
+-- | Parses a closure case expression
+-- | A closure case expression is a special kind of expression that is used
+-- | to create a match expression mixed with a closure expression.
+-- |
+-- | SYNTAX:
+-- |  - fn case pattern => expr
+eCaseClosure :: P.Parser CST.Expression
+eCaseClosure = do
+  void $ L.reserved "fn"
+  void $ L.reserved "case"
+
+  fnCaseArg <- Cmm.fromText <$> liftIO freshRef
+
+  pat <- Pat.parsePattern
+  expr <- L.symbol "=>" *> parseExpression <|> eBlock
+
+  let switch = CST.ESwitch (CST.EVariable fnCaseArg Nothing) [(pat, expr)]
+
+  return $ CST.EClosure [fnCaseArg Cmm.:@: Nothing] Nothing switch False
+
 -- | Parses a tuple expression
 -- | A tuple expression is a collection of expressions that are separated by
 -- | commas and enclosed in parentheses.
@@ -284,6 +316,7 @@ parseTerm =
     , eSwitch
     , eList
     , eMacroExpr
+    , P.try eCaseClosure
     , eClosure
     , eTuple
     , eVariable
