@@ -53,13 +53,12 @@ synthesize (Pre.EUnMut e) = do
   ty `unifiesWith` TMut tv
   pure (tv, ps, Post.EUnMut <$> r)
 synthesize (Pre.EBlock exprs) = local id $ do
-  (tys, pss, exprs') <-
-    mapAndUnzip3M
-      (localPosition . synthesize)
-      exprs
+  (tys, pss, exprs') <- localPosition $ unzip3 <$> synthesizeStmts exprs
 
   retTy <- gets returnType
   let retTy' = fromMaybe TUnit retTy
+
+  -- void $ maybeM (viaNonEmpty last tys) (`unifiesWith` retTy')
 
   return (retTy', concat pss, liftBlock (Post.EBlock <$> sequence exprs') tys retTy')
 synthesize (Pre.EReturn expr) = do
@@ -96,6 +95,31 @@ synthesize sw@(Pre.ESwitch {}) = synthSwitch synthesize sw
 synthesize int@(Pre.EInterface {}) = synthInterface synthesize int
 synthesize nat@(Pre.ENativeFunction {}) = synthNative nat
 synthesize _ = throw (CompilerError "Unsupported expression")
+
+synthesizeStmts :: (MonadChecker m) => [Pre.Expression] -> m [(PlumeType, [PlumeQualifier], Placeholder Post.Expression)]
+synthesizeStmts ((Pre.ELocated e pos) : es) = do
+  withPosition pos $ synthesizeStmts (e : es)
+synthesizeStmts (e@(Pre.EReturn _) : _) = do
+  (ty, ps, h) <- synthesizeStmt e
+  return [(ty, ps, Post.EReturn <$> h)]
+synthesizeStmts (e : es) = do
+  (ty, ps, h) <- synthesizeStmt e
+  (tys, pss, hs) <- unzip3 <$> synthesizeStmts es
+  return $ (ty, ps, h) : zip3 tys pss hs
+synthesizeStmts [] = pure []
+
+synthesizeStmt :: (MonadChecker m) => Pre.Expression -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression)
+synthesizeStmt sw@(Pre.ESwitch {}) = synthSwitch synthesize sw
+synthesizeStmt cond@(Pre.EConditionBranch {}) = synthCond synthesize cond
+synthesizeStmt (Pre.ELocated e pos) = withPosition pos $ synthesizeStmt e
+synthesizeStmt (Pre.EReturn e) = do
+  (ty, ps, expr') <- synthesize e
+  returnTy <- gets returnType
+  forM_ returnTy $ unifiesWith ty
+  pure (ty, ps, Post.EReturn <$> expr')
+synthesizeStmt e = do
+  (_, ps, h) <- synthesize e
+  return (TUnit, ps, h)
 
 synthesizeToplevel :: (MonadChecker m) => Pre.Expression -> m (PlumeScheme, [Post.Expression])
 synthesizeToplevel (Pre.ELocated e pos) = withPosition pos $ synthesizeToplevel e

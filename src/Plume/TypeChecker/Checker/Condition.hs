@@ -11,7 +11,9 @@ synthCond infer (Pre.EConditionBranch cond t f) = local id $ do
   -- Type checking the condition, the true branch and the false branch
   (condTy, ps1, cond') <- infer cond
   (tTy, ps2, t') <- local id $ infer t
-  f' <- maybeM f (local id . infer)
+  (fTy, ps3, f') <- local id $ infer f
+  
+  tTy `unifiesWith` fTy
 
   -- Unifying the condition type with a boolean type
   condTy `unifiesWith` TBool
@@ -19,10 +21,5 @@ synthCond infer (Pre.EConditionBranch cond t f) = local id $ do
   -- Unifying the true branch type with the false branch type
   -- if the false branch is present and return the type of the
   -- condition branch
-  (ps3, f'') <- case f' of
-    Nothing -> pure ([], Nothing)
-    Just (fTy, ps3, f'') -> do
-      tTy `unifiesWith` fTy
-      pure (ps3, Just f'')
-  pure (tTy, ps1 ++ ps2 ++ ps3 , Post.EConditionBranch <$> cond' <*> t' <*> sequence f'')
+  pure (tTy, ps1 ++ ps2 ++ ps3 , Post.EConditionBranch <$> cond' <*> t' <*> f')
 synthCond _ _ = throw $ CompilerError "Only condition branches are supported"
