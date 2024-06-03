@@ -54,7 +54,7 @@ instance Show Program where
 
 instance Show Statement where
   show (JSIfStatement e s1 s2) = "if (" <> show e <> ") {\n" <> intercalate "\n" (fmap show s1) <> "\n} else {\n" <> intercalate "\n" (fmap show (fromMaybe [] s2)) <> "\n}"
-  show (JSVariableDeclaration n e) = "let " <> varify (toString n) <> " = " <> show e <> ";"
+  show (JSVariableDeclaration n e) = "var " <> varify (toString n) <> " = " <> show e <> ";"
   show (JSExpression e) = show e <> ";"
   show (JSFunction n args body) = "function " <> varify (toString n) <> "(" <> intercalate ", " (fmap (varify . toString) args) <> ") {\n" <> intercalate "\n" (fmap show body) <> "\n}"
   show (JSReturn e) = "return " <> show e <> ";"
