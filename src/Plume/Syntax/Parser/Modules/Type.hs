@@ -117,19 +117,38 @@ tType =
 parseGeneric :: Parser PlumeGeneric
 parseGeneric = do
   name <- identifier
-  extension <- optional parseCls
+  extension <- optional parseClss
   case extension of
     Just exts -> return (GExtends name exts)
     Nothing -> return (GVar name)
 
   where
-    parseCls :: Parser [Text]
-    parseCls = do
+    parseClss :: Parser [PlumeInterface]
+    parseClss = do
       void $ reserved "extends"
       choice [
-          pure <$> identifier,
-          parens (identifier `sepBy1` comma)
+          pure <$> parseCls,
+          parens (parseCls `sepBy1` comma)
         ]
+
+    parseCls :: Parser PlumeInterface
+    parseCls = do
+      choice [
+          parseLonelyClass,
+          parseCls'
+        ]
+
+    parseLonelyClass :: Parser PlumeInterface
+    parseLonelyClass = do
+      name <- identifier
+      return $ Interface name []
+    
+    parseCls' :: Parser PlumeInterface
+    parseCls' = do
+      name <- identifier
+      exts <- angles (tType `sepBy1` comma)
+      let exts' = Interface name exts
+      return exts'
 
 -- | Parse a type constructor
 -- | A type constructor is a sort of function that takes types as arguments

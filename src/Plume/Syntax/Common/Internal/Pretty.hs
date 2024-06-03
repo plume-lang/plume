@@ -70,4 +70,4 @@ prettyGen (GVar n) = anCol Yellow $ "a" <> pretty n
 prettyGen (GExtends n tys) =
   anCol Yellow (pretty n)
     <+> anCol Blue "extends"
-    <+> hsep (punctuate comma (map pretty tys))
+    <+> hsep (punctuate comma (map show tys))
