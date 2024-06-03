@@ -1,0 +1,21 @@
+fn facto (n: int): int =>
+  switch n {
+    case 0 => 1
+    case ? {
+      f = facto(n - 1)
+      return n * f
+    }
+  }
+
+
+fn range(from: int, to: int): [int] {
+  if from == to {
+    return []
+  } else {
+    return [from] + range(from + 1, to)
+  }
+}
+
+xs = range(0, 21).map(fn(n) => (n, facto(n)))
+
+xs.map(fn case (n, f) => println("$n! = $f"))
