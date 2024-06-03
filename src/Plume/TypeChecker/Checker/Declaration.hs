@@ -73,8 +73,8 @@ synthDecl
     -- If there are no user-quantified variables and if the declaration is not
     -- toplevel, then just return the inferred expression as it was inferred.
     (clos, closTy, remainingPs, sch) <- if null qvars && not isToplevel then do
-      ps' <- removeDuplicatesQuals ps
-      return (h, ty', ps', scheme)
+      -- ps' <- removeDuplicatesQuals ps
+      return (h, ty', ps, scheme)
     else do
       cenv <- gets (extendEnv . environment)
 
@@ -89,7 +89,7 @@ synthDecl
       let (_ps, m2, as, _) = List.unzip4 res'
       let ps' = concatMap removeQVars _ps
 
-      ps'' <- removeDuplicatesQuals =<< mapM (liftIO . compressQual) ps'
+      ps'' <- mapM (liftIO . compressQual) ps'
       let ty''@(_ :=>: t) = List.nub ps'' :=>: ty'
 
       -- Compressing types in the generated map
@@ -162,21 +162,21 @@ synthDecl
     pure (retTy, psb <> remainingPs, declFun (Annotation name closTy' isMut') <$> clos <*> body')
 synthDecl _ _ _ = throw $ CompilerError "Only declarations are supported"
 
-removeGeneralizedQuals :: [PlumeQualifier] -> [QuVar] -> IO [PlumeQualifier]
-removeGeneralizedQuals [] _ = pure []
-removeGeneralizedQuals qs [] = filterM removeQualWithQVar qs
-removeGeneralizedQuals (IsIn (TypeQuantified n) _: qs) qvars 
-  | n `elem` qvars = removeGeneralizedQuals qs qvars
-removeGeneralizedQuals (q : qs) qvars = (q:) <$> removeGeneralizedQuals qs qvars
+-- removeGeneralizedQuals :: [PlumeQualifier] -> [QuVar] -> IO [PlumeQualifier]
+-- removeGeneralizedQuals [] _ = pure []
+-- removeGeneralizedQuals qs [] = filterM removeQualWithQVar qs
+-- removeGeneralizedQuals (IsIn (TypeQuantified n) _: qs) qvars 
+--   | n `elem` qvars = removeGeneralizedQuals qs qvars
+-- removeGeneralizedQuals (q : qs) qvars = (q:) <$> removeGeneralizedQuals qs qvars
 
-removeQualWithQVar :: PlumeQualifier -> IO Bool
-removeQualWithQVar (IsIn (TypeQuantified _) _) = pure False
-removeQualWithQVar (IsIn (TypeVar l) n) = do
-  v <- readIORef l
-  case v of
-    Link t -> removeQualWithQVar (IsIn t n)
-    _ -> pure True
-removeQualWithQVar _ = pure True
+-- removeQualWithQVar :: PlumeQualifier -> IO Bool
+-- removeQualWithQVar (IsIn (TypeQuantified _) _) = pure False
+-- removeQualWithQVar (IsIn (TypeVar l) n) = do
+--   v <- readIORef l
+--   case v of
+--     Link t -> removeQualWithQVar (IsIn t n)
+--     _ -> pure True
+-- removeQualWithQVar _ = pure True
 
 isTypeSubsetOf :: [PlumeType] -> [PlumeType] -> IO Bool
 isTypeSubsetOf [] _ = pure True

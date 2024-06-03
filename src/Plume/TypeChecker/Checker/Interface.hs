@@ -10,13 +10,13 @@ import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
 
 synthInterface :: Infer -> Infer
-synthInterface _ (Pre.EInterface (Annotation name [ty] _) generics methods) = do
+synthInterface _ (Pre.EInterface (Annotation name tys _) generics methods) = do
   gens' :: [PlumeQualifier] <- concatMapM convert generics
-  ty' <- convert ty
+  tys' <- mapM convert tys
   let qvars = getQVars gens'
   let gens = removeQVars gens'
 
-  let inst = IsIn ty' name.identifier
+  let inst = IsIn tys' name.identifier
   methods' <- mapM convertMethod methods
   let methods'' = fmap (\(n, Forall qv (ps :=>: t)) -> (n, Forall (qv <> qvars) $ (inst : ps) :=>: t)) methods'
 
@@ -32,7 +32,7 @@ synthInterface _ (Pre.EInterface (Annotation name [ty] _) generics methods) = do
   let mappedMethods = Map.fromList $ sort (map fst methods') `zip` [(0 :: Int) ..]
   modifyIORef' classMapIndex $ Map.union mappedMethods
 
-  let instTy = TypeApp (TypeId name.identifier) [ty']
+  let instTy = TypeApp (TypeId name.identifier) tys'
   let genTy = ([instTy] :->:)
   let getIdx n = fromMaybe (-1) (Map.lookup n mappedMethods)
   let genFuns =

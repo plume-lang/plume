@@ -49,7 +49,7 @@ data TypeError
   | NoReturnFound PlumeType
   | ExhaustivenessError String
   | UnresolvedTypeVariable [Assumption PlumeType]
-  | AlreadyDefinedInstance Text PlumeType
+  | AlreadyDefinedInstance Text [PlumeType]
   | ClassMismatch Text PlumeQualifier PlumeQualifier
   | MissingExtensionMethods Text [Text]
   | UnknownExtensionMethods Text [Text]

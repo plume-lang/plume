@@ -78,7 +78,7 @@ getMapNames ((IsIn _ _, Post.EVariable n _) : xs) = n.identifier : getMapNames x
 getMapNames (_ : xs) = getMapNames xs
 getMapNames [] = []
 
-isInstanceAlreadyDefined :: MonadChecker m => PlumeQualifier -> m (Maybe PlumeType)
+isInstanceAlreadyDefined :: MonadChecker m => PlumeQualifier -> m (Maybe [PlumeType])
 isInstanceAlreadyDefined p = do
   p' <- liftIO $ compressQual p
   MkExtendEnv instances <- gets (extendEnv . environment)
@@ -95,7 +95,7 @@ isInstanceAlreadyDefined p = do
 synthExt :: Infer -> Infer
 synthExt
   infer
-  (Pre.ETypeExtension generics (Annotation tcName [tcTy] _) _ methods) = do
+  (Pre.ETypeExtension generics (Annotation tcName tcTy _) _ methods) = do
     -- Dealing with pre-types and building the qualified qualifiers
     -- for the typeclass instance (used to indicate the instance form and its
     -- superclasses)
@@ -104,7 +104,7 @@ synthExt
     let gens = removeQVars gens'
     let qvars = getQVars gens'
 
-    ty <- convert tcTy
+    ty <- mapM convert tcTy
     let instH = IsIn ty tcName.identifier
     let pred' = gens :=>: instH
     
@@ -175,8 +175,8 @@ synthExt
       let (_ps, m2, as, _) = unzip4 res'
       let ps' = concatMap removeQVars _ps
 
-      ps'' <- removeDuplicatesQuals ps'
-      let ty''@(_ :=>: t) = List.nub ps'' :=>: ty'
+      -- ps'' <- removeDuplicatesQuals ps'
+      let ty''@(_ :=>: t) = List.nub ps' :=>: ty'
 
       -- Compressing types in the generated map
       m' <- liftIO $ mapM (firstM compressQual) $ List.nub $ concat m2
@@ -259,18 +259,18 @@ synthExt
     addClassInstance cls''
 
     -- Generating the instance dictionary by sorting the methods by name
-    ty' <- liftIO $ compressPaths ty
-    let name = tcName.identifier <> "_" <> createInstName ty'
+    ty' <- liftIO $ mapM compressPaths ty
+    let name = tcName.identifier <> "_" <> createInstNames ty'
     let methods' = Map.toList dict
     let methods'' = sortBy (\(a, _) (b, _) -> compare a b) methods'
 
     -- Creating the instance expression and adding eventual super-interfaces
     -- constraints
-    let tapp = TypeApp (TypeId tcName.identifier) [ty]
-    let funTy = if null args' then tapp else tys'' :->: ty
-    let instDict = Post.EInstanceDict tcName.identifier (Identity ty) (map snd methods'')
+    let tapp = TypeApp (TypeId tcName.identifier) ty
+    let funTy = if null args' then tapp else tys'' :->: tapp
+    let instDict = Post.EInstanceDict tcName.identifier (Identity tapp) (map snd methods'')
 
-    let dictE = if null args' then instDict else Post.EClosure args' (Identity ty) instDict False
+    let dictE = if null args' then instDict else Post.EClosure args' (Identity tapp) instDict False
 
     mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) generics
 
@@ -288,8 +288,8 @@ getExpr pos xs p = do
 
 removeSuperclassAssumps :: MonadIO m => [Assumption PlumeType] -> [PlumeQualifier] -> m [Assumption PlumeType]
 removeSuperclassAssumps [] _ = pure []
-removeSuperclassAssumps (x@(_ :>: TypeApp (TypeId tcName) [ty]) : xs) scs = do
-  ty' <- liftIO $ compressPaths ty
+removeSuperclassAssumps (x@(_ :>: TypeApp (TypeId tcName) ty) : xs) scs = do
+  ty' <- liftIO $ mapM compressPaths ty
   let tcName' = toString tcName
   case tcName' of
     '@':tcName'' -> do
@@ -331,7 +331,7 @@ isSuperClass p ps = do
 
 allIsSuperclass :: MonadIO m => [Assumption PlumeType] -> [PlumeQualifier] -> m Bool
 allIsSuperclass [] _ = pure True
-allIsSuperclass (_ :>: TypeApp (TypeId tc) [ty] : xs) ps = do
+allIsSuperclass (_ :>: TypeApp (TypeId tc) ty : xs) ps = do
   let name = toString tc
   case name of
     '@':tcName -> do

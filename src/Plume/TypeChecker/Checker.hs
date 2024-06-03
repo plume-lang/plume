@@ -130,8 +130,8 @@ synthesizeToplevel e@(Pre.EDeclaration {}) = do
 
   let (ps', m, as, _) = mconcat zs
   (_, as') <- removeDuplicatesAssumps as
-  ps'' <- removeDuplicatesQuals ps'
-  let t'' = Forall [] $ List.nub ps'' :=>: ty
+  -- ps'' <- removeDuplicatesQuals ps'
+  let t'' = Forall [] $ List.nub ps' :=>: ty
 
   pos <- fetchPosition
   h' <- liftIO $ runReaderT h $ getExpr pos m
@@ -149,8 +149,8 @@ synthesizeToplevel e = do
 
   let (ps', m, as, _) = mconcat zs
   (_, as') <- removeDuplicatesAssumps as
-  ps'' <- removeDuplicatesQuals ps'
-  let t'' = Forall [] $ List.nub ps'' :=>: ty
+  -- ps'' <- removeDuplicatesQuals ps'
+  let t'' = Forall [] $ List.nub ps' :=>: ty
 
   pos <- fetchPosition
   h' <- liftIO $ runReaderT h $ getExpr pos m

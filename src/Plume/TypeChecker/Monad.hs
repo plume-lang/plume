@@ -328,10 +328,10 @@ instantiateWithSub s (Forall qvars (gens :=>: ty)) = do
     goMany subst [] = pure ([], subst)
 
     goGens :: (MonadChecker m) => Substitution -> [PlumeQualifier] -> m ([PlumeQualifier], Substitution)
-    goGens subst (IsIn name t : xs) = do
-      (name', subst') <- go subst name
+    goGens subst (IsIn t name : xs) = do
+      (t', subst') <- goMany subst t
       (xs', subst'') <- goGens subst' xs
-      pure (IsIn name' t : xs', subst'')
+      pure (IsIn t' name : xs', subst'')
     goGens subst (_ : xs) = goGens subst xs
     goGens subst [] = pure ([], subst)
 
@@ -513,11 +513,17 @@ interpretError (p, UnresolvedTypeVariable as) =
     showAssumps (x : xs) = 
       showAssump x <> ", " <> showAssumps xs
 
-    showAssump (_ :>: TypeApp (TypeId tcName) [ty]) = 
-      toString (T.drop 1 tcName) <> " for " <> show ty
+    showAssump (_ :>: TypeApp (TypeId tcName) ty) = 
+      toString (T.drop 1 tcName) <> " for " <> showTys ty
     showAssump (_ :>: TypeId tcName) = 
       toString (T.drop 1 tcName)
     showAssump _ = error "Not a type application"
+
+    showTys :: [PlumeType] -> String
+    showTys [] = ""
+    showTys [x] = show x
+    showTys [x, y] = show x <> " and " <> show y
+    showTys (x : xs) = show x <> ", " <> showTys xs
 interpretError (p, AlreadyDefinedInstance n t) =
   printErrorFromString
     mempty

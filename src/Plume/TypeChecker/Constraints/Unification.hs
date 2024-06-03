@@ -15,9 +15,9 @@ doesUnifyWith t t' = do
 
 doesQualUnifiesWith :: PlumeQualifier -> PlumeQualifier -> IO Bool
 doesQualUnifiesWith (IsIn t n) (IsIn t' n') | n == n' = do
-  t1 <- compressPaths t
-  t2 <- compressPaths t'
-  doesUnifyWithH t1 t2
+  t1 <- mapM compressPaths t
+  t2 <- mapM compressPaths t'
+  and <$> zipWithM doesUnifyWithH t1 t2
 doesQualUnifiesWith _ _ = pure False
 
 doesUnifyWithScheme :: PlumeType -> PlumeScheme -> IO Bool
@@ -115,7 +115,7 @@ mgu t t' = do
       _ -> throw (UnificationFail t1 t2)
 
 compressQual :: PlumeQualifier -> IO PlumeQualifier
-compressQual (IsIn t n) = IsIn <$> compressPaths t <*> pure n
+compressQual (IsIn t n) = IsIn <$> mapM compressPaths t <*> pure n
 compressQual q = pure q
 
 compressPaths :: PlumeType -> IO PlumeType

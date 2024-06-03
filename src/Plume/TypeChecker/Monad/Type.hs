@@ -57,7 +57,7 @@ data PlumeScheme = Forall [QuVar] PlumeQualified
 -- | A plume qualifier in its most basic form, it can be a generic type defined
 -- | by the user or a type that inherits a specific interface.
 data PlumeQualifier
-  = IsIn PlumeType Text
+  = IsIn [PlumeType] Text
   | IsQVar QuVar
   deriving (Eq, Show)
 
@@ -91,8 +91,11 @@ pattern TVarArg t = TypeApp (TypeId "variable") [t]
 getQVars :: [PlumeQualifier] -> [QuVar]
 getQVars [] = []
 getQVars (IsQVar q : qs) = q : getQVars qs
-getQVars (IsIn (TypeQuantified q) _ : qs) = q : getQVars qs
-getQVars (_ : qs) = getQVars qs
+getQVars (IsIn q _ : qs) = concatMap getQVarsFromType q <> getQVars qs
+
+getQVarsFromType :: PlumeType -> [QuVar]
+getQVarsFromType (TypeQuantified q) = [q]
+getQVarsFromType _ = []
 
 -- | A way to remove generic types from a list of qualifiers.
 removeQVars :: [PlumeQualifier] -> [PlumeQualifier]
