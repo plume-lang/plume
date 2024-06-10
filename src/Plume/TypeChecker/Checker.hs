@@ -121,10 +121,15 @@ synthesizeStmt e = do
   (_, ps, h) <- synthesize e
   return (TUnit, ps, h)
 
+isClosure :: Pre.Expression -> Bool
+isClosure (Pre.ELocated e _) = isClosure e
+isClosure (Pre.EClosure {}) = True
+isClosure _ = False
+
 synthesizeToplevel :: (MonadChecker m) => Pre.Expression -> m (PlumeScheme, [Post.Expression])
 synthesizeToplevel (Pre.ELocated e pos) = withPosition pos $ synthesizeToplevel e
-synthesizeToplevel e@(Pre.EDeclaration {}) = do
-  (ty, ps, h) <- synthDecl True synthesize e
+synthesizeToplevel e@(Pre.EDeclaration _ _ body _) = do
+  (ty, ps, h) <- synthDecl (isClosure body) synthesize e
   cenv <- gets (extendEnv . environment)
   zs <- traverse (discharge cenv) ps
 

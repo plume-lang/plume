@@ -148,7 +148,8 @@ liftBlock block _ t = do
   case res of
     Typed.EBlock exprs 
       | any Typed.containsReturn exprs 
-        || ty == TUnit -> do
+        || ty == TUnit
+        || ty == TAsync TUnit -> do
           pure $ Typed.EBlock exprs
     Typed.EBlock exprs
       | not (any Typed.containsReturn exprs)

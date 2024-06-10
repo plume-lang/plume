@@ -32,7 +32,7 @@ synthClosure infer (Pre.EClosure args ret body _) = local id $ do
 
   modify (\s -> s {isAsynchronous = old})
 
-  let retTy' = if isAsync then TypeApp (TypeId "async") [retTy] else retTy
+  let retTy' = if isAsync then createAsyncType retTy else retTy
 
   -- Unifying specified return type with the inferred return type
   convertedRet `unifiesWith` retTy
@@ -53,3 +53,7 @@ synthClosure _ _ = throw $ CompilerError "Only closures are supported"
 createEnvFromAnnotations :: [Annotation PlumeType] -> Map Text PlumeScheme
 createEnvFromAnnotations xs =
   Map.fromList $ map (\(Annotation n ty _) -> (n.identifier, Forall [] ([] :=>: ty))) xs
+
+createAsyncType :: PlumeType -> PlumeType 
+createAsyncType (TypeApp (TypeId "async") [t]) = TypeApp (TypeId "async") [t]
+createAsyncType t = TypeApp (TypeId "async") [t]

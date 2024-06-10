@@ -89,7 +89,9 @@ synthDecl
       let (_ps, m2, as, _) = List.unzip4 res'
       let ps' = concatMap removeQVars _ps
 
-      ps'' <- mapM (liftIO . compressQual) ps'
+      _ps'' <- mapM (liftIO . compressQual) ps'
+      ps'' <- liftIO . mapM compressQual =<< removeSameQualifiers qvars _ps''
+
       let ty''@(_ :=>: t) = List.nub ps'' :=>: ty'
 
       -- Compressing types in the generated map
@@ -191,3 +193,24 @@ keepAssumpWithQual as (q:qs) = do
   as2 <- keepAssumpWithQual as qs
   pure . List.nub $ as1 <> as2
 keepAssumpWithQual _ _ = pure []
+
+removeSameQualifiers :: MonadChecker m => [QuVar] -> [PlumeQualifier] -> m [PlumeQualifier]
+removeSameQualifiers _ [] = pure []
+removeSameQualifiers qvs (q : qs) = do
+  qs' <- removeSameQualifiers qvs qs
+  b1 <- isElemOf q qs'
+  b2 <- contains q qvs
+  if b1 && b2 then pure qs' else pure (q : qs')
+
+contains :: MonadChecker m => PlumeQualifier -> [QuVar] -> m Bool
+contains (IsIn t _) qs = do
+  t' <- liftIO $ mapM compressPaths t
+  let qs' = map TypeQuantified qs
+  anyM (\q -> and <$> zipWithM doesMatch t' (repeat q)) qs'
+contains _ _ = pure False
+
+isElemOf :: MonadChecker m => PlumeQualifier -> [PlumeQualifier] -> m Bool
+isElemOf q (q':qs) = doesMatchQual q q' >>= \case
+  True -> pure True
+  False -> isElemOf q qs
+isElemOf _ _ = pure False

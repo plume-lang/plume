@@ -87,6 +87,9 @@ pattern TUnit = TypeId "unit"
 pattern TVarArg :: PlumeType -> PlumeType 
 pattern TVarArg t = TypeApp (TypeId "variable") [t]
 
+pattern TAsync :: PlumeType -> PlumeType
+pattern TAsync t = TypeApp (TypeId "async") [t]
+
 -- | A way to get extension constraints from a list of qualifiers.
 getQVars :: [PlumeQualifier] -> [QuVar]
 getQVars [] = []
