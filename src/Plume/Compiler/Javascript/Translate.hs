@@ -31,7 +31,7 @@ assembleNative (Pre.DPNativeFunction lib name _ isStd) = do
     requireCall = Post.JSCall (Post.JSIdentifier "require") [
         if isStd then 
           createStandardPath lib 
-        else Post.JSLiteral (Cmm.LString lib)
+        else Post.JSLiteral (Cmm.LString ("./" <> lib))
       ]
     nameCall = Post.JSMember requireCall name
 assembleNative _ = []
@@ -92,4 +92,7 @@ runTranslateJS :: [Pre.DesugaredProgram] -> Post.Program
 runTranslateJS = mconcat . fmap assemble
 
 createMainJSApp :: Post.Program -> Text
-createMainJSApp (Post.Program stmts) = show (Post.JSCall (Post.JSAsyncAnnFunction [] stmts) [])
+createMainJSApp (Post.Program stmts) = show (Post.JSCall (Post.JSAsyncAnnFunction [] (nilDefinition : stmts)) [])
+
+nilDefinition :: Post.Statement
+nilDefinition = Post.JSVariableDeclaration "nil" Post.JSNull

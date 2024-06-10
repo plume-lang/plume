@@ -115,14 +115,14 @@ closeClosure args e isAsync = do
   let substBody = substituteMany envProps e
 
   let body = case substBody of
-        Post.CSExpr (Post.CEBlock [Post.CSExpr ret]) ->
-          Post.CSExpr (Post.CEBlock (envDecl <> [Post.CSReturn ret]))
-        Post.CSExpr (Post.CEBlock es) ->
-          Post.CSExpr (Post.CEBlock (envDecl <> es))
+        Post.CSExpr (Post.CEBlock xs) ->
+          Post.CSExpr (Post.CEBlock (envDecl <> xs))
         Post.CSExpr ret -> Post.CSExpr (Post.CEBlock (envDecl <> [Post.CSReturn ret]))
         _ -> case envDecl of
           [] -> substBody
           _ -> Post.CSExpr (Post.CEBlock (envDecl <> [substBody]))
+
+  -- print (args, env)
 
   let lambdaDict =
         Post.CEDictionary $
