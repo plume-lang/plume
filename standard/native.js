@@ -73,7 +73,14 @@ module.exports = {
   ffi_print: (s) => process.stdout.write(s),
   ffi_println: (s) => console.log(s),
   get_args: () => process.argv.slice(2),
-  execute_command: (cmd) => childProcess.execSync(cmd).toString(),
+  execute_command(cmd) {
+    try {
+      childProcess.execSync(cmd);
+      return 1;
+    } catch {
+      return 0;
+    }
+  },
   input: (prompt) => new Promise((resolve, reject) => {
     const rl = readline.createInterface({
       input: process.stdin,
@@ -110,7 +117,13 @@ module.exports = {
   list_append: (l, e) => l.concat(e),
   list_prepend: (l, e) => [e].concat(l),
   list_concat: (a, b) => a.concat(b),
-  ffi_get_index: (l, i) => l[i],
+  ffi_get_index(l, i) {
+    if (i < 0 || i >= l.length) {
+      return [null, "Option", "None"];
+    }
+
+    return [null, "Option", "Some", l[i]];
+  },
   ffi_slice_list: (l, start, end) => l.slice(start, end),
 
   char_to_string: (c) => c,
