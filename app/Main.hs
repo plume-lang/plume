@@ -76,7 +76,6 @@ main = setEncoding $ do
         let ast' = concatMap (removeUselessBlocks False) ast
         ppBuilding "Typechecking..."
         runSynthesize ast' `with` \tlir -> do
-          -- ppPrint tlir
           ppBuilding "Compiling and optimizing..."
           erased <- erase tlir
           runClosureConversion erased `with` \closed -> do
@@ -88,12 +87,3 @@ main = setEncoding $ do
             writeFileText (replaceExtension file ".js") code
             ppSuccess ("Bytecode written to " <> fromString (replaceExtension file ".js"))
     Nothing -> ppFailure "No input file provided"
-
--- printBytecode :: [Instruction] -> IO ()
--- printBytecode bytecode =
---   mapM_
---     ( \(i, instr) -> do
---         putStr (show i <> ": ")
---         print instr
---     )
---     (zip [0 :: Int ..] bytecode)
