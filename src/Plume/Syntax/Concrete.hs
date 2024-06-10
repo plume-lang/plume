@@ -55,7 +55,7 @@ pattern EListIndex :: Expression -> Expression -> Expression
 pattern EListIndex l i = CST.EApplication (CST.EVariable "get_index" Nothing) [l, i]
 
 pattern EProperty :: Text -> Expression -> Expression
-pattern EProperty p e = CST.EApplication (EVarText p) [e]
+pattern EProperty p e = CST.EApplication (EVarText "#property") [EVarText p, e]
 
 pattern EMacroText :: Text -> Expression 
 pattern EMacroText t = CST.EVariable (Cmm.MkIdentifier t True) Nothing

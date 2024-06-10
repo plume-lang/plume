@@ -29,7 +29,12 @@ removeUselessBlocks isInner (AST.EBlock es)
       if isEx 
         then [AST.EBlock $ concatMap (removeUselessBlocks False) es]
         else [AST.EBlock $ concatMap (removeUselessBlocks False) es <> [nilReturn]]
-  | otherwise = concatMap (removeUselessBlocks False) es
+  | otherwise = do
+      let isEx = isExhaustiveBlock es
+
+      if isEx 
+        then concatMap (removeUselessBlocks False) es
+        else concatMap (removeUselessBlocks False) es <> [nilReturn]
 removeUselessBlocks _ (AST.EApplication f xs) = do
   f' <- removeUselessBlocks True f
   xs' <- mapM (removeUselessBlocks True) xs
