@@ -245,9 +245,11 @@ runConcreteToAbstract
   -> FilePath
   -> IO (Either Error [AST.Expression])
 runConcreteToAbstract std dir paths fp = do
+  mod' <- lookupEnv "PPM_PATH"
   -- Writing the standard library path to the IORef to keep it
   -- without needing to refetch it every time
   writeIORef stdPath std
+  writeIORef modulePath mod'
   initialDir <- absolutize dir
   writeIORef initialCWD initialDir
 

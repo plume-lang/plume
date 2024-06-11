@@ -52,15 +52,31 @@ getPath modName ext = do
   cwd <- asks fst
   let strModName = toString modName -<.> fromMaybe "plm" ext
   let isStd = "std:" `isPrefixOf` modName
-  let modPath =
-        if isStd
-          then do
+  let isMod = "mod:" `isPrefixOf` modName
+  let modPath 
+        | isStd = do
             p <- liftIO $ readIORef stdPath
             case p of
               Just p' -> return $ Right (p' </> drop 4 strModName)
               Nothing -> throwError' $ CompilerError "Standard library path not set"
-          else return $ Right $ cwd </> strModName
-  modPath `with` liftIO . absolutize
+        | isMod = do
+            p <- liftIO $ readIORef modulePath
+            case p of
+              Just p' -> return $ Right (p' </> "modules" </> drop 4 strModName)
+              Nothing -> throwError' $ CompilerError "PPM_PATH not set"
+        | otherwise = return $ Right $ cwd </> strModName 
+
+
+  res <- modPath `with` liftIO . absolutize
+
+  let resWithoutExt = dropExtension res
+  isDir <- liftIO (doesFileExist resWithoutExt) >>= \case
+    False | isMod -> liftIO (doesDirectoryExist resWithoutExt)
+    _ -> return False
+
+  print res
+
+  if isDir then return $ resWithoutExt </> "main.plm" else return res
 
 -- | Convert a require expression to an abstract expression
 -- | This function is used to load a module and parse it

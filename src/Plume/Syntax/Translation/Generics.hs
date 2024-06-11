@@ -20,6 +20,12 @@ import System.IO.Pretty (printErrorFromString, parseError, ppFailure)
 stdPath :: IORef (Maybe FilePath)
 stdPath = unsafePerformIO $ newIORef Nothing
 
+-- | Store the current module path, used to resolve external
+-- | imports
+{-# NOINLINE modulePath #-}
+modulePath :: IORef (Maybe FilePath)
+modulePath = unsafePerformIO $ newIORef Nothing
+
 -- | Keeping track of the current position in the file
 -- | Used to provide better error messages
 {-# NOINLINE positionRef #-}
