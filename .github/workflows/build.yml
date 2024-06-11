@@ -28,6 +28,7 @@ jobs:
       - name: Checking for dependencies
         run: |
           python3 --version
+          node --version
     
       - name: Set up GHC ${{ matrix.ghc-version }}
         uses: haskell-actions/setup@v2
@@ -66,7 +67,7 @@ jobs:
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
       - name: Build compiler and VM
-        run: python3 scripts/build_project.py --root
+        run: python3 scripts/build_project.py
 
       - name: Create ZIP archive on UNIX
         if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
