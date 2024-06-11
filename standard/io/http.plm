@@ -3,4 +3,4 @@ require "async"
 
 native "native" "std:native" fetch(url: str): Result<str, str>
 
-native "js" "std:native" fetch(url: str): Async<Result<str, str>>
+native "js" "std:native" fetch(url: str): async<Result<str, str>>
