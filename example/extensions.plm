@@ -1,28 +1,40 @@
-@println(3 ^ 3)
+println(3 ^ 3)
 
-println([1, 2, 3, 4, 5].show())
+println([1, 2, 3, 4, 5])
 
-@println("Hello, World!")
+println("Hello, World!")
 
-@println(Some(8))
-
-extend str {
-  fn test(): str => "tesdt"
-}
+println(Some(8))
 
 fn bruh(n: str) {
-  [n, n, n, n].map(println)
+  [n, n, n, n].map(fn(x) => println(x))
 
   return n
 }
 
-@println(bruh("test"))
+println(bruh("test"))
 
-@println("Hello" + "World")
+println("Hello" + "World")
 
-@println([1, 2, 3] == [4, 5, 6])
-@println([1, 2, 3] == [1, 2, 3])
-@println([1, 2, 3] != [4, 5, 6])
-@println([1, 2, 3] != [1, 2, 3])
+println([1, 2, 3] == [4, 5, 6])
+println([1, 2, 3] == [1, 2, 3])
+println([1, 2, 3] != [4, 5, 6])
+println([1, 2, 3] != [1, 2, 3])
 
-@println([1, 2, 3] + [4, 5, 6])
+println([1, 2, 3] + [4, 5, 6])
+
+fn test(x: str) => fn(_: int): str {
+    return switch x {
+      case "a" => "b"
+      case ? {
+        if true {
+          return "c"
+        } else {
+          return "d"
+        }
+      }
+    }
+  }
+
+x = test("a")(9)
+println(x)

@@ -4,9 +4,9 @@ type Result<A, B> {
 }
 
 extend<A extends show, B extends show> show<Result<A, B>> {
-  fn show(self: Result<A, B>): str => switch self {
-    case Error(a) => "Error(" + a.show() + ")"
-    case Ok(b) => "Ok(" + b.show() + ")"
+  fn show_prec(self: Result<A, B>, prec: int): str => switch self {
+    case Error(a) => "Error(" + a.show_prec(prec + 1) + ")"
+    case Ok(b) => "Ok(" + b.show_prec(prec + 1) + ")"
   }
 }
 

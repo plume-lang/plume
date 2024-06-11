@@ -46,78 +46,45 @@ prettyTyCons (TConstructor n ts) = anItalic (pretty n) <> parens (hsep . punctua
 prettyTyCons (TVariable n) = anItalic (pretty n)
 
 prettyExpr :: Int -> Expression -> Doc AnsiStyle
-prettyExpr _ (EType (Annotation name gens) ts) =
+prettyExpr _ (EType (Annotation name gens _) ts) =
   anCol Blue "type" <+> anItalic (pretty name)
-    <> angles (hsep . punctuate comma $ map ansiPretty gens)
+    <> angles (hsep . punctuate comma $ map pretty gens)
       <+> "="
     <> line
     <> indent 2 (vsep . punctuate comma $ map ansiPretty ts)
-prettyExpr i (EBinary op e1' e2') =
-  if i > 0
-    then parens res
-    else res
- where
-  res = prettyExpr (i + 1) e1' <+> prettyBin op <+> prettyExpr (i + 1) e2'
-prettyExpr i (EPrefix op e) =
-  if i > 0
-    then parens res
-    else res
- where
-  res = prettyPrefix op <+> prettyExpr (i + 1) e
 prettyExpr _ (EApplication e es) =
   prettyExpr 0 e
     <> parens (hsep . punctuate comma $ map (prettyExpr 0) es)
-prettyExpr _ (EVariable v) = anItalic $ pretty v
+prettyExpr _ (EVariable v _) = anItalic $ pretty v
 prettyExpr _ (ELiteral l) = ansiPretty l
-prettyExpr _ (EDeclaration generics isMut a e1' e2') =
-  if isMut
-    then anCol Blue "mut"
-    else
-      mempty
-        <+> ansiPretty generics
-        <> typeAnnotation a
-          <+> "="
-          <+> prettyExpr 0 e1'
-          <+> case e2' of
-            Nothing -> ""
-            Just e2'' -> anCol Blue "\nin" <+> prettyExpr 0 e2''
+prettyExpr _ (EDeclaration generics a e1' e2') =
+  ansiPretty generics
+    <> typeAnnotation a
+      <+> "="
+      <+> prettyExpr 0 e1'
+      <+> case e2' of
+        Nothing -> ""
+        Just e2'' -> anCol Blue "\nin" <+> prettyExpr 0 e2''
 prettyExpr _ (EConditionBranch e1' e2' e3') =
   anCol Blue "if"
     <+> prettyExpr 0 e1'
     <+> anCol Blue "then "
     <> prettyExpr 0 e2'
-    <> case e3' of
-      Nothing -> ""
-      Just e3'' -> anCol Blue "\nelse " <> prettyExpr 0 e3''
-prettyExpr _ (EClosure as t e) =
+    <> anCol Blue "\nelse " <> prettyExpr 0 e3'
+prettyExpr _ (EClosure as t e _) =
   ppArgs as t
     <+> "=>\n"
     <+> indent 2 (prettyExpr 0 e)
  where
-  ppArgs [x :@: (Nothing, mt)] Nothing = ppMut mt <+> pretty x
+  ppArgs [x :@: Nothing] Nothing = pretty x
   ppArgs xs ret = parens (hsep . punctuate comma $ map argAnnotation xs) <> ppRet ret
 
   ppRet Nothing = ""
   ppRet (Just t') = ":" <+> prettyTy t'
-prettyExpr _ (EUnMut e) = anBold "*" <> prettyExpr 0 e
 prettyExpr _ (EBlock es) =
   anCol Blue "block" <> line <> indent 4 (vsep (map (prettyExpr 0) es))
-prettyExpr _ (EListIndex e1' e2') = prettyExpr 0 e1' <> brackets (prettyExpr 0 e2')
 prettyExpr _ (ERequire l) = anCol Blue "require" <+> anCol Green (dquotes $ pretty l)
 prettyExpr _ (ELocated e _) = prettyExpr 0 e
-prettyExpr _ (EMacro n e) = anCol Yellow "@" <> anCol Yellow (pretty n) <+> "=" <+> prettyExpr 0 e
-prettyExpr _ (EMacroFunction n args e) =
-  anCol Yellow "@"
-    <> anCol Yellow (pretty n)
-      <+> parens (hsep . punctuate comma $ map pretty args)
-      <+> "=>"
-      <+> prettyExpr 0 e
-prettyExpr _ (EMacroVariable n) = anCol Yellow "@" <> anCol Yellow (pretty n)
-prettyExpr _ (EPostfix PostfixSlice e) = prettyExpr 0 e <> brackets ".."
-prettyExpr _ (EMacroApplication n es) =
-  anCol Yellow "@"
-    <> anCol Yellow (pretty n)
-    <> parens (hsep . punctuate comma $ map (prettyExpr 0) es)
 prettyExpr _ (ESwitch e ps) =
   anCol Blue "switch"
     <+> prettyExpr 0 e
@@ -125,7 +92,6 @@ prettyExpr _ (ESwitch e ps) =
     <> indent 2 (vsep (map prettyCase ps))
  where
   prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "=>" <+> prettyExpr 0 e'
-prettyExpr _ (EProperty n e) = parens $ prettyExpr 0 e <> "." <> anItalic (pretty n)
 prettyExpr _ (EReturn e) = anCol Blue "return" <+> prettyExpr 0 e
 prettyExpr _ (ETypeExtension gens a var es) =
   anCol Blue "extends"
@@ -134,7 +100,7 @@ prettyExpr _ (ETypeExtension gens a var es) =
       <+> "with" <+> pretty var
       <+> line
     <> indent 2 (vsep (map prettyExt es))
-prettyExpr _ (ENativeFunction fp n gens (args :->: ret)) =
+prettyExpr _ (ENativeFunction fp n gens (args :->: ret) _ _) =
   anCol Blue "native"
     <+> anCol Green (pretty fp)
     <+> anBold (pretty n)
@@ -143,7 +109,7 @@ prettyExpr _ (ENativeFunction fp n gens (args :->: ret)) =
       <+> ":"
       <+> ansiPretty ret
 prettyExpr _ (ENativeFunction {}) = compilerError "ENativeFunction: invalid type"
-prettyExpr _ (EInterface (Annotation name gens) gs ms) =
+prettyExpr _ (EInterface (Annotation name gens _) gs ms) =
   anCol Blue "interface"
     <> angles (hsep . punctuate comma $ map ansiPretty gs)
     <+> anItalic (pretty name)
@@ -159,8 +125,10 @@ prettyExpr _ (EVariableDeclare gens n t) =
     <+> anItalic (pretty n)
     <+> ":"
     <+> ansiPretty t
+prettyExpr _ (EAwait e) = anCol Blue "await" <+> prettyExpr 0 e
+prettyExpr _ e = show e
 
-prettyExt :: ExtensionMember PlumeType -> Doc AnsiStyle
+prettyExt :: ExtensionMember -> Doc AnsiStyle
 prettyExt (ExtDeclaration gs a e1') =
   ansiPretty gs
     <> typeAnnotation a

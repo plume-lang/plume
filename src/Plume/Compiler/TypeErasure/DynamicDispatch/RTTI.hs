@@ -17,7 +17,7 @@ rtti (TypeId n) = Single n
 rtti (TypeQuantified _) = Nil
 
 createCondition
-  :: TypedExpression PlumeType -> RTTIResult -> [TypedExpression PlumeType]
+  :: TypedExpression -> RTTIResult -> [TypedExpression]
 createCondition e (Item (Single "list") [x]) =
   [EEqualsType e "list"] <> createCondition (EIndex e (ELiteral (LInt 0))) x
 createCondition e (Single n) = [EEqualsType e n]

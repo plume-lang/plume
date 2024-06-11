@@ -27,10 +27,16 @@ instance Pre.PlumeGeneric `ConvertsTo` [Post.PlumeQualifier] where
     searchEnv @"datatypeEnv" name >>= \case
       Just _ ->
         throw $ CompilerError "Generic type variable shadowing datatype"
-      Nothing -> do
+      Nothing ->do
         let ty = Post.TypeQuantified name
         insertEnv @"genericsEnv" name ty
-        pure (map (Post.IsIn ty) tcs)
+        mapM (convertInterface ty) tcs
+
+
+convertInterface :: (MonadChecker m) => Post.PlumeType -> Pre.PlumeInterface -> m Post.PlumeQualifier
+convertInterface t (Pre.Interface name tys) = do
+  tys' <- mapM convert tys
+  pure (Post.IsIn (tys' <> [t]) name)
 
 instance Pre.PlumeType `ConvertsTo` Post.PlumeType where
   convert (Pre.TId n) = do
@@ -78,4 +84,4 @@ instance (a `ConvertsTo` b) => [a] `ConvertsTo` [b] where
   convert = mapM convert
 
 instance (a `ConvertsTo` b) => Annotation a `ConvertsTo` Annotation b where
-  convert (Annotation n ty) = Annotation n <$> convert ty
+  convert (Annotation n ty b) = Annotation n <$> convert ty <*> pure b

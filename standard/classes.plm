@@ -1,12 +1,15 @@
-native "std:native" to_string<A>(x: A): str
-native "std:native" {
+native "native" "std:native" to_string<A>(x: A): str
+native "native" "std:native" {
   copy_ref<A>(x: A): A
   free_ref<A>(x: A): A
 }
+native "js" "std:native" to_string<A>(x: A): str
 
 interface<A> show<A> {
-  fn show(a: A): str
+  fn show_prec(a: A, prec: int): str
 }
+
+fn show<A extends show>(a: A): str => a.show_prec(0)
 
 interface<A> boolean_algebra<A> {
   fn and(x: A, y: A): A

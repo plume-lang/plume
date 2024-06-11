@@ -1,4 +1,4 @@
-native "std:native" {
+native ("js", "native") "std:native" {
   add_int(x: int, y: int): int
   sub_int(x: int, y: int): int
   mul_int(x: int, y: int): int
@@ -11,7 +11,7 @@ native "std:native" {
 }
 
 // Native float functions
-native "std:native" {
+native ("native", "js") "std:native" {
   add_float(x: float, y: float): float
   sub_float(x: float, y: float): float
   mul_float(x: float, y: float): float
@@ -43,7 +43,7 @@ extend product<int> {
 }
 
 extend show<int> {
-  fn show(c: int) => to_string(c)
+  fn show_prec(c: int, _) => to_string(c)
 }
 
 fn (%) (c: int, d: int) => mod_int(c, d)
@@ -87,7 +87,7 @@ extend ordering<float> {
 }
 
 extend show<float> {
-  fn show(c: float) => to_string(c)
+  fn show_prec(c: float, _) => to_string(c)
 }
 
 extend to_str<float> {

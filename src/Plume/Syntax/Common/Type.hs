@@ -29,7 +29,11 @@ data PlumeType
 -- | example: a extends show => a must implement the show type extension
 data PlumeGeneric
   = GVar Text
-  | GExtends Text [Text]
+  | GExtends Text [PlumeInterface]
+  deriving (Eq, Show)
+
+data PlumeInterface 
+  = Interface Text [PlumeType]
   deriving (Eq, Show)
 
 data PlumeScheme = MkScheme [PlumeGeneric] PlumeType
@@ -38,6 +42,10 @@ data PlumeScheme = MkScheme [PlumeGeneric] PlumeType
 getGenericName :: PlumeGeneric -> Text
 getGenericName (GVar name) = name
 getGenericName (GExtends name _) = name
+
+getTypeName :: PlumeType -> Text
+getTypeName (TId name) = name
+getTypeName _ = ""
 
 -- TYPE SYNONYMS SHORTCUTS
 

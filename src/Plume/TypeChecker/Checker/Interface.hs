@@ -4,20 +4,19 @@ module Plume.TypeChecker.Checker.Interface where
 import Data.Map qualified as Map
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Common.Annotation
-import Plume.Syntax.Common.Type qualified as Pre
 import Plume.Syntax.Translation.Generics (concatMapM)
 import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
 
 synthInterface :: Infer -> Infer
-synthInterface _ (Pre.EInterface (Annotation name [ty]) generics methods) = do
+synthInterface _ (Pre.EInterface (Annotation name tys _) generics methods) = do
   gens' :: [PlumeQualifier] <- concatMapM convert generics
-  ty' <- convert ty
+  tys' <- mapM convert tys
   let qvars = getQVars gens'
   let gens = removeQVars gens'
 
-  let inst = IsIn ty' name
+  let inst = IsIn tys' name.identifier
   methods' <- mapM convertMethod methods
   let methods'' = fmap (\(n, Forall qv (ps :=>: t)) -> (n, Forall (qv <> qvars) $ (inst : ps) :=>: t)) methods'
 
@@ -28,21 +27,21 @@ synthInterface _ (Pre.EInterface (Annotation name [ty]) generics methods) = do
   let methodsBis = map (\(n, Forall qv t) -> (n, Forall (qv <> qvars) t)) methods'
   let cls = MkClass qvars pred' (Map.fromList methodsBis)
 
-  addClass name cls
+  addClass name.identifier cls
 
   let mappedMethods = Map.fromList $ sort (map fst methods') `zip` [(0 :: Int) ..]
   modifyIORef' classMapIndex $ Map.union mappedMethods
 
-  let instTy = TypeApp (TypeId name) [ty']
+  let instTy = TypeApp (TypeId name.identifier) tys'
   let genTy = ([instTy] :->:)
   let getIdx n = fromMaybe (-1) (Map.lookup n mappedMethods)
-  pos <- fetchPosition
   let genFuns =
         map
           ( \(n, Forall _ (_ :=>: funTy)) ->
               Post.EDeclaration
-                (n :@: genTy funTy)
-                (Post.EClosure ["$inst" :@: instTy] funTy (Post.EInstanceAccess (Post.EVariable "$inst" instTy) (getIdx n)) pos)
+                []
+                (fromText n :@: Identity (genTy funTy))
+                (Post.EClosure ["$inst" :@: Identity instTy] (Identity funTy) (Post.EInstanceAccess (Post.EVariable "$inst" (Identity instTy)) (getIdx n)) False)
                 Nothing
           )
           methods'
@@ -52,16 +51,16 @@ synthInterface _ (Pre.EInterface (Annotation name [ty]) generics methods) = do
 synthInterface _ _ = throw $ CompilerError "Only interfaces are supported"
 
 convertMethod :: (MonadChecker m) => Annotation Pre.PlumeScheme -> m (Text, PlumeScheme)
-convertMethod (Annotation name (Pre.MkScheme gens ty)) = do
+convertMethod (Annotation name (Pre.MkScheme gens ty) _) = do
   gens' :: [PlumeQualifier] <- concatMapM convert gens
 
-  searchEnv @"typeEnv" name >>= \case
-    Just sch -> throw $ FunctionAlreadyExists name sch
+  searchEnv @"typeEnv" name.identifier >>= \case
+    Just sch -> throw $ FunctionAlreadyExists name.identifier sch
     Nothing -> pure ()
 
   let qvars = getQVars gens'
   ty' <- convert ty
-  pure (name, Forall qvars $ gens' :=>: ty')
+  pure (name.identifier, Forall qvars $ gens' :=>: ty')
 
 buildInterface :: (MonadChecker m) => Text -> [Pre.PlumeType] -> m PlumeType
 buildInterface name [] = pure (TypeId name)

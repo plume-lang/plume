@@ -3,6 +3,7 @@ module Plume.Syntax.Parser.Modules.Literal where
 import Control.Monad.Parser
 import Data.Text qualified as T
 import Plume.Syntax.Common.Literal
+import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Concrete
 import Plume.Syntax.Parser.Lexer
 import Text.Megaparsec hiding (many, parse, some)
@@ -42,24 +43,24 @@ parseStringWithInterpolation = lexeme $ do
       -- span the variable name
       let (var, rest) = span isIdentChar xs
           rest'       = buildString rest
-          var'        = EVariable $ T.pack (x:var)
+          var'        = EVariable (fromText $ T.pack (x:var)) Nothing
 
-      EBinary Plus (showApp var') rest'
+      EBinary "+" (showApp var') rest'
     buildString (x:xs) = do
       let (rest, next) = span (/= '$') xs
           rest'        = T.pack (x:rest)
 
-      EBinary Plus (ELiteral $ LString rest') (buildString next)
+      EBinary "+" (ELiteral $ LString rest') (buildString next)
 
     combineCharsIntoString :: Expression -> Expression
-    combineCharsIntoString (EBinary Plus x (ELiteral (LString ""))) = combineCharsIntoString x 
-    combineCharsIntoString (EBinary Plus x y) = do
+    combineCharsIntoString (EBinary "+" x (ELiteral (LString ""))) = combineCharsIntoString x 
+    combineCharsIntoString (EBinary "+" x y) = do
       let x' = combineCharsIntoString x
       let y' = combineCharsIntoString y
 
       case (x', y') of
         (ELiteral (LString a), ELiteral (LString b)) -> ELiteral (LString (a <> b))
-        _ -> EBinary Plus x' y'
+        _ -> EBinary "+" x' y'
     combineCharsIntoString x = x
 -- | Parse a character literal
 -- | A character literal is a single character enclosed in single quotes

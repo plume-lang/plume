@@ -1,16 +1,23 @@
-native "std:native" print(x: str): int
-native "std:native" println(x: str): int
-
-macro print(x) => print(x.show())
-
-macro println(x) {
-  @print(x)
-  print("\n")
+native ("native", "js") "std:native" {
+  ffi_print(x: str): int
+  ffi_println(x: str): int
 }
 
-macro print_with(fmt, x) => print(x.show(fmt))
+fn print<A extends show>(xs: ..A): unit {
+  xs.map(fn (x) {
+    ffi_print(x.show())
+    ffi_print(" ")
+  })
 
-macro println_with(fmt, x) {
-  @print_with(fmt, x)
-  print("\n")
+  return unit
+}
+
+fn println<A extends show>(xs: ..A): unit {
+  xs.map(fn (x) {
+    ffi_print(x.show())
+    ffi_print(" ")
+  })
+
+  ffi_print("\n")
+  return unit
 }

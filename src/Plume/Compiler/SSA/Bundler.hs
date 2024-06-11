@@ -4,8 +4,8 @@ import Plume.Compiler.Desugaring.Syntax
 
 bundleProg :: DesugaredProgram -> Maybe DesugaredProgram
 bundleProg (DPDeclare n) = Just $ DPDeclare n
-bundleProg (DPFunction name args stmts) =
-  Just $ DPFunction name args stmts
+bundleProg (DPFunction name args stmts isAsync) =
+  Just $ DPFunction name args stmts isAsync
 bundleProg (DPStatement (DSDeclaration n e)) =
   Just $ DPDeclaration n e
 bundleProg (DPStatement s) = Just $ DPStatement s

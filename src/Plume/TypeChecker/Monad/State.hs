@@ -15,6 +15,7 @@ data CheckState = MkCheckState
   , returnType :: Maybe PlumeType
   , positions :: [Position]
   , natives :: Map Text (PlumeScheme, Position)
+  , isAsynchronous :: Bool
   }
   deriving (Eq)
 
@@ -77,6 +78,7 @@ emptyState =
     , returnType = Nothing
     , positions = []
     , natives = mempty
+    , isAsynchronous = False
     }
 
 -- | classMapIndex is used to keep updated the index of the method in its

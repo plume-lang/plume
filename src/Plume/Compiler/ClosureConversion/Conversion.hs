@@ -88,8 +88,9 @@ closeClosure
   :: (MonadClosure m)
   => [Text]
   -> Post.ClosedStatement
+  -> Bool
   -> m ([Post.ClosedProgram], Post.ClosedExpr)
-closeClosure args e = do
+closeClosure args e isAsync = do
   funs <- S.fromList . M.keys <$> readIORef reserved
   lcls <- readIORef locals
 
@@ -114,10 +115,8 @@ closeClosure args e = do
   let substBody = substituteMany envProps e
 
   let body = case substBody of
-        Post.CSExpr (Post.CEBlock [Post.CSExpr ret]) ->
-          Post.CSExpr (Post.CEBlock (envDecl <> [Post.CSReturn ret]))
-        Post.CSExpr (Post.CEBlock es) ->
-          Post.CSExpr (Post.CEBlock (envDecl <> es))
+        Post.CSExpr (Post.CEBlock xs) ->
+          Post.CSExpr (Post.CEBlock (envDecl <> xs))
         Post.CSExpr ret -> Post.CSExpr (Post.CEBlock (envDecl <> [Post.CSReturn ret]))
         _ -> case envDecl of
           [] -> substBody
@@ -128,7 +127,7 @@ closeClosure args e = do
           fromList [("0", envDict), ("1", Post.CEVar name)]
 
   return
-    ([Post.CPFunction name (name <> "_env" : args) body], lambdaDict)
+    ([Post.CPFunction name (name <> "_env" : args) body isAsync], lambdaDict)
 
 tupleMaybe :: (Maybe a, Maybe a) -> Maybe a
 tupleMaybe (Just x, _) = Just x
@@ -154,6 +153,7 @@ closeExpression (Pre.UEVar x) = do
                 Pre.UEClosure
                   args
                   (Pre.USReturn (Pre.UEApplication (Pre.UEVar x) (map Pre.UEVar args)))
+                  False
           closeExpression lambda
         _ -> pure ([], Post.CEVar x)
     else pure ([], Post.CEVar x)
@@ -193,11 +193,11 @@ closeExpression (Pre.UEConditionBranch e1 e2 e3) = do
   (p2, e2') <- closeExpression e2
   (p3, e3') <- closeExpression e3
   pure (p1 <> p2 <> p3, Post.CEConditionBranch e1' e2' e3')
-closeExpression (Pre.UEClosure args e) = do
+closeExpression (Pre.UEClosure args e isAsync) = do
   old <- readIORef locals
   modifyIORef' locals (S.union (S.fromList args))
   (stmts, body) <- closeStatement e
-  xs <- first (stmts <>) <$> closeClosure args body
+  xs <- first (stmts <>) <$> closeClosure args body isAsync
   writeIORef locals old
   pure xs
 closeExpression (Pre.UEBlock es) = do
@@ -288,14 +288,15 @@ closeProgram
 closeProgram (Pre.UPADTFunction name args e) = do
   modifyIORef' reserved (M.insert name (length args))
   (stmts, e') <- closeStatement e
-  pure $ stmts ++ [Post.CPFunction name args e']
+  pure $ stmts ++ [Post.CPFunction name args e' False]
 closeProgram (Pre.UPDeclare name arity) = do
   modifyIORef' reserved (M.insert name arity)
   pure [Post.CPDeclare name]
-closeProgram (Pre.UPFunction name args e) = do
+closeProgram (Pre.UPFunction name args e isAsync) = do
   modifyIORef' reserved (M.insert name (length args))
+  modifyIORef' locals (<> S.fromList args)
   (stmts, e') <- closeStatement e
-  pure $ stmts ++ [Post.CPFunction name args e']
+  pure $ stmts ++ [Post.CPFunction name args e' isAsync]
 closeProgram (Pre.UPNativeFunction fp name arity st) = do
   modifyIORef' reserved (M.insert name arity)
   pure [Post.CPNativeFunction fp name arity st]

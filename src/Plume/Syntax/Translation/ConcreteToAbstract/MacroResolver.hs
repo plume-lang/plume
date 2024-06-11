@@ -8,6 +8,7 @@ import Plume.Syntax.Abstract qualified as AST
 import Plume.Syntax.Concrete qualified as CST
 import Plume.Syntax.Translation.Generics
 import Plume.Syntax.Translation.Substitution
+import Plume.Syntax.Common
 
 -- | Macro body can be a single expression, a spread of expressions
 -- | but it can't be empty
@@ -27,15 +28,16 @@ macroState = unsafePerformIO $ newIORef $ MacroState mempty mempty
 -- | Convert all macro expressions (macro variables and macro applications)
 -- | with their corresponding values
 convertMacro :: Translator Error CST.Expression AST.Expression
+convertMacro f (CST.EMacroFunction name args expr) = do
+  let args' = map (\(Annotation n _ _) -> n.identifier) args
+  f expr `with` \body -> do
+    modifyIORef' macroState $ \st ->
+      st {macroFunctions = Map.insert name (args', body) $ macroFunctions st}
+    return $ Right Empty
 convertMacro f (CST.EMacro name expr) =
   shouldBeAlone <$> f expr `with` \body -> do
     modifyIORef' macroState $ \st ->
       st {macroVariables = Map.insert name body $ macroVariables st}
-    return $ Right Empty
-convertMacro f (CST.EMacroFunction name args expr) =
-  f expr `with` \body -> do
-    modifyIORef' macroState $ \st ->
-      st {macroFunctions = Map.insert name (args, body) $ macroFunctions st}
     return $ Right Empty
 
 -- | Macro variable is just replaced by its macro corresponding

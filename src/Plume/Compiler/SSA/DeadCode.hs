@@ -65,6 +65,7 @@ instance Free DesugaredStatement where
   free (DSDeclaration n e) = free e S.\\ S.singleton n
   free (DSMutDeclaration n e) = free e S.\\ S.singleton n
   free (DSMutUpdate n e) = free e S.\\ free n
+  free (DSIf e1 e2 e3) = free e1 <> fst (freeStmtList e2) <> fst (freeStmtList e3)
 
 type BoundVariables = Set Text
 type DeclaredFunctions = Set Text
@@ -93,6 +94,11 @@ freeStmtList xs = go xs (S.empty, S.empty)
   go (DSMutUpdate n e : rest) s =
     let freeE = free e S.\\ free n
      in go rest (bimap (S.union freeE) (S.union (free n)) s)
+  go (DSIf e1 e2 e3 : rest) s =
+    let freeE = free e1
+        (freeE2, bound2) = freeStmtList e2
+        (freeE3, bound3) = freeStmtList e3
+     in go rest (bimap (S.union freeE) (S.union bound2) s <> (freeE2 <> freeE3, bound3))
   go [] s = s
 
 freeProgList :: [DesugaredProgram] -> FreeVariables
@@ -102,7 +108,7 @@ freeProgList xs = fst $ go xs (S.empty, S.empty)
     :: [DesugaredProgram]
     -> Variables
     -> Variables
-  go (DPFunction n args stmts : rest) s =
+  go (DPFunction n args stmts _ : rest) s =
     let (freeStmts, bound) = freeStmtList stmts
         freeE = freeStmts S.\\ (S.fromList args <> S.singleton n)
         bound' = S.insert n bound
@@ -124,7 +130,7 @@ freeProgList xs = fst $ go xs (S.empty, S.empty)
   go [] s = s
 
 instance Free DesugaredProgram where
-  free (DPFunction n args stmts) = free stmts S.\\ (S.fromList args <> S.singleton n)
+  free (DPFunction n args stmts _) = free stmts S.\\ (S.fromList args <> S.singleton n)
   free (DPStatement s) = free s
   free (DPNativeFunction {}) = S.empty
   free (DPDeclaration n e) = free e S.\\ S.singleton n
@@ -140,13 +146,13 @@ removeDeadCode
 removeDeadCode s d (DPDeclare n : rest) = do
   let rest' = removeDeadCode s (S.insert n d) rest
   DPDeclare n : rest'
-removeDeadCode s d (DPFunction n args stmts : rest) =
+removeDeadCode s d (DPFunction n args stmts async : rest) =
   let bound = S.fromList args <> S.singleton n
       rest' = removeDeadCode (S.insert n s) d rest
       freeVars = freeProgList rest'
       stmts' = removeDeadCodeStmt bound stmts
    in if n `S.member` freeVars || n `S.member` d
-        then DPFunction n args (removeNilReturn stmts') : rest'
+        then DPFunction n args (removeNilReturn stmts') async : rest'
         else rest'
 removeDeadCode s d (DPStatement stmt : rest) =
   let (_, b) = freeStmtList [stmt]
@@ -210,6 +216,11 @@ removeDeadCodeStmt s (DSMutUpdate n e : rest) =
   let e' = maybeToList $ removeDeadCodeExpr s e
       rest' = removeDeadCodeStmt (S.union (free n) s) rest
    in (DSMutUpdate n <$> e') <> rest'
+removeDeadCodeStmt s (DSIf e1 e2 e3 : rest) =
+  let rest' = removeDeadCodeStmt s rest
+      e2' = removeDeadCodeStmt s e2
+      e3' = removeDeadCodeStmt s e3
+   in [DSIf e1  e2' e3'] <> rest'
 removeDeadCodeStmt _ [] = []
 
 removeDeadCodeExpr :: BoundVariables -> DesugaredExpr -> Maybe DesugaredExpr

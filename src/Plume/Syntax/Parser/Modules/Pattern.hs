@@ -1,10 +1,10 @@
 module Plume.Syntax.Parser.Modules.Pattern where
 
 import Control.Monad.Parser
-import Plume.Syntax.Common.Pattern
 import Plume.Syntax.Parser.Lexer
 import Plume.Syntax.Parser.Modules.Literal hiding (parseLiteral)
 import Text.Megaparsec hiding (some)
+import Plume.Syntax.Concrete
 
 -- | Parse a pattern
 -- | A pattern is a value that is used to match against a value
@@ -25,7 +25,7 @@ parsePattern =
 -- | A variable pattern is a pattern that matches any value
 -- | The variable name is used to refer to the value in the pattern
 parseVariable :: Parser Pattern
-parseVariable = PVariable <$> identifier
+parseVariable = PVariable <$> identifier <*> pure Nothing
 
 -- | Parse a tuple pattern
 -- | A tuple pattern is a pattern that matches a tuple
@@ -42,9 +42,9 @@ parseTuple = do
   items <- parens (parsePattern `sepBy` comma)
   return $ buildTuple items
  where
-  buildTuple [] = PVariable "unit"
+  buildTuple [] = PVariable "unit" Nothing
   buildTuple [x] = x
-  buildTuple (x : xs) = PConstructor "tuple" [x, buildTuple xs]
+  buildTuple (x : xs) = PConstructor ("tuple", Nothing) [x, buildTuple xs]
 
 -- | Parse a literal pattern
 -- | A literal pattern is a pattern that matches a literal value
@@ -71,18 +71,18 @@ parseList =
     items <- (parseSlice <|> parsePattern) `sepBy` comma
     (items', slice) <- case reverse items of
       [] -> return ([], Nothing)
-      (p@(PSlice _) : rest)
+      (p@(PSlice _ _) : rest)
         | not (any isSlice rest) -> return (reverse rest, Just p)
       _ | not (any isSlice items) -> return (items, Nothing)
         | otherwise -> fail "invalid slice position"
-    return $ PList items' slice
+    return $ PList Nothing items' slice
   where
     isSlice :: Pattern -> Bool
-    isSlice (PSlice _) = True
+    isSlice (PSlice _ _) = True
     isSlice _ = False
 
     parseSlice :: Parser Pattern
-    parseSlice = PSlice <$> (symbol ".." *> identifier)
+    parseSlice = PSlice <$> (symbol ".." *> identifier) <*> pure Nothing
 
 
 -- | Parse a constructor pattern
@@ -96,11 +96,11 @@ parseConstructor = do
   name <- try $ identifier <* symbol "("
   args <- parsePattern `sepBy1` comma
   _ <- symbol ")"
-  return $ PConstructor name args
+  return $ PConstructor (name, Nothing) args
 
 -- | Parse a wildcard pattern
 -- | A wildcard pattern is a pattern that matches any value
 -- | It is used to ignore a value in a pattern
 -- | It can be seen as a variable that is not used
 parseWildcard :: Parser Pattern
-parseWildcard = PWildcard <$ symbol "?"
+parseWildcard = PWildcard Nothing <$ symbol "?"

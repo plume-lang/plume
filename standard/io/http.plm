@@ -1,5 +1,6 @@
 require "std:datatypes/result"
+require "async"
 
-native "std:native" ffi_fetch(url: str): Result<str, str>
+native "native" "std:native" fetch(url: str): Result<str, str>
 
-fn fetch(url: str): Result<str, str> => ffi_fetch(url)
+native "js" "std:native" fetch(url: str): Async<Result<str, str>>

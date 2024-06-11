@@ -49,11 +49,11 @@ unify (x : xs) = do
   pure $ s' <> s''
 
 getVarName :: Post.Expression -> Text
-getVarName (Post.EVariable n _) = n
+getVarName (Post.EVariable n _) = n.identifier
 getVarName _ = ""
 
 getVarType :: Post.Expression -> PlumeType
-getVarType (Post.EVariable _ t) = t
+getVarType (Post.EVariable _ (Identity t)) = t
 getVarType _ = error "getVarType: Not a variable"
 
 getAllElements :: Post.Expression -> [Post.Expression]
@@ -74,11 +74,11 @@ keepAssumpWithName (x@(n :>: _) : xs) names
   | otherwise = keepAssumpWithName xs names
 
 getMapNames :: [(PlumeQualifier, Post.Expression)] -> [Text]
-getMapNames ((IsIn _ _, Post.EVariable n _) : xs) = n : getMapNames xs
+getMapNames ((IsIn _ _, Post.EVariable n _) : xs) = n.identifier : getMapNames xs
 getMapNames (_ : xs) = getMapNames xs
 getMapNames [] = []
 
-isInstanceAlreadyDefined :: MonadChecker m => PlumeQualifier -> m (Maybe PlumeType)
+isInstanceAlreadyDefined :: MonadChecker m => PlumeQualifier -> m (Maybe [PlumeType])
 isInstanceAlreadyDefined p = do
   p' <- liftIO $ compressQual p
   MkExtendEnv instances <- gets (extendEnv . environment)
@@ -95,7 +95,7 @@ isInstanceAlreadyDefined p = do
 synthExt :: Infer -> Infer
 synthExt
   infer
-  (Pre.ETypeExtension generics (Annotation tcName [tcTy]) _ methods) = do
+  (Pre.ETypeExtension generics (Annotation tcName tcTy _) _ methods) = do
     -- Dealing with pre-types and building the qualified qualifiers
     -- for the typeclass instance (used to indicate the instance form and its
     -- superclasses)
@@ -104,18 +104,18 @@ synthExt
     let gens = removeQVars gens'
     let qvars = getQVars gens'
 
-    ty <- convert tcTy
-    let instH = IsIn ty tcName
+    ty <- mapM convert tcTy
+    let instH = IsIn ty tcName.identifier
     let pred' = gens :=>: instH
     
     -- Checking if the instance is already defined
     possibleInst <- isInstanceAlreadyDefined instH
     when (isJust possibleInst) $ case possibleInst of
-      Just ty' -> throw $ AlreadyDefinedInstance tcName ty'
+      Just ty' -> throw $ AlreadyDefinedInstance tcName.identifier ty'
       _ -> throw $ CompilerError "Instance already defined"
 
     -- Pre-generating an instance dictionary only based on types
-    cls@(MkClass _ _ meths) <- findClass tcName
+    cls@(MkClass _ _ meths) <- findClass tcName.identifier
     case cls of
       MkClass qs' quals methods' -> do
         case quals of 
@@ -146,7 +146,7 @@ synthExt
     let (_, m1, ass, _) = unzip4 res''
     m1' <- liftIO . mapM (firstM compressQual) . List.nub $ concat m1
     let ass' = concat ass
-    let args' = map (\(n :>: t') -> n :@: t') ass'
+    let args' = map (\(n :>: t') -> Cmm.fromText n :@: Identity t') ass'
     let tys'' = map (\(_ :>: t') -> t') ass'
 
     res' <- forM exprs $ \(ty', ps, h, name) -> do
@@ -175,8 +175,8 @@ synthExt
       let (_ps, m2, as, _) = unzip4 res'
       let ps' = concatMap removeQVars _ps
 
-      ps'' <- removeDuplicatesQuals ps'
-      let ty''@(_ :=>: t) = List.nub ps'' :=>: ty'
+      -- ps'' <- removeDuplicatesQuals ps'
+      let ty''@(_ :=>: t) = List.nub ps' :=>: ty'
 
       -- Compressing types in the generated map
       m' <- liftIO $ mapM (firstM compressQual) $ List.nub $ concat m2
@@ -200,7 +200,8 @@ synthExt
 
       -- Getting the duplicates assumptions in order to remove and resolve
       -- duplicatas.
-      sub' <- unify finalExprs'
+      let finalExprs'' = map (\(i, Identity t') -> (i.identifier, t')) finalExprs'
+      sub' <- unify finalExprs''
       let sub'' = Map.toList sub' <> sub <> remainingSub
 
       -- Running the expression reader because we're toplevel or there are 
@@ -218,12 +219,12 @@ synthExt
       unlessM (allIsSuperclass as''' scs) $ throw (UnresolvedTypeVariable as''')
 
       -- Generating new types and expressions based on assumptions
-      let args = map (\(n :>: t') -> n :@: t') as'''
+      let args = map (\(n :>: t') -> Cmm.fromText n :@: Identity t') as'''
       let tys' = map (\(_ :>: t') -> t') as'''
 
       cTy' <- liftIO $ compressPaths ty'
 
-      let clos = if null args then h'' else Post.EClosure args cTy' h'' pos
+      let clos = if null args then h'' else Post.EClosure args (Identity cTy') h'' False
       let closTy = if null args then t else tys' :->: t
 
       return ((Map.singleton name (Forall qvars ty''), closTy), Map.singleton name clos)
@@ -245,7 +246,12 @@ synthExt
             else Set.empty
     
     unless (Set.null missingMeths) $ 
-      throw $ MissingExtensionMethods tcName (Set.toList missingMeths)
+      throw $ MissingExtensionMethods tcName.identifier (Set.toList missingMeths)
+    
+    let unknown = filter (`Map.notMember` meths) meths'
+  
+    unless (null unknown) $ 
+      throw $ UnknownExtensionMethods tcName.identifier unknown
 
     -- Creating the new instance to insert it in the extend environment
     let inst = MkInstance qvars pred' dict dictFunTys
@@ -253,23 +259,22 @@ synthExt
     addClassInstance cls''
 
     -- Generating the instance dictionary by sorting the methods by name
-    ty' <- liftIO $ compressPaths ty
-    let name = tcName <> "_" <> createInstName ty'
+    ty' <- liftIO $ mapM compressPaths ty
+    let name = tcName.identifier <> "_" <> createInstNames ty'
     let methods' = Map.toList dict
     let methods'' = sortBy (\(a, _) (b, _) -> compare a b) methods'
 
     -- Creating the instance expression and adding eventual super-interfaces
     -- constraints
-    let tapp = TypeApp (TypeId tcName) [ty]
-    let funTy = if null args' then tapp else tys'' :->: ty
-    let instDict = Post.EInstanceDict tcName ty (map snd methods'')
+    let tapp = TypeApp (TypeId tcName.identifier) ty
+    let funTy = if null args' then tapp else tys'' :->: tapp
+    let instDict = Post.EInstanceDict tcName.identifier (Identity tapp) (map snd methods'')
 
-    pos <- fetchPosition
-    let dictE = if null args' then instDict else Post.EClosure args' ty instDict pos
+    let dictE = if null args' then instDict else Post.EClosure args' (Identity tapp) instDict False
 
     mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) generics
 
-    pure (TUnit, [], pure (Post.EDeclaration (Annotation name funTy) dictE Nothing))
+    pure (TUnit, [], pure (Post.EDeclaration [] (Annotation (Cmm.fromText name) (Identity funTy) False) dictE Nothing))
 synthExt _ _ = throw $ CompilerError "Only type extensions are supported"
 
 getExpr :: CST.Position -> [(PlumeQualifier, Post.Expression)] -> PlumeQualifier -> Post.Expression
@@ -283,8 +288,8 @@ getExpr pos xs p = do
 
 removeSuperclassAssumps :: MonadIO m => [Assumption PlumeType] -> [PlumeQualifier] -> m [Assumption PlumeType]
 removeSuperclassAssumps [] _ = pure []
-removeSuperclassAssumps (x@(_ :>: TypeApp (TypeId tcName) [ty]) : xs) scs = do
-  ty' <- liftIO $ compressPaths ty
+removeSuperclassAssumps (x@(_ :>: TypeApp (TypeId tcName) ty) : xs) scs = do
+  ty' <- liftIO $ mapM compressPaths ty
   let tcName' = toString tcName
   case tcName' of
     '@':tcName'' -> do
@@ -299,8 +304,8 @@ removeSuperclassAssumps (x : xs) scs = (x:) <$> removeSuperclassAssumps xs scs
 -- | Inference for extension members. Extension members are just regular
 -- | expressions or functions, except that they are part of a type extension,
 -- | so they might have super-constraints implied by the upper extension.
-extMemberToDeclaration :: (MonadChecker m) => Infer -> PlumeScheme -> Pre.ExtensionMem -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression, Text)
-extMemberToDeclaration infer sch (Pre.ExtDeclaration gens (Annotation name ty) c) = do
+extMemberToDeclaration :: (MonadChecker m) => Infer -> PlumeScheme -> Pre.ExtensionMember -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression, Text)
+extMemberToDeclaration infer sch (Pre.ExtDeclaration gens (Annotation name ty _) c) = do
   _ :: [PlumeQualifier] <- concatMapM convert gens
   ty' <- convert ty
 
@@ -311,7 +316,7 @@ extMemberToDeclaration infer sch (Pre.ExtDeclaration gens (Annotation name ty) c
   ty' `unifiesWith` bTy
 
   mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) gens
-  pure (bTy, ps', b, name)
+  pure (bTy, ps', b, name.identifier)
 
 -- | Checking if an interface is a included in a list of interfaces
 isSuperClass :: MonadIO m => PlumeQualifier -> [PlumeQualifier] -> m Bool
@@ -326,7 +331,7 @@ isSuperClass p ps = do
 
 allIsSuperclass :: MonadIO m => [Assumption PlumeType] -> [PlumeQualifier] -> m Bool
 allIsSuperclass [] _ = pure True
-allIsSuperclass (_ :>: TypeApp (TypeId tc) [ty] : xs) ps = do
+allIsSuperclass (_ :>: TypeApp (TypeId tc) ty : xs) ps = do
   let name = toString tc
   case name of
     '@':tcName -> do

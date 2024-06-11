@@ -9,9 +9,7 @@ import Plume.Syntax.Abstract qualified as AST
 import Plume.Syntax.Common qualified as Common
 import Plume.Syntax.Concrete qualified as CST
 import Plume.Syntax.Translation.ConcreteToAbstract.MacroResolver
-import Plume.Syntax.Translation.ConcreteToAbstract.Operations
 import Plume.Syntax.Translation.ConcreteToAbstract.Require
-import Plume.Syntax.Translation.ConcreteToAbstract.UFCS
 import Plume.Syntax.Translation.Generics
 import System.Directory
 import System.FilePath
@@ -20,8 +18,9 @@ import qualified Data.Text as T
 
 -- | The shared library extension for all platforms
 {-# INLINE sharedLibExt #-}
-sharedLibExt :: String
-sharedLibExt = "plmc"
+sharedLibExt :: Text -> String
+sharedLibExt "js" = "js"
+sharedLibExt _ = "plmc"
 
 {-# NOINLINE initialCWD #-}
 initialCWD :: IORef FilePath
@@ -37,20 +36,6 @@ interpretSpreadable (Spread [e]) = e
 interpretSpreadable (Spread es) = AST.EBlock es
 interpretSpreadable Empty = AST.EBlock []
 
--- | Spanning a property expression means to split the expression
--- | according to the UFCS rules that states:
--- | 
--- | x.property(arg) <=> property(x, arg)
--- | 
--- | So spanning such an expression results in obtaining the possibly
--- | nested property in a callee.
-spanProperty
-  :: CST.Expression 
-  -> Maybe CST.Expression
-spanProperty (CST.ELocated e _) = spanProperty e
-spanProperty (CST.EProperty e p) = Just (CST.EProperty e p)
-spanProperty _ = Nothing
-
 -- | Main translation from concrete syntax to abstract syntax
 -- | This transformation pass performs some syntactic sugar reductions
 -- | such as UFCS introduction, macro expansion, import resolving,
@@ -58,11 +43,7 @@ spanProperty _ = Nothing
 concreteToAbstract
   :: CST.Expression
   -> TranslatorReader Error AST.Expression
-concreteToAbstract (CST.EVariable n) = transRet . Right $ AST.EVariable n
 concreteToAbstract (CST.ELiteral l) = transRet . Right $ AST.ELiteral l
-concreteToAbstract e@(CST.EBinary {}) = convertOperation concreteToAbstract e
-concreteToAbstract e@(CST.EPrefix {}) = convertOperation concreteToAbstract e
-concreteToAbstract e@(CST.EPostfix {}) = convertOperation concreteToAbstract e
 concreteToAbstract m@(CST.EMacro {}) =
   convertMacro concreteToAbstract m
 concreteToAbstract m@(CST.EMacroFunction {}) =
@@ -71,20 +52,24 @@ concreteToAbstract m@(CST.EMacroVariable _) =
   convertMacro concreteToAbstract m
 concreteToAbstract m@(CST.EMacroApplication {}) =
   convertMacro concreteToAbstract m
-concreteToAbstract (CST.EApplication e args)
-  | Just e' <- spanProperty e = do
-      convertUFCS concreteToAbstract (CST.EApplication e' args)
-  | otherwise = do
-      e' <- shouldBeAlone <$> concreteToAbstract e
-      es' <- fmap flat . sequence <$> mapM concreteToAbstract args
-      transRet $ AST.EApplication <$> e' <*> es'
-concreteToAbstract (CST.EDeclaration g isMut ann e me) = do
+concreteToAbstract (CST.EVariable n t) = transRet . Right $ AST.EVariable n t
+concreteToAbstract (CST.EApplication (CST.EProperty p e) args) = do
+  e' <- shouldBeAlone <$> concreteToAbstract e
+  args' <- fmap flat . sequence <$> mapM concreteToAbstract args
+  let args'' = (:) <$> e' <*> args'
+
+  transRet $ AST.EApplication (CST.EVariable (Common.fromText p) Nothing) <$> args''
+concreteToAbstract (CST.EApplication e args) = do
+  e' <- shouldBeAlone <$> concreteToAbstract e
+  es' <- fmap flat . sequence <$> mapM concreteToAbstract args
+  transRet $ AST.EApplication <$> e' <*> es'
+concreteToAbstract (CST.EDeclaration g ann e me) = do
   ann' <- mapM (mapM transformType) ann
   -- Declaration and body value cannot be spread elements, so we need to
   -- check if they are alone and unwrap them if they are.
   e' <- shouldBeAlone <$> concreteToAbstract e
   me' <- mapM shouldBeAlone <$> maybeM concreteToAbstract me
-  transRet $ AST.EDeclaration isMut g ann' <$> e' <*> me'
+  transRet $ AST.EDeclaration g ann' <$> e' <*> me'
 concreteToAbstract (CST.EUnMut e) = do
   -- Unmut can be a spread element, so we need to check if it is and
   -- then combine the expressions into a single expression by wrapping
@@ -100,20 +85,17 @@ concreteToAbstract (CST.EConditionBranch e1 e2 e3) = do
   -- into a block.
   e2' <- fmap interpretSpreadable <$> concreteToAbstract e2
   e3' <-
-    fmap (fmap interpretSpreadable) . sequence <$> maybeM concreteToAbstract e3
+    fmap interpretSpreadable <$> concreteToAbstract e3
   transRet $ AST.EConditionBranch <$> e1' <*> e2' <*> e3'
-concreteToAbstract (CST.EClosure anns t e) = do
-  anns' <- mapM (mapM (\(t', b) -> do
-    case t' of
-      Just t'' -> do
-        t''' <- transformType t''
-        return (Just t''', b)
-      Nothing -> return (Nothing, b)
-    )) anns
+concreteToAbstract (CST.EClosure anns t e isA) = do
+  anns' <- mapM (\(Common.Annotation name ty mut) -> do
+    ty' <- mapM transformType ty
+    return $ Common.Annotation name ty' mut
+    ) anns
   t' <- mapM transformType t
   -- Same method as described for condition branches
   e' <- fmap interpretSpreadable <$> concreteToAbstract e
-  transRet $ AST.EClosure anns' t' <$> e'
+  transRet $ AST.EClosure anns' t' <$> e' <*> pure isA
 concreteToAbstract (CST.EBlock es) = do
   -- Blocks can be composed of spread elements, so we need to flatten
   -- the list of expressions into a single expression.
@@ -150,25 +132,18 @@ concreteToAbstract (CST.ESwitch e ps) = do
         (\(p, body) -> (p,) . fmap interpretSpreadable <$> concreteToAbstract body)
         ps
   transRet $ AST.ESwitch <$> e' <*> ps'
-concreteToAbstract (CST.EProperty i e) = do
-  e' <- shouldBeAlone <$> concreteToAbstract e
-  transRet $ AST.EApplication (AST.EVariable i) . (: []) <$> e'
 concreteToAbstract (CST.EReturn e) = do
   -- Return can be a spread element, so we need to check if it is and
   -- then combine the expressions into a single expression by wrapping
   -- them into a block.
   e' <- fmap interpretSpreadable <$> concreteToAbstract e
   transRet $ AST.EReturn <$> e'
-concreteToAbstract (CST.EListIndex e i) = do
-  e' <- shouldBeAlone <$> concreteToAbstract e
-  i' <- shouldBeAlone <$> concreteToAbstract i
-  transRet $ AST.EApplication (AST.EVariable "get_index") <$> sequence [e', i']
 concreteToAbstract (CST.ETypeExtension g ann var ems) = do
   ann' <- mapM (mapM transformType) ann
   ems' <-
     fmap flat . sequence <$> mapM concreteToAbstractExtensionMember ems
   transRet $ AST.ETypeExtension g ann' var <$> ems'
-concreteToAbstract (CST.ENativeFunction fp n gens t) = do
+concreteToAbstract (CST.ENativeFunction fp n gens t libTy _) = do
   t' <- transformType t
   dir <- asks fst
   initialDir <- liftIO $ readIORef initialCWD
@@ -178,9 +153,9 @@ concreteToAbstract (CST.ENativeFunction fp n gens t) = do
   -- Native function resolution is kind the same as require resolution
   -- except we do not parse everything. But we need to resolve the path 
   -- absolutely to make it work everywhere on the system.
-  let strModName = fromString $ toString fp -<.> sharedLibExt
-  let (isStd, path) = if "std:" `T.isPrefixOf` fp then (True, T.drop 4 strModName) else (False, fromString $ basePath </> toString fp -<.> sharedLibExt)
-  transRet . Right $ AST.ENativeFunction path n gens t' isStd
+  let strModName = fromString $ toString fp -<.> sharedLibExt libTy
+  let (isStd, path) = if "std:" `T.isPrefixOf` fp then (True, T.drop 4 strModName) else (False, fromString $ basePath </> toString fp -<.> sharedLibExt libTy)
+  transRet . Right $ AST.ENativeFunction path n gens t' libTy isStd
 concreteToAbstract (CST.EList es) = do
   -- Lists can be composed of spread elements, so we need to flatten
   -- the list of expressions into a single expression.
@@ -195,15 +170,20 @@ concreteToAbstract (CST.EInterface ann gs ms) = do
   ms' <- mapM (mapM transformSch) ms
   bireturn . Single $ AST.EInterface ann' gs ms'
 concreteToAbstract (CST.ETypeAlias ann t) = do
-  let gens = map Common.getGenericName ann.annotationValue
+  let gens = ann.annotationValue
+  let name = ann.annotationName.identifier
   t' <- liftIO $ transformType t
   
-  modifyIORef' typeAliases (Map.insert ann.annotationName (gens, t'))
+  modifyIORef' typeAliases (Map.insert name (gens, t'))
 
   bireturn Empty
 concreteToAbstract (CST.EVariableDeclare gens n t) = do
   t' <- mapM transformType t
   bireturn . Single $ AST.EVariableDeclare gens n t'
+concreteToAbstract (CST.EAwait e) = do
+  e' <- shouldBeAlone <$> concreteToAbstract e
+  transRet $ AST.EApplication (AST.EVariable "wait" Nothing) . (: []) <$> e'
+concreteToAbstract _ = throwError' (CompilerError "Unsupported expression")
 
 transformSch :: MonadIO m => Common.PlumeScheme -> m Common.PlumeScheme
 transformSch (Common.MkScheme gens t) = do
@@ -250,8 +230,8 @@ substituteType (Common.TId n) subs =
 
 -- | Translate a concrete extension member to an abstract extension member
 concreteToAbstractExtensionMember
-  :: CST.ExtensionMember Common.PlumeType
-  -> TranslatorReader Error (AST.ExtensionMember Common.PlumeType)
+  :: CST.ExtensionMember
+  -> TranslatorReader Error AST.ExtensionMember
 concreteToAbstractExtensionMember (CST.ExtDeclaration g ann e) = do
   ann' <- mapM (mapM transformType) ann
   e' <- shouldBeAlone <$> concreteToAbstract e
