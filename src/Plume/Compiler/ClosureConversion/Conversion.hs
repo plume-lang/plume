@@ -122,8 +122,6 @@ closeClosure args e isAsync = do
           [] -> substBody
           _ -> Post.CSExpr (Post.CEBlock (envDecl <> [substBody]))
 
-  -- print (args, env)
-
   let lambdaDict =
         Post.CEDictionary $
           fromList [("0", envDict), ("1", Post.CEVar name)]
