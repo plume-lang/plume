@@ -85,3 +85,10 @@ extend monadic<Option> {
 
   fn pure<A>(a: A): Option<A> => Some(a)
 }
+
+fn simplify_option<T>(x: Option<Option<T>>): Option<T> {
+  return switch x {
+    case Some(Some(a)) => Some(a)
+    case ? => None
+  }
+}
