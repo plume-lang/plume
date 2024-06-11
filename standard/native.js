@@ -114,8 +114,6 @@ module.exports = {
   eq_float: (a, b) => a === b,
   lt_float: (a, b) => a < b,
 
-  list_append: (l, e) => l.concat(e),
-  list_prepend: (l, e) => [e].concat(l),
   list_concat: (a, b) => a.concat(b),
   ffi_get_index(l, i) {
     if (i < 0 || i >= l.length) {
