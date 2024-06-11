@@ -4,6 +4,7 @@ import os.path
 from glob import glob
 import platform
 from sys import argv
+import pathlib
 
 is_root = argv[1] == '--root' if len(argv) > 1 else False
 
@@ -34,6 +35,9 @@ if not os.path.isdir('bin'): os.mkdir('bin')
 system(f"cp {executable} bin/{executable_out}")
 
 # Testing the compiler
+
+dir = pathlib.Path(__file__).parent.parent.resolve() / "standard"
+os.environ['PLUME_PATH'] = str(dir)
 
 system('bin/plumec example/closure.plm')
 system('node example/closure.js')
