@@ -9,9 +9,7 @@ import Data.Either
 import Data.Text.IO hiding (putStr)
 import Plume.Compiler.ClosureConversion.Conversion
 import Plume.Compiler.Desugaring.Desugar
-import Plume.Compiler.SSA
 import Plume.Compiler.TypeErasure.EraseType
-import Plume.Syntax.Abstract.Internal.Pretty ()
 import Plume.Syntax.Parser.Modules.ParseImports
 import Plume.Syntax.Translation.ConcreteToAbstract
 import Plume.Compiler.Javascript.Translate
@@ -78,25 +76,14 @@ main = setEncoding $ do
         let ast' = concatMap (removeUselessBlocks False) ast
         ppBuilding "Typechecking..."
         runSynthesize ast' `with` \tlir -> do
-          -- ppPrint tlir
           ppBuilding "Compiling and optimizing..."
           erased <- erase tlir
           runClosureConversion erased `with` \closed -> do
             desugared <- desugar closed
 
-            let ssa  = runSSA desugared
-                js   = runTranslateJS ssa
+            let js   = runTranslateJS desugared
                 code = createMainJSApp js
-                
+
             writeFileText (replaceExtension file ".js") code
             ppSuccess ("Bytecode written to " <> fromString (replaceExtension file ".js"))
     Nothing -> ppFailure "No input file provided"
-
--- printBytecode :: [Instruction] -> IO ()
--- printBytecode bytecode =
---   mapM_
---     ( \(i, instr) -> do
---         putStr (show i <> ": ")
---         print instr
---     )
---     (zip [0 :: Int ..] bytecode)

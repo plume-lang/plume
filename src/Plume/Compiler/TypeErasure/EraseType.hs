@@ -9,9 +9,6 @@ import Plume.Compiler.TypeErasure.Syntax qualified as Post
 import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Concrete (Position)
 import Plume.Syntax.Common.Literal
-import Plume.Syntax.Concrete.Expression qualified as Pre (TypeConstructor (..))
-import Plume.TypeChecker.Constraints.Solver (isNotTVar)
-import Plume.TypeChecker.Constraints.Unification (doesUnifyWith)
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.TLIR qualified as Pre
 import Control.Monad.Exception (compilerError)
@@ -57,25 +54,27 @@ insertReturnStmt e = Pre.EBlock [Pre.EReturn e]
 
 isNotDecl :: Pre.Expression -> Bool
 isNotDecl (Pre.EDeclaration {}) = False
-isNotDecl (Pre.EMutDeclaration {}) = False
 isNotDecl (Pre.EMutUpdate {}) = False
 isNotDecl _ = True
 
-eraseType :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]
-eraseType (Pre.EDeclaration (Annotation name _) (Pre.EClosure args _ body isA) Nothing : xs) = do
-  let args' = map (\(Annotation n _) -> n) args
-  let b = insertReturnStmt body
-  b' <- eraseStatement b
-  let fun = Post.UPFunction name args' b' isA
+arity :: Identity PlumeType -> Int
+arity (Identity (a :->: _)) = length a
+arity _ = -1
+
+eraseType :: [Pre.TypedExpression] -> IO [Post.UntypedProgram]
+eraseType (Pre.EDeclaration _ (Annotation name _ _) (Pre.EClosure args _ body isAsync) Nothing : xs) = do
+  let args' = map (\(Annotation n _ _) -> n.identifier) args
+  b' <- eraseStatement body
+  let fun = Post.UPFunction name.identifier args' b' isAsync
   modifyIORef' program (<> [fun])
   eraseType xs
-eraseType (Pre.EVariableDeclare name arity : xs) = do
-  modifyIORef' program (<> [Post.UPDeclare name arity])
+eraseType (Pre.EVariableDeclare _ name t : xs) = do
+  modifyIORef' program (<> [Post.UPDeclare name (arity t)])
   eraseType xs
-eraseType (Pre.ENativeFunction fp n (args :->: _) st : xs) = do
+eraseType (Pre.ENativeFunction fp n _ (args :->: _) _ isStd : xs) = do
   modifyIORef'
     program
-    (<> [Post.UPNativeFunction fp n (length args) st])
+    (<> [Post.UPNativeFunction fp n (length args) isStd])
   eraseType xs
 eraseType (Pre.EType tyName ts : xs) = do
   tys <- mapM createFunction ts
@@ -91,7 +90,7 @@ eraseType (Pre.EType tyName ts : xs) = do
             , const $
                 Post.UEList
                   [ Post.UESpecial
-                  , Post.UELiteral (LString tyName)
+                  , Post.UELiteral (LString tyName.annotationName.identifier)
                   , Post.UELiteral (LString n)
                   ]
             )
@@ -100,7 +99,7 @@ eraseType (Pre.EType tyName ts : xs) = do
             , \vars ->
                 Post.UEList
                   ( [ Post.UESpecial
-                    , Post.UELiteral (LString tyName)
+                    , Post.UELiteral (LString tyName.annotationName.identifier)
                     , Post.UELiteral (LString n)
                     ]
                       <> map Post.UEVar vars
@@ -117,19 +116,19 @@ eraseType (Pre.EType tyName ts : xs) = do
      where
       args = map createVariant [0 .. length vars - 1]
     Nothing -> compilerError "Type constructor not found"
-eraseType (Pre.EDeclaration (Annotation name _) e Nothing : xs) = do
+eraseType (Pre.EDeclaration _ (Annotation name _ True) e Nothing : xs) = do
   e' <- eraseExpr e
-  modifyIORef' program (<> [Post.UPDeclaration name e'])
+  modifyIORef' program (<> [Post.UPMutDeclaration name.identifier e'])
   eraseType xs
-eraseType (Pre.EMutDeclaration (Annotation name _) e Nothing : xs) = do
+eraseType (Pre.EDeclaration _ (Annotation name _ _) e Nothing : xs) = do
   e' <- eraseExpr e
-  modifyIORef' program (<> [Post.UPMutDeclaration name e'])
+  modifyIORef' program (<> [Post.UPDeclaration name.identifier e'])
   eraseType xs
-eraseType (Pre.EMutUpdate (Annotation name _) e Nothing : xs) = do
+eraseType (Pre.EMutUpdate (Annotation name _ _) e Nothing : xs) = do
   e' <- eraseExpr e
-  modifyIORef' program (<> [Post.UPMutUpdate name e'])
+  modifyIORef' program (<> [Post.UPMutUpdate name.identifier e'])
   eraseType xs
-eraseType (Pre.EEmpty : xs) = eraseType xs
+-- eraseType (Pre.EEmpty : xs) = eraseType xs
 eraseType (x : xs) = do
   x' <- eraseStatement x
   modifyIORef' program (<> [Post.UPStatement x'])
@@ -137,110 +136,89 @@ eraseType (x : xs) = do
   return (Post.UPStatement x' : ys)
 eraseType [] = return []
 
-eraseStatement :: Pre.TypedExpression PlumeType -> IO Post.UntypedStatement
+eraseStatement :: Pre.TypedExpression -> IO Post.UntypedStatement
 eraseStatement (Pre.EReturn e) =
   transformReturnE . Post.USReturn <$> eraseExpr e
-eraseStatement (Pre.EDeclaration (Annotation n _) e Nothing) = Post.USDeclaration n <$> eraseExpr e
-eraseStatement (Pre.EMutDeclaration (Annotation n _) e1 Nothing) =
-  Post.USMutDeclaration n <$> eraseExpr e1
-eraseStatement (Pre.EMutUpdate (Annotation n _) e1 Nothing) =
-  Post.USMutUpdate n <$> eraseExpr e1
+eraseStatement (Pre.EDeclaration _ (Annotation n _ True) e1 Nothing) =
+  Post.USMutDeclaration n.identifier <$> eraseExpr e1
+eraseStatement (Pre.EDeclaration _ (Annotation n _ _) e Nothing) = Post.USDeclaration n.identifier <$> eraseExpr e
+eraseStatement (Pre.EMutUpdate (Annotation n _ _) e1 Nothing) =
+  Post.USMutUpdate n.identifier <$> eraseExpr e1
 eraseStatement (Pre.EConditionBranch e1 e2 e3) = do
-  e3' <- maybeM e3 eraseStatement
-  case e3' of
-    Just e3'' -> Post.USConditionBranch <$> eraseExpr e1 <*> eraseStatement e2 <*> pure e3''
-    Nothing -> compilerError "Condition branch without a body"
+  Post.USConditionBranch 
+    <$> eraseExpr e1
+    <*> eraseStatement e2
+    <*> eraseStatement e3
 eraseStatement e = Post.USExpr <$> eraseExpr e
 
-eraseExpr :: Pre.TypedExpression PlumeType -> IO Post.UntypedExpr
-eraseExpr (Pre.EMutDeclaration (Annotation n _) e1 e2) = do
+eraseExpr :: Pre.TypedExpression -> IO Post.UntypedExpr
+eraseExpr (Pre.EDeclaration _ (Annotation n _ True) e1 e2) = do
   e1' <- eraseExpr e1
   e2' <- maybeM e2 eraseExpr
   case e2' of
-    Just e2'' -> return $ Post.UEMutDeclaration n e1' e2''
+    Just e2'' -> return $ Post.UEMutDeclaration n.identifier e1' e2''
     Nothing -> compilerError "Mut declaration without a body"
-eraseExpr (Pre.EMutUpdate (Annotation n _) e1 e2) = do
+eraseExpr (Pre.EMutUpdate (Annotation n _ _) e1 e2) = do
   e1' <- eraseExpr e1
   e2' <- maybeM e2 eraseExpr
   case e2' of
-    Just e2'' -> return $ Post.UEMutUpdate n e1' e2''
+    Just e2'' -> return $ Post.UEMutUpdate n.identifier e1' e2''
     Nothing -> compilerError "Mut update without a body"
-eraseExpr (Pre.EVariable x _) = pure $ Post.UEVar x
+eraseExpr (Pre.EVariable x _) = pure $ Post.UEVar x.identifier
 eraseExpr (Pre.EApplication f args) =
   Post.UEApplication <$> eraseExpr f <*> mapM eraseExpr args
 eraseExpr (Pre.ELiteral l) = pure $ Post.UELiteral l
 eraseExpr (Pre.EUnMut e) = Post.UEUnMut <$> eraseExpr e
 eraseExpr (Pre.EList es) = Post.UEList <$> mapM eraseExpr es
-eraseExpr (Pre.EDeclaration (Annotation n _) e1 e2) = case e2 of
-  Just e2' -> Post.UEDeclaration n <$> eraseExpr e1 <*> eraseExpr e2'
+eraseExpr (Pre.EDeclaration _ (Annotation n _ _) e1 e2) = case e2 of
+  Just e2' -> Post.UEDeclaration n.identifier <$> eraseExpr e1 <*> eraseExpr e2'
   Nothing -> compilerError "Declaration without a body"
-eraseExpr (Pre.EConditionBranch e1 e2 e3) = case e3 of
-  Just e3' ->
-    Post.UEConditionBranch
-      <$> eraseExpr e1
-      <*> eraseExpr e2
-      <*> eraseExpr e3'
-  Nothing -> compilerError "Condition branch without a body"
+eraseExpr (Pre.EConditionBranch e1 e2 e3) = 
+  Post.UEConditionBranch
+    <$> eraseExpr e1
+    <*> eraseExpr e2
+    <*> eraseExpr e3
 eraseExpr (Pre.ESwitch e cases) = do
   e' <- eraseExpr e
   cases' <- mapM (bimapM erasePattern eraseExpr) cases
   return $ Post.UESwitch e' cases'
 eraseExpr (Pre.EBlock es) = Post.UEBlock <$> mapM eraseStatement es
-eraseExpr (Pre.EClosure args _ body isA) = do
+eraseExpr (Pre.EClosure args _ body isAsync) = do
   let b' = insertReturnStmt body
   b <- eraseExpr b'
   return $
     Post.UEClosure
-      (map (\(Annotation n _) -> n) args)
+      (map (\(Annotation n _ _) -> n.identifier) args)
       (Post.USExpr b)
-      isA
-eraseExpr (Pre.EExtVariable x fun t) = do
-  let err = compilerError $
-          "Invalid function type for extension variable: "
-            <> x
-            <> " with type"
-            <> show fun
-  case t of
-    TypeVar _ -> case fun of
-      (t' : _) :->: _ -> do
-        b <- isNotTVar t'
-        if b then Post.UEVar <$> getName t' else err
-      _ -> err
-    _ -> Post.UEVar <$> getName t
- where
-  getName :: PlumeType -> IO Text
-  getName ty = do
-    m <- readIORef dispatched
-    findWithKeyM (\(t', n) -> (n == x &&) <$> ty `doesUnifyWith` t') m >>= \case
-      Just (_, n) -> return n
-      Nothing -> compilerError $ "Extension not found: " <> show x <> " for type " <> show ty
+      isAsync
 eraseExpr (Pre.EEqualsType e t) = Post.UEEqualsType <$> eraseExpr e <*> pure t
 eraseExpr (Pre.ENativeFunction {}) = compilerError "Native functions aren't expressions"
 eraseExpr (Pre.EAnd e1 e2) = Post.UEAnd <$> eraseExpr e1 <*> eraseExpr e2
 eraseExpr (Pre.EIndex e i) = Post.UEIndex <$> eraseExpr e <*> eraseExpr i
 eraseExpr (Pre.EReturn e) = eraseExpr e
 eraseExpr (Pre.EType {}) = compilerError "Type isn't an expression"
-eraseExpr (Pre.EInstanceVariable name _) = pure $ Post.UEVar name
+eraseExpr (Pre.EInstanceVariable name _) = pure $ Post.UEVar name.identifier
 eraseExpr (Pre.EInstanceAccess expr i) = do
   expr' <- eraseExpr expr
   pure (Post.UEIndex expr' (Post.UELiteral (LInt (toInteger i))))
-eraseExpr Pre.EEmpty = error "Should not encounter empty expressions"
+-- eraseExpr Pre.EEmpty = error "Should not encounter empty expressions"
 eraseExpr (Pre.ESpreadable _) = error "Should not encounter spreadable expressions"
 eraseExpr (Pre.EInstanceDict _ _ exprs) = do
   exprs' <- mapM eraseExpr exprs
   return (Post.UEList exprs')
-eraseExpr (Pre.EVariableDeclare _ _) = error "Should not encounter variable declarations"
+eraseExpr _ = compilerError "Unknown expression"
 
-erasePattern :: Pre.TypedPattern PlumeType -> IO Post.UntypedPattern
+erasePattern :: Pre.Pattern -> IO Post.UntypedPattern
 erasePattern (Pre.PVariable x _) = pure $ Post.UPVariable x
 erasePattern (Pre.PLiteral l) = pure $ Post.UPLiteral l
-erasePattern (Pre.PConstructor n _ ps) = Post.UPConstructor n <$> mapM erasePattern ps
+erasePattern (Pre.PConstructor (n, _) ps) = Post.UPConstructor n <$> mapM erasePattern ps
 erasePattern (Pre.PWildcard _) = pure Post.UPWildcard
 erasePattern (Pre.PSpecialVar x _) = pure $ Post.UPSpecialVariable x
 erasePattern (Pre.PList _ ps t) =
   Post.UPList <$> mapM erasePattern ps <*> maybeM t erasePattern
+erasePattern _ = compilerError "Unknown pattern"
 
-erase :: [Pre.TypedExpression PlumeType] -> IO [Post.UntypedProgram]
+erase :: [Pre.TypedExpression] -> IO [Post.UntypedProgram]
 erase xs = do
   writeIORef program []
   void $ eraseType xs

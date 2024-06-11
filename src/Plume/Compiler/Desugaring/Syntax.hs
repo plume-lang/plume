@@ -3,7 +3,7 @@ module Plume.Compiler.Desugaring.Syntax where
 import Plume.Compiler.ClosureConversion.Free
 import Plume.Compiler.ClosureConversion.Syntax (Update(..))
 import Plume.Syntax.Common.Literal
-import Plume.Syntax.Abstract.Expression (IsStandard)
+import Plume.Syntax.Abstract (IsStandard)
 import GHC.Show
 import Prelude hiding (show)
 import Data.IntMap qualified as IntMap
@@ -35,6 +35,7 @@ data DesugaredStatement
   | DSDeclaration Text DesugaredExpr
   | DSMutDeclaration Text DesugaredExpr
   | DSMutUpdate Update DesugaredExpr
+  | DSIf DesugaredExpr [DesugaredStatement] [DesugaredStatement]
   deriving (Eq, Ord)
 
 type LibraryPath = Text
@@ -81,6 +82,10 @@ instance Show DesugaredStatement where
   show (DSDeclaration n e) = "let " <> toString n <> " = " <> show e
   show (DSMutDeclaration n e) = "mut " <> toString n <> " = " <> show e
   show (DSMutUpdate n e) = show n <> " = " <> show e
+  show (DSIf e1 e2 e3) =
+    "sif (" <> show e1 <> ") then " <> intercalate ", " (map show e2)
+      <> " else "
+      <> intercalate ", " (map show e3)
 
 instance Show DesugaredProgram where
   show (DPFunction name args body _) =
@@ -103,6 +108,8 @@ instance Substitutable DesugaredStatement DesugaredExpr where
     | otherwise = DSDeclaration n (substitute (name, expr) e)
   substitute s (DSMutDeclaration n e) = DSMutDeclaration n $ substitute s e
   substitute s (DSMutUpdate n e) = DSMutUpdate n $ substitute s e
+  substitute s (DSIf e1 e2 e3) =
+    DSIf (substitute s e1) (map (substitute s) e2) (map (substitute s) e3)
 
 instance Substitutable DesugaredExpr DesugaredExpr where
   substitute s (DEVar x)

@@ -54,7 +54,6 @@ import Plume.TypeChecker.Monad.Error as Monad
 import Plume.TypeChecker.Monad.State as Monad
 import Plume.TypeChecker.Monad.Type as Monad
 import Plume.TypeChecker.TLIR qualified as Typed
-import Plume.TypeChecker.TLIR.Internal.Pretty (prettyToString, prettyTy)
 import System.IO.Pretty (ppFailure, printErrorFromString)
 import Prelude hiding (get, gets, local, modify, put)
 
@@ -88,7 +87,8 @@ local f action = do
   old <- get
   put (f old)
   a <- action
-  put old
+  new <- get
+  modify $ \s -> s { isAsynchronous = isAsynchronous new}
   pure a
 
 -- | Throwing an error onto the error stack if a position is
@@ -328,10 +328,10 @@ instantiateWithSub s (Forall qvars (gens :=>: ty)) = do
     goMany subst [] = pure ([], subst)
 
     goGens :: (MonadChecker m) => Substitution -> [PlumeQualifier] -> m ([PlumeQualifier], Substitution)
-    goGens subst (IsIn name t : xs) = do
-      (name', subst') <- go subst name
+    goGens subst (IsIn t name : xs) = do
+      (t', subst') <- goMany subst t
       (xs', subst'') <- goGens subst' xs
-      pure (IsIn name' t : xs', subst'')
+      pure (IsIn t' name : xs', subst'')
     goGens subst (_ : xs) = goGens subst xs
     goGens subst [] = pure ([], subst)
 
@@ -413,17 +413,14 @@ removeLink (TypeApp t ts) = do
   pure $ TypeApp t' ts'
 removeLink t = pure t
 
-showTy :: PlumeType -> String
-showTy = prettyToString . prettyTy
-
 interpretError :: PlumeError -> IO ()
 interpretError (p, UnificationFail t1 t2) =
   printErrorFromString
     mempty
     ( "Expected type "
-        <> prettyToString (prettyTy t1)
+        <> show t1
         <> " but received type "
-        <> prettyToString (prettyTy t2),
+        <> show t2,
       Nothing,
       p
     )
@@ -440,7 +437,7 @@ interpretError (p, InfiniteType i t) =
     )
     "while performing typechecking"
   where
-    pp = prettyToString (prettyTy t)
+    pp = show t
 interpretError (p, UnificationMismatch t t1' t2') =
   printErrorFromString
     mempty
@@ -451,7 +448,7 @@ interpretError (p, UnificationMismatch t t1' t2') =
     "while performing typechecking"
   where
     getMissingError ts1 ts2
-      | null ts1 = "Type " <> showTy t <> " has no arguments, but should have" <> show (length ts2) <> " arguments"
+      | null ts1 = "Type " <> show t <> " has no arguments, but should have" <> show (length ts2) <> " arguments"
       | length ts1 < length ts2 = "Expected more arguments, got " <> show (length ts1) <> " but expected " <> show (length ts2)
       | otherwise = "Expected less arguments, got " <> show (length ts1) <> " but expected " <> show (length ts2)
 interpretError (p, EmptyMatch) =
@@ -489,7 +486,7 @@ interpretError (p, DuplicateNative n s) =
 interpretError (p, NoReturnFound t) =
   printErrorFromString
     mempty
-    ( "No return found in the expression for type " <> showTy t,
+    ( "No return found in the expression for type " <> show t,
       Just "Every function must have a return in its body",
       p
     )
@@ -516,15 +513,21 @@ interpretError (p, UnresolvedTypeVariable as) =
     showAssumps (x : xs) = 
       showAssump x <> ", " <> showAssumps xs
 
-    showAssump (_ :>: TypeApp (TypeId tcName) [ty]) = 
-      toString (T.drop 1 tcName) <> " for " <> showTy ty
+    showAssump (_ :>: TypeApp (TypeId tcName) ty) = 
+      toString (T.drop 1 tcName) <> " for " <> showTys ty
     showAssump (_ :>: TypeId tcName) = 
       toString (T.drop 1 tcName)
     showAssump _ = error "Not a type application"
+
+    showTys :: [PlumeType] -> String
+    showTys [] = ""
+    showTys [x] = show x
+    showTys [x, y] = show x <> " and " <> show y
+    showTys (x : xs) = show x <> ", " <> showTys xs
 interpretError (p, AlreadyDefinedInstance n t) =
   printErrorFromString
     mempty
-    ( "Instance " <> toString n <> " already defined for " <> showTy t,
+    ( "Instance " <> toString n <> " already defined for " <> show t,
       Nothing,
       p
     )
@@ -549,6 +552,14 @@ interpretError (p, FunctionAlreadyExists n s) =
   printErrorFromString
     mempty
     ( "Function " <> toString n <> " already exists with type " <> show s,
+      Nothing,
+      p
+    )
+    "while performing typechecking"
+interpretError (p, UnknownExtensionMethods n ms) = 
+  printErrorFromString
+    mempty
+    ( "Unknown methods for " <> toString n <> ": " <> intercalate ", " (map toString ms),
       Nothing,
       p
     )

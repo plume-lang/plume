@@ -64,23 +64,23 @@ desugarANF t f (Pre.CEMutUpdate name expr body) = do
   return (Post.DEVar fresh, stmts)
 desugarANF (isNotTop, isReturned, _) f (Pre.CEConditionBranch e1 e2 e3) = do
   (e1', stmts1) <- f e1
-  r1@(e2', stmts2) <- f e2
-  r2@(e3', stmts3) <- f e3
+  r1@(_, stmts2) <- f e2
+  r2@(_, stmts3) <- f e3
 
   if (not (null stmts2) || not (null stmts3))
     && isNotTop
-    && not isReturned
     then do
       let br1 = createBr r1
       let br2 = createBr r2
+
       let br = Post.DSExpr $ Post.DEIf e1' br1 br2
       return (Post.DEVar "nil", stmts1 <> [br])
     else do
       return
-        ( Post.DEIf e1' (stmts2 <> [Post.DSExpr e2']) (stmts3 <> [Post.DSExpr e3'])
+        ( Post.DEIf e1' (createBr r1) (createBr r2)
         , stmts1
         )
  where
-  createBr (e, st) = st <> [Post.DSReturn e]
+  createBr (e, st) = st <> [(if isReturned then Post.DSReturn else Post.DSExpr) e]
 desugarANF _ _ _ =
   compilerError "Received incorrect expression, not an ANF convertible one"

@@ -115,10 +115,8 @@ closeClosure args e isAsync = do
   let substBody = substituteMany envProps e
 
   let body = case substBody of
-        Post.CSExpr (Post.CEBlock [Post.CSExpr ret]) ->
-          Post.CSExpr (Post.CEBlock (envDecl <> [Post.CSReturn ret]))
-        Post.CSExpr (Post.CEBlock es) ->
-          Post.CSExpr (Post.CEBlock (envDecl <> es))
+        Post.CSExpr (Post.CEBlock xs) ->
+          Post.CSExpr (Post.CEBlock (envDecl <> xs))
         Post.CSExpr ret -> Post.CSExpr (Post.CEBlock (envDecl <> [Post.CSReturn ret]))
         _ -> case envDecl of
           [] -> substBody
@@ -296,6 +294,7 @@ closeProgram (Pre.UPDeclare name arity) = do
   pure [Post.CPDeclare name]
 closeProgram (Pre.UPFunction name args e isAsync) = do
   modifyIORef' reserved (M.insert name (length args))
+  modifyIORef' locals (<> S.fromList args)
   (stmts, e') <- closeStatement e
   pure $ stmts ++ [Post.CPFunction name args e' isAsync]
 closeProgram (Pre.UPNativeFunction fp name arity st) = do

@@ -34,27 +34,18 @@ library
         Plume.Syntax.Parser.Modules.Type
         Plume.Syntax.Parser.Modules.Pattern
         Plume.Syntax.Parser.Modules.ParseImports
-
-        Plume.Syntax.Abstract
-        Plume.Syntax.Abstract.Expression
-        Plume.Syntax.Abstract.Internal.Pretty
         
         Plume.Syntax.Translation.Generics
         Plume.Syntax.Translation.ConcreteToAbstract
-        Plume.Syntax.Translation.ConcreteToAbstract.Operations
         Plume.Syntax.Translation.ConcreteToAbstract.Require
         Plume.Syntax.Translation.ConcreteToAbstract.MacroResolver
-        Plume.Syntax.Translation.ConcreteToAbstract.UFCS
         Plume.Syntax.Translation.Substitution
 
-        Plume.Syntax.Memory
         Plume.Syntax.Blocks
 
+        Plume.Syntax.Abstract
+
         Plume.TypeChecker.TLIR
-        Plume.TypeChecker.TLIR.Syntax
-        Plume.TypeChecker.TLIR.Synonyms
-        Plume.TypeChecker.TLIR.Modules.Pattern
-        Plume.TypeChecker.TLIR.Internal.Pretty
 
         Plume.TypeChecker.Monad
         Plume.TypeChecker.Monad.State
@@ -98,15 +89,6 @@ library
         Plume.Compiler.SSA
         Plume.Compiler.SSA.DeadCode
         Plume.Compiler.SSA.Bundler
-
-        Plume.Compiler.LLIR.Syntax
-        Plume.Compiler.LLIR.Assembler
-        Plume.Compiler.LLIR.Free
-
-        Plume.Compiler.Bytecode.Assembler
-        Plume.Compiler.Bytecode.Label
-        Plume.Compiler.Bytecode.Syntax
-        Plume.Compiler.Bytecode.Serialize
 
         Plume.Compiler.Javascript.Syntax
         Plume.Compiler.Javascript.Translate

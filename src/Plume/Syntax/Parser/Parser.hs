@@ -2,6 +2,7 @@ module Plume.Syntax.Parser.Parser where
 
 import Control.Monad.Combinators.Expr qualified as P
 import Control.Monad.Parser qualified as P
+import GHC.IO qualified as IO
 import Data.SortedList qualified as SL
 import Plume.Syntax.Common qualified as Cmm
 import Plume.Syntax.Concrete qualified as CST
@@ -15,8 +16,19 @@ import Text.Megaparsec qualified as P
 import Text.Megaparsec.Char qualified as P
 import Plume.Syntax.Common.Type qualified as Typ
 
-type Argument = Cmm.Annotation (Maybe Cmm.PlumeType, CST.IsMutable)
-type TypedArg = Cmm.Annotation (Cmm.PlumeType, CST.IsMutable)
+type Argument = Cmm.Annotation (Maybe Cmm.PlumeType)
+type TypedArg = Cmm.Annotation Cmm.PlumeType
+
+-- | Reference used to count the numbers of generated fn cases
+{-# NOINLINE fnCaseRef #-}
+fnCaseRef :: IORef Int
+fnCaseRef = IO.unsafePerformIO $ newIORef 0
+
+freshRef :: IO Text
+freshRef = do
+  i <- readIORef fnCaseRef
+  modifyIORef' fnCaseRef (+1)
+  return $ "fn_case_" <> show i
 
 -- SOME UTILITY FUNCTIONS
 
@@ -75,14 +87,14 @@ mutArg =
   P.option False (True <$ L.reserved "mut") >>= \mut -> do
     name <- L.identifier
     typ <- P.optional $ L.symbol ":" *> Typ.tType
-    return $ name Cmm.:@: (typ, mut)
+    return $ Cmm.Annotation (Cmm.fromText name) typ mut
 
 mutArg' :: P.Parser TypedArg
 mutArg' = do
   mut <- P.option False (True <$ L.reserved "mut")
   name <- L.identifier
   typ <- L.symbol ":" *> Typ.tType
-  return $ name Cmm.:@: (typ, mut)
+  return $ Cmm.Annotation (Cmm.fromText name) typ mut
 
 -- | Parses an annotated parser with a generic annotation
 -- | This is useful to parse generic annotations in declarations
@@ -94,7 +106,7 @@ annotated :: P.Parser a -> P.Parser (Cmm.Annotation (Maybe a))
 annotated p = do
   n <- L.lexeme $ L.nonLexedID <* P.lookAhead (P.optional $ L.symbol ":")
   a <- optional $ L.symbol ":" *> p
-  return $ n Cmm.:@: a
+  return $ Cmm.fromText n Cmm.:@: a
 
 -- | Parses a type annotation, useful to parse variable declarations.
 -- | It is a direct application of the `annotated` function with a type
@@ -106,7 +118,7 @@ typeAnnotTyped :: P.Parser (Cmm.Annotation Cmm.PlumeType)
 typeAnnotTyped = do
   n <- L.lexeme $ L.nonLexedID <* P.lookAhead (L.symbol ":")
   a <- L.symbol ":" *> Typ.tType
-  return $ n Cmm.:@: a
+  return $ Cmm.fromText n Cmm.:@: a
 
 -- | Parses a type annotation, but without optional type parsing 
 -- | This is useful to parse type extension's type
@@ -139,7 +151,7 @@ eBlock =
 -- |  - it should not be followed by a colon or an equal sign (avoid 
 -- |    declaration conflicts)
 eVariable :: P.Parser CST.Expression
-eVariable = CST.EVariable <$> L.lexeme (L.nonLexedID <* isNotDecl)
+eVariable = CST.EVariable . Cmm.fromText <$> L.lexeme (L.nonLexedID <* isNotDecl) <*> pure Nothing
   where 
     isNotDecl :: P.Parser ()
     isNotDecl = P.notFollowedBy (L.lexeme $ P.oneOf (":=" :: String))
@@ -158,11 +170,9 @@ eIf = do
   void $ L.reserved "if"
   cond <- parseExpression
   thenBlock <- eBlock
-  elseBlock <- P.optional $ do
-    void $ L.reserved "else"
-    eBlock
+  void $ L.reserved "else"
 
-  return $ CST.EConditionBranch cond thenBlock elseBlock
+  CST.EConditionBranch cond thenBlock <$> eBlock
 
 -- | Parses a switch expression
 -- | A switch expression is a conditional expression that may have multiple
@@ -225,15 +235,18 @@ eMacroExpr =
  where
   parseMacroVar :: P.Parser CST.Expression
   parseMacroVar = do
-    CST.EMacroVariable
-      <$> (P.char '@' *> L.identifier)
+    name <- P.char '@' *> L.identifier
+    return $ CST.EMacroVariable name
 
   parseMacroCall :: P.Parser CST.Expression
   parseMacroCall = do
     name <- P.try $ P.char '@' *> L.identifier <* L.symbol "("
     args <- parseExpression `P.sepBy` L.comma
     void $ L.symbol ")"
-    return $ CST.EMacroApplication name args
+
+    let var = CST.EMacroVariable name
+
+    return $ CST.EApplication var args
 
 -- | Parses a closure expression
 -- | A closure expression is a function-like expression that is not
@@ -257,7 +270,27 @@ eClosure = do
                 *> parseExpression
             )
 
-  return $ CST.EClosure args retTy body
+  return $ CST.EClosure args retTy body False
+
+-- | Parses a closure case expression
+-- | A closure case expression is a special kind of expression that is used
+-- | to create a match expression mixed with a closure expression.
+-- |
+-- | SYNTAX:
+-- |  - fn case pattern => expr
+eCaseClosure :: P.Parser CST.Expression
+eCaseClosure = do
+  void $ L.reserved "fn"
+  void $ L.reserved "case"
+
+  fnCaseArg <- Cmm.fromText <$> liftIO freshRef
+
+  pat <- Pat.parsePattern
+  expr <- L.symbol "=>" *> parseExpression <|> eBlock
+
+  let switch = CST.ESwitch (CST.EVariable fnCaseArg Nothing) [(pat, expr)]
+
+  return $ CST.EClosure [fnCaseArg Cmm.:@: Nothing] Nothing switch False
 
 -- | Parses a tuple expression
 -- | A tuple expression is a collection of expressions that are separated by
@@ -267,9 +300,9 @@ eClosure = do
 eTuple :: P.Parser CST.Expression
 eTuple = buildTuple <$> L.parens (parseExpression `P.sepBy1` L.comma)
  where
-  buildTuple [] = CST.EVariable "unit"
+  buildTuple [] = CST.EVariable "unit" Nothing
   buildTuple [x] = x
-  buildTuple (x : xs) = CST.EApplication (CST.EVariable "tuple") [x, buildTuple xs]
+  buildTuple (x : xs) = CST.EApplication (CST.EVariable "tuple" Nothing) [x, buildTuple xs]
 
 -- | Parses a term expression
 -- | A term expression is a simple expression that does not include any
@@ -283,6 +316,7 @@ parseTerm =
     , eSwitch
     , eList
     , eMacroExpr
+    , P.try eCaseClosure
     , eClosure
     , eTuple
     , eVariable
@@ -388,7 +422,7 @@ sMutDeclaration = do
 
   body <- P.optional $ L.reserved "in" *> eBlock
 
-  return $ CST.EDeclaration [] True name value body
+  return $ CST.EDeclaration [] name value body
 
 -- | Parses a declaration
 -- | A declaration is a statement that is used to declare a immutable
@@ -408,7 +442,7 @@ sDeclaration = do
 
   body <- P.optional $ L.reserved "in" *> eBlock
 
-  return $ CST.EDeclaration [] False name value body
+  return $ CST.EDeclaration [] name value body
 
 -- | Parses a function declaration
 -- | A function declaration is a statement that is used to declare a function.
@@ -429,13 +463,12 @@ sFunction = do
   retTy <- P.optional $ L.symbol ":" *> Typ.tType
   body <- L.symbol "=>" *> parseExpression <|> eBlock
 
-  let cl = CST.EClosure args retTy body
+  let cl = CST.EClosure args retTy body False
 
   return $
     CST.EDeclaration
       generics
-      False
-      (name Cmm.:@: Nothing)
+      (Cmm.fromText name Cmm.:@: Nothing)
       cl
       Nothing
 
@@ -458,7 +491,7 @@ parseStatement =
 -- | Parses an extension member
 -- | An extension member is a member that is added to a type to extend its
 -- | functionalities.
-eExtensionMember :: P.Parser (CST.ExtensionMember Cmm.PlumeType)
+eExtensionMember :: P.Parser CST.ExtensionMember
 eExtensionMember =
   P.choice
     [ eExtFunction
@@ -473,7 +506,7 @@ eExtensionMember =
 -- |  - name: ty = expr
 -- | where `name` is an identifier, `ty` is a type annotation and `expr` is
 -- | an expression.
-eExtVariable :: P.Parser (CST.ExtensionMember Cmm.PlumeType)
+eExtVariable :: P.Parser CST.ExtensionMember
 eExtVariable = do
   name <- P.try $ typeAnnot <* P.lookAhead (L.symbol "=")
   void $ L.symbol "="
@@ -489,7 +522,7 @@ eExtVariable = do
 -- | where `name` is an identifier, `generics` is a list of generic annotations,
 -- | `arg1`, `arg2`, ... are mutable arguments, `retTy` is an optional return
 -- | type, `expr` is an expression and `block` is a block of expressions.
-eExtFunction :: P.Parser (CST.ExtensionMember Cmm.PlumeType)
+eExtFunction :: P.Parser CST.ExtensionMember
 eExtFunction = do
   void $ L.reserved "fn"
   name <- L.identifier <|> L.parens L.operator
@@ -500,43 +533,8 @@ eExtFunction = do
   pure $
     CST.ExtDeclaration
       gens
-      (name Cmm.:@: Nothing)
-      (CST.EClosure args ret body)
-
-eTypedExtensionMember :: P.Parser (CST.ExtensionMember Cmm.PlumeType, (Text, Cmm.PlumeScheme))
-eTypedExtensionMember = 
-  P.choice
-    [ eTypedExtFunction
-    , eTypedExtVariable
-    ]
-
-eTypedExtFunction :: P.Parser (CST.ExtensionMember Cmm.PlumeType, (Text, Cmm.PlumeScheme))
-eTypedExtFunction = do
-  void $ L.reserved "fn"
-  name <- L.identifier <|> L.parens L.operator
-  gens <- P.option [] $ L.angles (Typ.parseGeneric `P.sepBy` L.comma)
-  args <- L.parens (mutArg' `P.sepBy` L.comma)
-  ret <- L.symbol ":" *> Typ.tType
-
-  let argsTys = map (\(Cmm.Annotation _ (ty, _)) -> ty) args
-  let sch = Cmm.MkScheme gens (argsTys Cmm.:->: ret)
-  
-  let args' = map (\(Cmm.Annotation n (ty, m)) -> n Cmm.:@: (Just ty, m)) args
-
-  body <- L.symbol "=>" *> parseExpression <|> eBlock
-  pure 
-    (CST.ExtDeclaration
-      gens
-      (name Cmm.:@: Nothing)
-      (CST.EClosure args' (Just ret) body), (name, sch))
-
-eTypedExtVariable :: P.Parser (CST.ExtensionMember Cmm.PlumeType, (Text, Cmm.PlumeScheme))
-eTypedExtVariable = do
-  (name Cmm.:@: ty) <- P.try $ typeAnnotTyped <* P.lookAhead (L.symbol "=")
-  void $ L.symbol "="
-  let ann = Cmm.Annotation name (Just ty)
-  r <- CST.ExtDeclaration [] ann <$> parseExpression
-  return (r, (name, Cmm.MkScheme [] ty))
+      (Cmm.fromText name Cmm.:@: Nothing)
+      (CST.EClosure args ret body False)
 
 -- TOP-LEVEL DECLARATIONS
 
@@ -565,17 +563,17 @@ tInterface :: P.Parser [CST.Expression]
 tInterface = do
   void $ L.reserved "interface"
   gens <- P.option [] $ L.angles $ Typ.parseGeneric `P.sepBy` L.comma
-  annot <- Cmm.Annotation <$> L.identifier <*> L.angles (Typ.tType `P.sepBy` L.comma)
+  annot <- Cmm.Annotation . Cmm.fromText <$> L.identifier <*> L.angles (Typ.tType `P.sepBy` L.comma) <*> pure False
   members <- L.braces (P.many iFun)
   return [CST.EInterface annot gens members]
   where 
     iFun = do
       void $ L.reserved "fn"
-      name <- L.identifier <|> L.parens L.operator
+      name <- Cmm.fromText <$> (L.identifier <|> L.parens L.operator)
       gens <- P.option [] $ L.angles $ Typ.parseGeneric `P.sepBy` L.comma
       args <- L.parens $ typeAnnot' `P.sepBy` L.comma
       retTy <- P.option Cmm.TUnit $ L.symbol ":" *> Typ.tType
-      return $ Cmm.Annotation name (Cmm.MkScheme gens (args Cmm.:->: retTy))
+      return $ Cmm.Annotation name (Cmm.MkScheme gens (args Cmm.:->: retTy)) False
 
 -- | Parses a native statement
 -- | A native statement is a statement that is used to import a native module.
@@ -607,7 +605,7 @@ tNative = do
   xs <- P.choice [nativeGroup path, nativeOne path]
   
   if extTy `elem` libTy
-    then return (map ($ extTy) xs)
+    then return (map (\p -> p extTy False) xs)
     else return []
   where
     nativeGroup p = L.braces (P.many (parseNative p))
@@ -668,35 +666,10 @@ tExtension = do
   void $ L.reserved "extend"
   gens <- P.option [] $ L.angles (Typ.parseGeneric `P.sepBy` L.comma)
   
-  tc <- Cmm.Annotation <$> L.identifier <*> L.angles (Typ.tType `P.sepBy1` L.comma)
+  tc <- Cmm.Annotation . Cmm.fromText <$> L.identifier <*> L.angles (Typ.tType `P.sepBy1` L.comma) <*> pure False
 
   members <- L.braces (P.many eExtensionMember)
   return [CST.ETypeExtension gens tc Nothing members]
-
--- | Parses an orphan type extension
--- | An orphan type extension is a extension used for implementing methods
--- | only for one type (e.g. the old extension-system used to be like this).
--- |
--- | SYNTAX:
--- |  - extend<generics> ty { ext_members }
-tOrphanExtension :: P.Parser [CST.Expression]
-tOrphanExtension = do
-  void $ L.reserved "extend"
-  gens <- P.option [] $ L.angles (Typ.parseGeneric `P.sepBy` L.comma)
-  ty <- Typ.tType
-  (members, schs) <- unzip <$> L.braces (P.many eTypedExtensionMember)
-
-  i <- liftIO incOrphan
-  let name = "orphan_ext_" <> show ty <> "_" <> show i
-      anns = map (uncurry Cmm.Annotation) schs
-
-      intf = CST.EInterface (name Cmm.:@: [ty]) gens anns
-      ext  = CST.ETypeExtension gens (name Cmm.:@: [ty]) Nothing members
-
-  return [intf, ext]
-  where
-    incOrphan :: IO Int
-    incOrphan = atomicModifyIORef' L.orphanExtCounter (\x -> (x + 1, x))
 
 -- | Parses a type declaration
 -- | A type declaration is a statement that is used to declare a new
@@ -710,25 +683,21 @@ tType :: P.Parser [CST.Expression]
 tType = do
   void $ L.reserved "type"
   name <- L.identifier
-  gens <- P.option [] $ L.angles (Typ.parseGeneric `P.sepBy` L.comma)
-  cons <- typeConstructors name gens <|> typeAlias name gens 
+  gens <- P.option [] $ L.angles (L.identifier `P.sepBy` L.comma)
+  
+  cons <- typeConstructors name gens <|> typeAlias name gens
   return [cons]
   
   where
-    typeConstructors :: Text -> [Cmm.PlumeGeneric] -> P.Parser CST.Expression
+    typeConstructors :: Text -> [Text] -> P.Parser CST.Expression
     typeConstructors name gens = do
       cons <- L.braces (Typ.typeConstructor `P.sepBy` L.comma)
-      return $ CST.EType (Cmm.Annotation name gens) cons
+      return $ CST.EType (Cmm.Annotation (Cmm.fromText name) gens False) cons
 
-    typeAlias :: Text -> [Cmm.PlumeGeneric] -> P.Parser CST.Expression
+    typeAlias :: Text -> [Text]  -> P.Parser CST.Expression
     typeAlias name gens = do
       void $ L.symbol "="
-      guard (all isNotExtend gens)
-      CST.ETypeAlias (Cmm.Annotation name gens) <$> Typ.tType
-
-    isNotExtend :: Cmm.PlumeGeneric -> Bool
-    isNotExtend (Cmm.GExtends {}) = False
-    isNotExtend _ = True
+      CST.ETypeAlias (Cmm.Annotation (Cmm.fromText name) gens False) <$> Typ.tType
 
 -- | Parses a macro
 -- | A macro is a statement that is used to define a macro variable or a
@@ -746,13 +715,17 @@ tMacro = do
   void $ L.reserved "macro"
   name <- L.identifier
   (args, body, isFun) <- P.choice [macroFun, macroVar]
+  let body' = if isFun then CST.EClosure args Nothing body False else body
   return
-    [if isFun then CST.EMacroFunction name args body else CST.EMacro name body]
+    [CST.EDeclaration [] (Cmm.MkIdentifier name True Cmm.:@: Nothing) body' Nothing]
  where
   macroFun = do
     args <- L.parens $ L.identifier `P.sepBy` L.comma
     body <- L.symbol "=>" *> parseExpression <|> eBlock
-    return (args, body, True)
+
+    let args' = map (\n -> Cmm.Annotation (Cmm.fromText n) Nothing False) args
+
+    return (args', body, True)
   macroVar = do
     body <- L.symbol "=" *> parseExpression
     return ([], body, False)
@@ -802,7 +775,6 @@ parseToplevel =
       , tType
       , tCustomOperator
       , P.try tExtension
-      , tOrphanExtension
       , tMacro
       , pure <$> parseStatement
       ]

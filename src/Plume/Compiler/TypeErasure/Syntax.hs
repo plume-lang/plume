@@ -1,7 +1,7 @@
 module Plume.Compiler.TypeErasure.Syntax where
 
 import Plume.Syntax.Common.Literal
-import Plume.Syntax.Abstract.Expression (IsStandard)
+import Plume.Syntax.Abstract (IsStandard)
 
 data UntypedExpr
   = UEVar Text

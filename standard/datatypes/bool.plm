@@ -5,7 +5,7 @@ extend boolean_algebra<bool> {
 }
 
 extend show<bool> {
-  fn show(self: bool): str => if (self) "true" else "false"
+  fn show_prec(self: bool, _): str => if (self) "true" else "false"
 }
 
 fn (!=)<A extends equality>(a: A, b: A): bool => not(a == b)

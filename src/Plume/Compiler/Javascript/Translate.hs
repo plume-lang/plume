@@ -31,7 +31,7 @@ assembleNative (Pre.DPNativeFunction lib name _ isStd) = do
     requireCall = Post.JSCall (Post.JSIdentifier "require") [
         if isStd then 
           createStandardPath lib 
-        else Post.JSLiteral (Cmm.LString lib)
+        else Post.JSLiteral (Cmm.LString ("./" <> lib))
       ]
     nameCall = Post.JSMember requireCall name
 assembleNative _ = []
@@ -42,12 +42,24 @@ instance Assemble Pre.DesugaredStatement Post.Statement where
   assemble (Pre.DSMutUpdate name expr) = Post.JSUpdate (assemble name) (assemble expr)
   assemble (Pre.DSReturn e) = Post.JSReturn (assemble e)
   assemble (Pre.DSExpr e) = Post.JSExpression (assemble e)
+  assemble (Pre.DSIf e1 e2 e3) = Post.JSIfStatement (assemble e1) (assemble e2) (Just $ assemble e3)
+
+doesContainReturn :: [Pre.DesugaredStatement] -> Bool
+doesContainReturn = any isReturn
+  where
+    isReturn (Pre.DSReturn _) = True
+    isReturn _ = False
 
 blockToExpr :: [Pre.DesugaredStatement] -> Post.Expression
 blockToExpr [Pre.DSExpr e] = assemble e
 blockToExpr [Pre.DSReturn e] = assemble e
 blockToExpr [] = Post.JSNull
-blockToExpr xs = Post.JSCall (Post.JSAnnFunction [] (assemble xs)) []
+blockToExpr xs = do
+  let xs' = fmap assemble xs
+  if any containsAsyncS xs' then
+    Post.JSAwait (Post.JSCall (Post.JSAsyncAnnFunction [] xs') [])
+  else
+    Post.JSCall (Post.JSAnnFunction [] xs') []
 
 instance Assemble Pre.DesugaredExpr Post.Expression where
   assemble (Pre.DEAnd e1 e2) = Post.JSBinary "&&" (assemble e1) (assemble e2)
@@ -85,4 +97,31 @@ runTranslateJS :: [Pre.DesugaredProgram] -> Post.Program
 runTranslateJS = mconcat . fmap assemble
 
 createMainJSApp :: Post.Program -> Text
-createMainJSApp (Post.Program stmts) = show (Post.JSCall (Post.JSAsyncAnnFunction [] stmts) [])
+createMainJSApp (Post.Program stmts) = show (Post.JSCall (Post.JSAsyncAnnFunction [] (nilDefinition : stmts)) [])
+
+nilDefinition :: Post.Statement
+nilDefinition = Post.JSVariableDeclaration "nil" Post.JSNull
+
+containsAsync :: Post.Expression -> Bool
+containsAsync (Post.JSAwait _) = True
+containsAsync (Post.JSObject fields) = any (containsAsync . snd) fields
+containsAsync (Post.JSArray es) = any containsAsync es
+containsAsync (Post.JSArrayIndex e i) = containsAsync e || containsAsync i
+containsAsync (Post.JSTernary e1 e2 e3) = containsAsync e1 || containsAsync e2 || containsAsync e3
+containsAsync (Post.JSMember e _) = containsAsync e
+containsAsync (Post.JSUnary _ e) = containsAsync e
+containsAsync (Post.JSBinary _ e1 e2) = containsAsync e1 || containsAsync e2
+containsAsync (Post.JSCall e args) = containsAsync e || any containsAsync args
+containsAsync (Post.JSLiteral _) = False
+containsAsync (Post.JSIdentifier _) = False
+containsAsync Post.JSNull = False
+containsAsync _ = False
+
+containsAsyncS :: Post.Statement -> Bool
+containsAsyncS (Post.JSIfStatement e s1 s2) = containsAsync e || any containsAsyncS s1 || any containsAsyncS (fromMaybe [] s2)
+containsAsyncS (Post.JSVariableDeclaration _ e) = containsAsync e
+containsAsyncS (Post.JSExpression e) = containsAsync e
+containsAsyncS (Post.JSFunction _ _ body) = any containsAsyncS body
+containsAsyncS (Post.JSReturn e) = containsAsync e
+containsAsyncS (Post.JSUpdate _ e) = containsAsync e
+containsAsyncS (Post.JSAsyncFunction _ _ body) = any containsAsyncS body

@@ -14,23 +14,25 @@ import Plume.Syntax.Common.Literal
 import Control.Monad.Exception (compilerError)
 import Plume.Syntax.Translation.Generics
 
-type Desugar' =
+type DesugarStmt =
   Desugar Pre.ClosedStatement [ANFResult (Maybe Post.DesugaredStatement)]
 
-type Desugar'' = Desugar Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
+type DesugarExpr = Information -> Pre.ClosedExpr -> MonadDesugar (ANFResult Post.DesugaredExpr)
+
 type DesugarSwitch =
-  (Desugar'', Desugar') -> Desugar''
+  (DesugarExpr, DesugarStmt) -> Desugar Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
 
 type IsToplevel = Bool
 type IsReturned = Bool
 type IsExpression = Bool
+type Information = (IsToplevel, IsReturned, IsExpression)
 
 {-# NOINLINE switchCounter #-}
 switchCounter :: IORef Int
 switchCounter = unsafePerformIO $ newIORef 0
 
 desugarSwitch :: (IsToplevel, IsReturned, IsExpression) -> DesugarSwitch
-desugarSwitch (_, shouldReturn, isExpr) (fExpr, fStmt) (Pre.CESwitch x cases) = do
+desugarSwitch info@(_, shouldReturn, isExpr) (fExpr, fStmt) (Pre.CESwitch x cases) = do
   let freedPat = foldMap (free . fst) cases
   (decl, declVar) <- case x of
     Pre.CEVar n | n `S.notMember` freedPat -> return ([], x)
@@ -50,16 +52,16 @@ desugarSwitch (_, shouldReturn, isExpr) (fExpr, fStmt) (Pre.CESwitch x cases) = 
           (i, expr, m) -> do
             let pat = maybeAt i conds
             let expr' = substituteMany (M.toList m) expr
-            (expr'', stmts'') <- fExpr expr'
+            (expr'', stmts'') <- fExpr info expr'
             let lastStmt =
-                  if shouldReturn
+                  if shouldReturn || shouldExprReturn expr'
                     then Post.DSReturn expr''
                     else Post.DSExpr expr''
             let stmts''' = stmts'' <> [lastStmt]
             case pat of
               Nothing -> return (mempty, Post.DEIf (Post.DELiteral (LBool True)) stmts''' [])
               Just pats -> do
-                (pats', stmts2) <- mapAndUnzipM fExpr pats
+                (pats', stmts2) <- mapAndUnzipM (fExpr info) pats
                 let cond = createConditionExpr pats'
                 return (stmts2, Post.DEIf cond stmts''' [])
       )
@@ -86,7 +88,7 @@ unboxStatement _ = compilerError "Incorrect statement"
 createConditionExpr :: [Post.DesugaredExpr] -> Post.DesugaredExpr
 createConditionExpr [] = Post.DELiteral (LBool True)
 createConditionExpr [x] = x
-createConditionExpr (x : xs) = x `and'` createConditionExpr xs
+createConditionExpr (x : xs) = x `and''` createConditionExpr xs
 
 createIfsStatement
   :: [Post.DesugaredExpr]
@@ -94,7 +96,7 @@ createIfsStatement
 createIfsStatement [] = []
 createIfsStatement (Post.DEIf c t _ : xs)
   | c == Post.DELiteral (LBool True) = t
-  | otherwise = [Post.DSExpr (Post.DEIf c t (createIfsStatement xs))]
+  | otherwise = [Post.DSIf c t (createIfsStatement xs)]
 createIfsStatement (x : xs) = Post.DSExpr x : createIfsStatement xs
 
 shouldNotHappen :: Text -> Post.DesugaredStatement
@@ -107,6 +109,9 @@ shouldNotHappen x =
 
 and' :: Post.DesugaredExpr -> Post.DesugaredExpr -> Post.DesugaredExpr
 and' x y = Post.DEIf x [Post.DSExpr y] [Post.DSExpr (Post.DELiteral (LBool False))]
+
+and'' :: Post.DesugaredExpr -> Post.DesugaredExpr -> Post.DesugaredExpr
+and'' = Post.DEAnd
 
 createIfsExpr
   :: [Post.DesugaredExpr]
@@ -161,3 +166,7 @@ createCondition x (Pre.CPList pats slice) =
             (Pre.CEApplication (Pre.CEVar "@list_length") [x])
             (Pre.CELiteral (LInt (toInteger patLen)))
    in (lenCond : concat conds <> conds', mconcat maps <> maps')
+
+shouldExprReturn :: Pre.ClosedExpr -> Bool
+shouldExprReturn (Pre.CEBlock _) = False
+shouldExprReturn _ = True

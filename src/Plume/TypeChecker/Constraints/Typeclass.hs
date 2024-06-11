@@ -9,6 +9,7 @@ import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Constraints.Solver (unifiesWith)
 import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.TLIR qualified as Post
+import Plume.Syntax.Common.Annotation qualified as Cmm
 import Prelude hiding (gets)
 
 -- | Discharging operation is a step that decompose a qualified type into smaller
@@ -54,7 +55,7 @@ discharge cenv p = do
       let ty = getDictTypeForPred p'
       t <- liftIO $ compressPaths ty
 
-      let d = Post.EVariable (getDict b) t
+      let d = Post.EVariable (Cmm.fromText (getDict b)) (Identity t)
           e = if null ds then d else Post.EApplication d ds
       pure (ps', mp <> [(p', e)], as, pure e)
     Nothing -> do
@@ -64,9 +65,9 @@ discharge cenv p = do
       let paramTy = getDictTypeForPred p'
       pure
         ( pure p,
-          List.singleton (p', Post.EVariable param paramTy),
+          List.singleton (p', Post.EVariable (Cmm.fromText param) (Identity paramTy)),
           pure $ param :>: paramTy,
-          pure $ Post.EVariable param paramTy
+          pure $ Post.EVariable (Cmm.fromText param) (Identity paramTy)
         )
 
 -- SOME TEXT QUALIFIER RELATED FUNCTIONS
@@ -77,12 +78,15 @@ getDictName2 :: Text -> Text
 getDictName2 n = "@" <> n
 
 getDictTypeForPred :: PlumeQualifier -> PlumeType
-getDictTypeForPred (IsIn c t) = TypeApp (getDictName t) [c]
+getDictTypeForPred (IsIn c t) = TypeApp (getDictName t) c
 getDictTypeForPred (IsQVar t) = TypeQuantified t
 
 getDict :: PlumeQualifier -> Text
-getDict (IsIn c t) = t <> "_" <> createInstName c
+getDict (IsIn c t) = t <> "_" <> createInstNames c
 getDict (IsQVar t) = t
+
+createInstNames :: [PlumeType] -> Text
+createInstNames = List.foldl' (\acc x -> acc <> "_" <> createInstName x) ""
 
 getQuals :: ExtendEnv -> [([QuVar], Qualified PlumeQualifier)]
 getQuals (MkExtendEnv env) = map (\(a, MkInstance qs quals _ _) -> (qs, a <$ quals)) env
@@ -101,7 +105,7 @@ normalize (Forall qs t) = Forall qs $ normqual t
   where
     normqual (xs :=>: zs) =
       fmap (\case
-        (IsIn c t') -> IsIn (normtype c) t'
+        (IsIn c t') -> IsIn (map normtype c) t'
         _ -> error "Impossible") xs :=>: normtype zs
 
     normtype :: PlumeType -> PlumeType
@@ -112,6 +116,8 @@ normalize (Forall qs t) = Forall qs $ normqual t
 
 -- SOME UNIFYING FUNCTIONS FOR DISCHARGING
 doesMatch :: (MonadChecker m) => PlumeType -> PlumeType -> m Bool
+doesMatch (TypeId "variable") (TypeId "list") = pure True
+doesMatch (TypeId "list") (TypeId "variable") = pure True
 doesMatch (TypeApp x xs) (TypeApp y ys) = do
   b <- doesMatch x y
   if b
@@ -130,13 +136,15 @@ doesMatch _ _ = pure False
 
 doesMatchQual :: (MonadChecker m) => PlumeQualifier -> PlumeQualifier -> m Bool
 doesMatchQual (IsIn a b) (IsIn a' b') = do
-  a1 <- liftIO $ compressPaths a
-  a2 <- liftIO $ compressPaths a'
-  bl <- doesMatch a1 a2
+  a1 <- liftIO $ mapM compressPaths a
+  a2 <- liftIO $ mapM compressPaths a'
+  bl <- and <$> zipWithM doesMatch a1 a2
   pure $ bl && b == b'
 doesMatchQual _ _ = pure False
 
 matchMut :: (MonadChecker m) => PlumeType -> PlumeType -> m ()
+matchMut (TypeId "variable") (TypeId "list") = pure ()
+matchMut (TypeId "list") (TypeId "variable") = pure ()
 matchMut (TypeApp x xs) (TypeApp y ys) = do
   matchMut x y
   mconcat <$> zipWithM matchMut xs ys
@@ -151,52 +159,12 @@ matchMut t1 t2 = throw $ CompilerError $ "Type mismatch between " <> show t1 <> 
 
 matchMut' :: (MonadChecker m) => PlumeQualifier -> PlumeQualifier -> m (Maybe ())
 matchMut' (IsIn a1 b) (IsIn a2 b') | b == b' = do
-  a1' <- liftIO $ compressPaths a1
-  a2' <- liftIO $ compressPaths a2
-  Just <$> matchMut a1' a2'
+  a1' <- liftIO $ mapM compressPaths a1
+  a2' <- liftIO $ mapM compressPaths a2
+  Just <$> zipWithM_ matchMut a1' a2'
 matchMut' _ _ = pure Nothing
 
 -- SOME QUALIFIER FUNCTIONS
-removeDuplicatesQuals :: (MonadChecker m) => [PlumeQualifier] -> m [PlumeQualifier]
-removeDuplicatesQuals [] = pure []
-removeDuplicatesQuals (x@(IsIn (TypeQuantified _) tc) : xs) = do
-  xs' <- removeQualsWithTVar tc xs
-  pure (x : xs')
-removeDuplicatesQuals (x : xs) = do
-  xs' <- removeDuplicatesQuals xs
-  b <- elemQual x xs'
-  if b
-    then pure xs'
-    else pure (x : xs')
-
-removeQualsWithTVar :: (MonadChecker m) => Text -> [PlumeQualifier] -> m [PlumeQualifier]
-removeQualsWithTVar _ [] = pure []
-removeQualsWithTVar n (x@(IsIn t@(TypeVar _) n') : xs) | n == n' = do
-  t' <- liftIO $ compressPaths t
-  case t' of
-    TypeVar _ -> removeQualsWithTVar n xs
-    _ -> pure (x : xs)
-removeQualsWithTVar n (x : xs) = (x :) <$> removeQualsWithTVar n xs
-
-elemQual :: MonadChecker m => PlumeQualifier -> [PlumeQualifier] -> m Bool
-elemQual (IsIn a1 b) =
-  anyM
-    ( \case
-      (IsIn a2 b') -> do
-        a1' <- liftIO $ compressPaths a1
-        a2' <- liftIO $ compressPaths a2
-        bl <- case a1' of
-          TypeQuantified _ -> pure False
-          TypeVar _ -> case a2' of
-            TypeQuantified _ -> pure True
-            TypeVar _ -> pure True
-            _ -> liftIO $ doesUnifyWith a1' a2'
-          _ -> liftIO $ doesUnifyWith a1' a2'
-        
-        pure $ b == b' && bl
-      _ -> pure False
-    )
-elemQual _ = pure . const False
 
 removeDuplicatesAssumps :: (MonadChecker m) => [Assumption PlumeType] -> m ([(Text, Text)], [Assumption PlumeType])
 removeDuplicatesAssumps [] = pure ([], [])
@@ -249,9 +217,12 @@ instantiateQual s (ps :=>: h) = do
   pure (ps' :=>: h', s2)
 
 instantiateTyQual :: (MonadChecker m) => Substitution -> PlumeQualifier -> m (PlumeQualifier, Substitution)
-instantiateTyQual s (IsIn ty name) = do
-  (ty', _, s') <- instantiateWithSub s (Forall [] $ [] :=>: ty)
-  pure (IsIn ty' name, s')
+instantiateTyQual s (IsIn tys name) = do
+  (tys', s') <- foldlM (\(ts, s') t -> do
+      (t', _, s'') <- instantiateWithSub s' (Forall [] $ [] :=>: t)
+      return (ts <> [t'], s'')
+    ) ([], s) tys
+  pure (IsIn tys' name, s')
 instantiateTyQual s (IsQVar name) = pure (IsQVar name, s)
 
 instantiateClass :: (MonadChecker m) => Class -> m Class
@@ -265,7 +236,13 @@ instantiateClass (MkClass qvars quals methods) = do
   pure (MkClass qvars quals' methods'')
 
 unifiyTyQualWith :: (MonadChecker m) => PlumeQualifier -> PlumeQualifier -> m ()
-unifiyTyQualWith (IsIn ty1 name1) (IsIn ty2 name2) | name1 == name2 = ty1 `unifiesWith` ty2
+unifiyTyQualWith (IsIn ty1 name1) (IsIn ty2 name2) | name1 == name2 = 
+  zipWithM_ (\t1 t2 -> do
+    t1' <- liftIO $ compressPaths t1
+    t2' <- liftIO $ compressPaths t2
+    b <- liftIO $ doesUnifyWith t1' t2'
+
+    when b $ t1' `unifiesWith` t2') ty1 ty2
 unifiyTyQualWith _ _ = throw $ CompilerError "Mismatched typeclasses"
 
 unifyQualWith :: (MonadChecker m) => Qualified PlumeQualifier -> Qualified PlumeQualifier -> m ()
@@ -294,7 +271,7 @@ removeSuperclasses (x : xs) ys = do
 findMatchingClass :: MonadIO m => PlumeQualifier -> [PlumeQualifier] -> m [PlumeQualifier]
 findMatchingClass (IsIn t1 n1) qs = flip filterM qs $ \case
   IsIn t2 n2 -> do
-    b <- liftIO $ doesUnifyWith t1 t2
+    b <- liftIO $ and <$> zipWithM doesUnifyWith t1 t2
     pure $ b && n1 == n2
   _ -> pure False
 findMatchingClass _ _ = pure []
@@ -310,10 +287,10 @@ isInSuperclassOf p@(IsIn t n) ps = not . null <$> filterM (\case
     IsIn t' n' -> do
       MkClass _ (quals :=>: _) _ <- findClass n'
       if null quals then do
-        _t <- liftIO $ compressPaths t
-        _t' <- liftIO $ compressPaths t'
+        _t <- liftIO $ mapM compressPaths t
+        _t' <- liftIO $ mapM compressPaths t'
         if _t /= _t' then do
-          bl <- liftIO $ doesUnifyWith _t _t'
+          bl <- liftIO $ and <$> zipWithM doesUnifyWith _t _t'
           return (n == n' && bl)
         else pure False
       else isInSuperclassOf p quals

@@ -4,7 +4,6 @@ module Plume.TypeChecker.Checker.Switch where
 import Data.Map qualified as Map
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Common.Literal
-import Plume.Syntax.Common.Pattern qualified as Pre
 import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.TLIR qualified as Post
 import Plume.TypeChecker.Constraints.Solver (unifiesWith)
@@ -12,7 +11,6 @@ import Plume.TypeChecker.Checker.Datatype (datatypes, tA)
 import Plume.TypeChecker.Constraints.Unification (doesUnifyWith)
 import Data.List (nub)
 import System.IO.Pretty (printWarningFromString)
-import Plume.TypeChecker.TLIR.Internal.Pretty (prettyToString, prettyPat)
 import Prelude hiding (local, gets)
 
 synthSwitch :: Infer -> Infer
@@ -68,7 +66,7 @@ checkRedudancy _ xs = do
     pat <- project p
     whenM (pat `isRedundantIn` acc) $ do
       pos <- fetchPosition
-      let pat' = prettyToString (prettyPat p)
+      let pat' = show p
       liftIO $ printWarningFromString
         mempty
         ( "Pattern " <> pat' <> " is redundant"
@@ -143,26 +141,26 @@ synthPattern
   :: MonadChecker m
   => Pre.Pattern
   -> m (PlumeType, Post.Pattern, Map Text PlumeScheme)
-synthPattern Pre.PWildcard = do
+synthPattern Pre.PWildcard{} = do
   t <- fresh
-  pure (t, Post.PWildcard t, mempty)
-synthPattern (Pre.PVariable name) = do
+  pure (t, Post.PWildcard (Identity t), mempty)
+synthPattern (Pre.PVariable name _) = do
   t <- searchEnv @"datatypeEnv" name
   case t of
     Just t' -> do
       (inst, _) <- instantiate t'
-      return (inst, Post.PSpecialVar name inst, mempty)
+      return (inst, Post.PSpecialVar name (Identity inst), mempty)
     Nothing -> do
       ty <- fresh
       return
         ( ty
-        , Post.PVariable name ty
+        , Post.PVariable name (Identity ty)
         , Map.singleton name (Forall [] $ [] :=>: ty)
         )
 synthPattern (Pre.PLiteral l) = do
   let (ty, l') = typeOfLiteral l
   pure (ty, Post.PLiteral l', mempty)
-synthPattern (Pre.PConstructor name pats) = do
+synthPattern (Pre.PConstructor (name, _) pats) = do
   t <- searchEnv @"datatypeEnv" name
   case t of
     Just t' -> do
@@ -170,9 +168,9 @@ synthPattern (Pre.PConstructor name pats) = do
       ret <- fresh
       (patsTy, pats', env) <- mapAndUnzip3M synthPattern pats
       inst `unifiesWith` (patsTy :->: ret)
-      return (ret, Post.PConstructor name inst pats', mconcat env)
+      return (ret, Post.PConstructor (name, Identity inst) pats', mconcat env)
     Nothing -> throw $ UnboundVariable name
-synthPattern (Pre.PList pats slice) = do
+synthPattern (Pre.PList _ pats slice) = do
   tv <- fresh
   (patsTy, pats', env) <- mapAndUnzip3M synthPattern pats
   forM_ patsTy (`unifiesWith` tv)
@@ -182,15 +180,16 @@ synthPattern (Pre.PList pats slice) = do
   case slRes of
     Just (slTy, sl', slEnv) -> do
       slTy `unifiesWith` TList tv
-      return (TList tv, Post.PList tv pats' (Just sl'), mconcat env <> slEnv)
-    Nothing -> return (TList tv, Post.PList tv pats' Nothing, mconcat env)
-synthPattern (Pre.PSlice n) = do
+      return (TList tv, Post.PList (Identity tv) pats' (Just sl'), mconcat env <> slEnv)
+    Nothing -> return (TList tv, Post.PList (Identity tv) pats' Nothing, mconcat env)
+synthPattern (Pre.PSlice n _) = do
   tv <- fresh
   return
     ( TList tv
-    , Post.PVariable n (TList tv)
+    , Post.PVariable n (Identity $ TList tv)
     , Map.singleton n (Forall [] $ [] :=>: TList tv)
     )
+synthPattern _ = throw $ CompilerError "Invalid pattern"
 
 typeOfLiteral :: Literal -> (PlumeType, Literal)
 typeOfLiteral (LInt i) = (TInt, LInt i)
@@ -574,24 +573,25 @@ subtractSpaceWith a b = case (a, b) of
       a `subtractSpaceWith` un
 
 project :: MonadChecker m => Post.Pattern -> m Space
-project (Post.PVariable x t) = return $ VariablePoint x t
+project (Post.PVariable x (Identity t)) = return $ VariablePoint x t
 project (Post.PLiteral l) = do
   let (ty, l') = typeOfLiteral l
   return $ ConstantPoint (Literal l') ty
-project (Post.PConstructor t (args :->: _) pats) = do
+project (Post.PConstructor (t, Identity (args :->: _)) pats) = do
   ps <- mapM project pats
   return $ ConstructorSpace t args ps
 project (Post.PSpecialVar t _) = return $ ConstructorSpace t [] []
-project (Post.PWildcard t) = return (VariablePoint "?" t) 
+project (Post.PWildcard (Identity t)) = return (VariablePoint "?" t) 
 project (Post.PList _ [] _) = return (ConstructorSpace "nil" [] [])
-project (Post.PList t xs Nothing) = do
+project (Post.PList (Identity t) xs Nothing) = do
   ps <- mapM project xs
   return $ buildCons t ps (ConstructorSpace "nil" [] [])
-project (Post.PList t pats (Just sl)) = do
+project (Post.PList (Identity t) pats (Just sl)) = do
   ps <- mapM project pats
   sl' <- project sl
   return $ buildCons t ps sl'
 project (Post.PConstructor {}) = throw $ CompilerError "Invalid pattern"
+project (Post.PSlice {}) = throw $ CompilerError "Invalid pattern"
 
 buildCons :: PlumeType -> [Space] -> Space -> Space
 buildCons _ [] x = x

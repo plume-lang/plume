@@ -45,8 +45,8 @@ fn while<A>(cond: fn(): bool, body: fn(): Control<A>): Option<A> =>
 
 
 extend<A extends show> show<Option<A>> {
-  fn show(o: Option<A>): str => switch o {
-    case Some(x) => "Some(" + x.show() + ")"
+  fn show_prec(o: Option<A>, prec: int): str => switch o {
+    case Some(x) => "Some(" + x.show_prec(prec + 1) + ")"
     case None => "None"
   }
 }
@@ -84,4 +84,11 @@ extend monadic<Option> {
   }
 
   fn pure<A>(a: A): Option<A> => Some(a)
+}
+
+fn simplify_option<T>(x: Option<Option<T>>): Option<T> {
+  return switch x {
+    case Some(Some(a)) => Some(a)
+    case ? => None
+  }
 }

@@ -1,8 +1,20 @@
-const fetch = require('node-fetch');
 const fs = require('fs/promises');
-const readlineSync = require('readline-sync');
+const readline = require('node:readline');
 const childProcess = require('child_process');
-const deasync = require('deasync');
+
+function parseVersion(ver) {
+  const [major, minor, patch] = ver.split('.').map(Number);
+
+  return {
+    major,
+    minor,
+    patch
+  }
+}
+const {major} = parseVersion(process.version.slice(1));
+
+if (major < 20) 
+  throw new Error("Node.js version 20 or higher is required.");
 
 async function doesFileExist(path) {
   try {
@@ -58,11 +70,29 @@ module.exports = {
     .then(() => true)
     .catch(() => false),
 
-  print: (s) => process.stdout.write(s),
-  println: (s) => console.log(s),
+  ffi_print: (s) => process.stdout.write(s),
+  ffi_println: (s) => console.log(s),
   get_args: () => process.argv.slice(2),
-  execute_command: (cmd) => childProcess.execSync(cmd).toString(),
-  input: () => readlineSync.question(),
+  execute_command(cmd) {
+    try {
+      childProcess.execSync(cmd);
+      return 1;
+    } catch {
+      return 0;
+    }
+  },
+  input: (prompt) => new Promise((resolve, reject) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    rl.question(prompt, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  
+  }),
   add_int: (a, b) => a + b,
   sub_int: (a, b) => a - b,
   mul_int: (a, b) => a * b,
@@ -87,7 +117,13 @@ module.exports = {
   list_append: (l, e) => l.concat(e),
   list_prepend: (l, e) => [e].concat(l),
   list_concat: (a, b) => a.concat(b),
-  ffi_get_index: (l, i) => l[i],
+  ffi_get_index(l, i) {
+    if (i < 0 || i >= l.length) {
+      return [null, "Option", "None"];
+    }
+
+    return [null, "Option", "Some", l[i]];
+  },
   ffi_slice_list: (l, start, end) => l.slice(start, end),
 
   char_to_string: (c) => c,
@@ -105,20 +141,4 @@ module.exports = {
       return [null, "Result", "Error", e.toString()];
     }
   }
-}
-
-function blockForPromiseSync(p) {
-    let result= undefined;
-    let error= undefined;
-
-    p.then(value => { result = value })
-        .catch(err => { error = err })
-
-    deasync.loopWhile(() =>
-        result === undefined && error === undefined)
-
-    if (error !== undefined) {
-        throw error
-    }
-    return result
 }

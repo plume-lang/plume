@@ -23,7 +23,7 @@ synthDecl :: Bool -> Infer -> Infer
 synthDecl
   isToplevel
   infer
-  (Pre.EDeclaration isMut generics (Annotation name ty) expr body) = do
+  (Pre.EDeclaration generics (Annotation name ty isMut) expr body) = do
     convertedGenerics :: [PlumeQualifier] <- concatMapM convert generics
     convertedTy :: PlumeType <- convert ty
 
@@ -36,23 +36,20 @@ synthDecl
     -- Check if the variable is already declared, if it is and it is mutable
     -- then it should be an update and the update type should have the same
     -- type as the variable
-    searchEnv @"typeEnv" name >>= \case
+    searchEnv @"typeEnv" name.identifier >>= \case
       Just (Forall _ (_ :=>: (TMut t))) -> convertedTy `unifiesWith` t
       _ -> pure ()
 
     -- Creating an utility function that shortens the code and a boolean
     -- that indicates if the variable is mutable
     (declFun, isMut') <-
-      searchEnv @"typeEnv" name >>= \case
+      searchEnv @"typeEnv" name.identifier >>= \case
         Just (Forall _ (_ :=>: (TMut t))) -> do
           t `unifiesWith` convertedTy
           return (Post.EMutUpdate, True)
         Nothing ->
-          return $
-            if isMut
-              then (Post.EMutDeclaration, isMut)
-              else (Post.EDeclaration, isMut)
-        Just _ -> return (Post.EDeclaration, isMut)
+          return (Post.EDeclaration [], isMut)
+        Just _ -> return (Post.EDeclaration [], isMut)
 
     let mut = if isMut' then TMut else id
     -- Creating the type of the variable based on mutability and adding it
@@ -60,7 +57,7 @@ synthDecl
     let convertedTy' = mut convertedTy
 
     let scheme = Forall qvars $ convertedGenerics :=>: convertedTy'
-    insertEnv @"typeEnv" name scheme
+    insertEnv @"typeEnv" name.identifier scheme
 
     enterLevel
     (exprTy, ps, h) <- case convertedGenerics of
@@ -76,8 +73,8 @@ synthDecl
     -- If there are no user-quantified variables and if the declaration is not
     -- toplevel, then just return the inferred expression as it was inferred.
     (clos, closTy, remainingPs, sch) <- if null qvars && not isToplevel then do
-      ps' <- removeDuplicatesQuals ps
-      return (h, ty', ps', scheme)
+      -- ps' <- removeDuplicatesQuals ps
+      return (h, ty', ps, scheme)
     else do
       cenv <- gets (extendEnv . environment)
 
@@ -92,7 +89,9 @@ synthDecl
       let (_ps, m2, as, _) = List.unzip4 res'
       let ps' = concatMap removeQVars _ps
 
-      ps'' <- removeDuplicatesQuals =<< mapM (liftIO . compressQual) ps'
+      _ps'' <- mapM (liftIO . compressQual) ps'
+      ps'' <- liftIO . mapM compressQual =<< removeSameQualifiers qvars _ps''
+
       let ty''@(_ :=>: t) = List.nub ps'' :=>: ty'
 
       -- Compressing types in the generated map
@@ -114,7 +113,8 @@ synthDecl
 
       -- Getting the duplicates assumptions in order to remove and resolve
       -- duplicatas.
-      sub' <- unify finalExprs'
+      let finalExprs'' = map (\(MkIdentifier n _, Identity t') -> (n, t')) finalExprs'
+      sub' <- unify finalExprs''
       let sub'' = Map.toList sub' <> sub <> remainingSub
 
       -- Running the expression reader because we're toplevel or there are 
@@ -132,12 +132,12 @@ synthDecl
       unlessM (allIsSuperclass as''' scs) $ throw (UnresolvedTypeVariable as''')
       
       -- Generating new types and expressions based on assumptions
-      let args = map (\(n :>: t') -> n :@: t') as''
+      let args = map (\(n :>: t') -> fromText n :@: Identity t') as''
       let tys' = map (\(_ :>: t') -> t') as''
     
       cTy' <- liftIO $ compressPaths ty'
 
-      let clos = if null args then h'' else Post.EClosure args cTy' h'' False
+      let clos = if null args then h'' else Post.EClosure args (Identity cTy') h'' False
       let closTy = if null args then t else tys' :->: t
 
       let scheme' = Forall qvars ty''
@@ -148,7 +148,7 @@ synthDecl
   
     -- Creating a new scheme for the variable based on the substitution
     -- newScheme <- liftIO $ compressPaths t
-    insertEnv @"typeEnv" name sch
+    insertEnv @"typeEnv" name.identifier sch
 
     -- Removing the generic types from the environment
     mapM_ (deleteEnv @"genericsEnv" . getGenericName) generics
@@ -159,24 +159,26 @@ synthDecl
     let body' = mapM thd3 b
     let psb = maybe [] snd3 b
 
-    pure (retTy, psb <> remainingPs, declFun (Annotation name closTy) <$> clos <*> body')
+    let closTy' = Identity closTy
+
+    pure (retTy, psb <> remainingPs, declFun (Annotation name closTy' isMut') <$> clos <*> body')
 synthDecl _ _ _ = throw $ CompilerError "Only declarations are supported"
 
-removeGeneralizedQuals :: [PlumeQualifier] -> [QuVar] -> IO [PlumeQualifier]
-removeGeneralizedQuals [] _ = pure []
-removeGeneralizedQuals qs [] = filterM removeQualWithQVar qs
-removeGeneralizedQuals (IsIn (TypeQuantified n) _: qs) qvars 
-  | n `elem` qvars = removeGeneralizedQuals qs qvars
-removeGeneralizedQuals (q : qs) qvars = (q:) <$> removeGeneralizedQuals qs qvars
+-- removeGeneralizedQuals :: [PlumeQualifier] -> [QuVar] -> IO [PlumeQualifier]
+-- removeGeneralizedQuals [] _ = pure []
+-- removeGeneralizedQuals qs [] = filterM removeQualWithQVar qs
+-- removeGeneralizedQuals (IsIn (TypeQuantified n) _: qs) qvars 
+--   | n `elem` qvars = removeGeneralizedQuals qs qvars
+-- removeGeneralizedQuals (q : qs) qvars = (q:) <$> removeGeneralizedQuals qs qvars
 
-removeQualWithQVar :: PlumeQualifier -> IO Bool
-removeQualWithQVar (IsIn (TypeQuantified _) _) = pure False
-removeQualWithQVar (IsIn (TypeVar l) n) = do
-  v <- readIORef l
-  case v of
-    Link t -> removeQualWithQVar (IsIn t n)
-    _ -> pure True
-removeQualWithQVar _ = pure True
+-- removeQualWithQVar :: PlumeQualifier -> IO Bool
+-- removeQualWithQVar (IsIn (TypeQuantified _) _) = pure False
+-- removeQualWithQVar (IsIn (TypeVar l) n) = do
+--   v <- readIORef l
+--   case v of
+--     Link t -> removeQualWithQVar (IsIn t n)
+--     _ -> pure True
+-- removeQualWithQVar _ = pure True
 
 isTypeSubsetOf :: [PlumeType] -> [PlumeType] -> IO Bool
 isTypeSubsetOf [] _ = pure True
@@ -191,3 +193,24 @@ keepAssumpWithQual as (q:qs) = do
   as2 <- keepAssumpWithQual as qs
   pure . List.nub $ as1 <> as2
 keepAssumpWithQual _ _ = pure []
+
+removeSameQualifiers :: MonadChecker m => [QuVar] -> [PlumeQualifier] -> m [PlumeQualifier]
+removeSameQualifiers _ [] = pure []
+removeSameQualifiers qvs (q : qs) = do
+  qs' <- removeSameQualifiers qvs qs
+  b1 <- isElemOf q qs'
+  b2 <- contains q qvs
+  if b1 && b2 then pure qs' else pure (q : qs')
+
+contains :: MonadChecker m => PlumeQualifier -> [QuVar] -> m Bool
+contains (IsIn t _) qs = do
+  t' <- liftIO $ mapM compressPaths t
+  let qs' = map TypeQuantified qs
+  anyM (\q -> and <$> zipWithM doesMatch t' (repeat q)) qs'
+contains _ _ = pure False
+
+isElemOf :: MonadChecker m => PlumeQualifier -> [PlumeQualifier] -> m Bool
+isElemOf q (q':qs) = doesMatchQual q q' >>= \case
+  True -> pure True
+  False -> isElemOf q qs
+isElemOf _ _ = pure False

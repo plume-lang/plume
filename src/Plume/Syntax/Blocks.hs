@@ -2,10 +2,39 @@ module Plume.Syntax.Blocks where
 
 import Plume.Syntax.Abstract as AST
 
+isExhaustiveReturn :: AST.Expression -> Bool
+isExhaustiveReturn (AST.ELocated e _) = isExhaustiveReturn e
+isExhaustiveReturn (AST.EReturn _) = True
+isExhaustiveReturn (AST.EConditionBranch _ t f) = isExhaustiveReturn t && isExhaustiveReturn f
+isExhaustiveReturn (AST.ESwitch _ cases) = all (isExhaustiveReturn . snd) cases
+isExhaustiveReturn (AST.EBlock es) = isExhaustiveBlock es
+isExhaustiveReturn _ = False
+
+isItBlock :: AST.Expression -> Bool
+isItBlock AST.EBlock{} = True
+isItBlock (AST.ELocated e _) = isItBlock e
+isItBlock _ = False
+
+isExhaustiveBlock :: [AST.Expression] -> Bool
+isExhaustiveBlock es = maybe False isExhaustiveReturn (viaNonEmpty last es)
+
+nilReturn :: AST.Expression
+nilReturn = AST.EReturn (AST.EVariable "unit" Nothing)
+
 removeUselessBlocks :: Bool -> AST.Expression -> [AST.Expression]
 removeUselessBlocks isInner (AST.EBlock es) 
-  | isInner = [AST.EBlock $ concatMap (removeUselessBlocks False) es]
-  | otherwise = concatMap (removeUselessBlocks False) es
+  | isInner = do
+      let isEx = isExhaustiveBlock es
+
+      if isEx 
+        then [AST.EBlock $ concatMap (removeUselessBlocks False) es]
+        else [AST.EBlock $ concatMap (removeUselessBlocks False) es <> [nilReturn]]
+  | otherwise = do
+      let isEx = isExhaustiveBlock es
+
+      if isEx 
+        then concatMap (removeUselessBlocks False) es
+        else concatMap (removeUselessBlocks False) es <> [nilReturn]
 removeUselessBlocks _ (AST.EApplication f xs) = do
   f' <- removeUselessBlocks True f
   xs' <- mapM (removeUselessBlocks True) xs
@@ -13,7 +42,7 @@ removeUselessBlocks _ (AST.EApplication f xs) = do
 removeUselessBlocks isInner (AST.EConditionBranch e1 e2 e3) = do
   e1' <- removeUselessBlocks True e1
   let e2' = removeUselessBlocksIf isInner e2
-  let e3' = removeUselessBlocksIf isInner <$> e3
+  let e3' = removeUselessBlocksIf isInner e3
   [AST.EConditionBranch e1' e2' e3']
 removeUselessBlocks _ (AST.EList es) = do
   es' <- mapM (removeUselessBlocks True) es
@@ -22,20 +51,22 @@ removeUselessBlocks isInner (AST.ESwitch e cases) = do
   e' <- removeUselessBlocks True e
   let cases' = map (second (removeUselessBlocksIf isInner)) cases
   [AST.ESwitch e' cases']
-removeUselessBlocks isInner (AST.EDeclaration isMut gens n e1 e2) = do
+removeUselessBlocks isInner (AST.EDeclaration gens n e1 e2) = do
   e1' <- removeUselessBlocks True e1
   e2' <- mapM (removeUselessBlocks isInner) e2
-  [AST.EDeclaration isMut gens n e1' e2']
-removeUselessBlocks _ (AST.EClosure args ret body) = do
+  [AST.EDeclaration gens n e1' e2']
+removeUselessBlocks _ (AST.EClosure args ret body isA) = do
+  let isBl = isItBlock body
+  let isEx = isExhaustiveReturn body
   let b = removeUselessBlocks False body
   case b of
-    [AST.EBlock es] -> [AST.EClosure args ret (AST.EBlock es)]
-    [x] -> [AST.EClosure args ret x]
-    _ -> [AST.EClosure args ret (AST.EBlock b)]
+    [AST.EBlock es] -> [AST.EClosure args ret (AST.EBlock es) isA]
+    [x] | isEx || not isBl -> [AST.EClosure args ret x isA]
+    _ -> [AST.EClosure args ret (AST.EBlock b) isA]
 removeUselessBlocks isInner (AST.EUnMut e) = do
   e' <- removeUselessBlocks isInner e
   [AST.EUnMut e']
-removeUselessBlocks _ (AST.EVariable n) = [AST.EVariable n]
+removeUselessBlocks _ (AST.EVariable n t) = [AST.EVariable n t]
 removeUselessBlocks _ (AST.ELiteral l) = [AST.ELiteral l]
 removeUselessBlocks isInner (AST.EReturn e) = do
   e' <- removeUselessBlocks isInner e
@@ -49,7 +80,7 @@ removeUselessBlocks isInner (AST.ETypeExtension gens ann var mems) = do
   [AST.ETypeExtension gens ann var mems']
 removeUselessBlocks _ e = [e]
 
-removeUselessBlocksExt :: Bool -> AST.ExtensionMem -> AST.ExtensionMem
+removeUselessBlocksExt :: Bool -> AST.ExtensionMember -> AST.ExtensionMember
 removeUselessBlocksExt isInner (AST.ExtDeclaration gens n e) = do
   let e' = removeUselessBlocks isInner e
   case e' of

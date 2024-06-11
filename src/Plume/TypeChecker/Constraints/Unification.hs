@@ -4,6 +4,7 @@ module Plume.TypeChecker.Constraints.Unification where
 import Plume.TypeChecker.Constraints.Definition
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.TLIR qualified as Typed
+import Plume.Syntax.Common.Annotation qualified as Cmm
 import System.IO.Pretty
 
 doesUnifyWith :: PlumeType -> PlumeType -> IO Bool
@@ -14,9 +15,9 @@ doesUnifyWith t t' = do
 
 doesQualUnifiesWith :: PlumeQualifier -> PlumeQualifier -> IO Bool
 doesQualUnifiesWith (IsIn t n) (IsIn t' n') | n == n' = do
-  t1 <- compressPaths t
-  t2 <- compressPaths t'
-  doesUnifyWithH t1 t2
+  t1 <- mapM compressPaths t
+  t2 <- mapM compressPaths t'
+  and <$> zipWithM doesUnifyWithH t1 t2
 doesQualUnifiesWith _ _ = pure False
 
 doesUnifyWithScheme :: PlumeType -> PlumeScheme -> IO Bool
@@ -27,6 +28,8 @@ doesUnifyWithScheme t (Forall _ (_ :=>: t')) = do
 
 doesUnifyWithH :: PlumeType -> PlumeType -> IO Bool
 doesUnifyWithH t1 t2 | t1 == t2 = pure True
+doesUnifyWithH (TypeId "variable") (TypeId "list") = pure True
+doesUnifyWithH (TypeId "list") (TypeId "variable") = pure True
 doesUnifyWithH (TypeVar tv) t = do
   tv' <- readIORef tv
   case tv' of
@@ -93,6 +96,8 @@ mgu t t' = do
   if t1 == t2
     then pure ()
     else case (t1, t2) of
+      (TypeId "variable", TypeId "list") -> pure ()
+      (TypeId "list", TypeId "variable") -> pure ()
       (TypeVar tv1, _) -> readIORef tv1 >>= \case
         Link tl -> mgu tl t2
         Unbound _ _ -> liftIO $ do
@@ -110,7 +115,7 @@ mgu t t' = do
       _ -> throw (UnificationFail t1 t2)
 
 compressQual :: PlumeQualifier -> IO PlumeQualifier
-compressQual (IsIn t n) = IsIn <$> compressPaths t <*> pure n
+compressQual (IsIn t n) = IsIn <$> mapM compressPaths t <*> pure n
 compressQual q = pure q
 
 compressPaths :: PlumeType -> IO PlumeType
@@ -143,7 +148,8 @@ liftBlock block _ t = do
   case res of
     Typed.EBlock exprs 
       | any Typed.containsReturn exprs 
-        || ty == TUnit -> do
+        || ty == TUnit
+        || ty == TAsync TUnit -> do
           pure $ Typed.EBlock exprs
     Typed.EBlock exprs
       | not (any Typed.containsReturn exprs)
@@ -186,6 +192,6 @@ liftPlaceholders name ty ps = do
   f <- ask
   let dicts = fmap f ps
   pure $ case length dicts of
-    0 -> Typed.EVariable name ty
-    _ | null dicts -> Typed.EInstanceVariable name ty
-    _ -> Typed.EApplication (Typed.EInstanceVariable name ty) dicts
+    0 -> Typed.EVariable (Cmm.fromText name) (Identity ty)
+    _ | null dicts -> Typed.EInstanceVariable (Cmm.fromText name) (Identity ty)
+    _ -> Typed.EApplication (Typed.EInstanceVariable (Cmm.fromText name) (Identity ty)) dicts

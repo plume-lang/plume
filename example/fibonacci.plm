@@ -1,0 +1,8 @@
+fn fib(n: int): int => 
+  switch n {
+    case 0 => 0
+    case 1 => 1
+    case ? => fib(n - 1) + fib(n - 2)
+  }
+
+println(fib(30))

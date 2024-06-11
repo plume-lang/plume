@@ -25,25 +25,9 @@ jobs:
         with:
           submodules: true
       
-      - name: Install CLang on Windows and Ubuntu
-        uses: KyleMayes/install-llvm-action@v2
-        if: startsWith(matrix.os, 'windows') || startsWith(matrix.os, 'ubuntu')
-        with:
-          version: "17.0"
-        
-      - uses: xmake-io/github-action-setup-xmake@v1
-        with:
-          xmake-version: latest
-          actions-cache-folder: '.xmake-cache'
-          actions-cache-key: '${{matrix.os}}'
-      
       - name: Checking for dependencies
         run: |
           python3 --version
-          xmake --version --root
-
-      - name: Update xmake repository
-        run: xmake repo --update --root
     
       - name: Set up GHC ${{ matrix.ghc-version }}
         uses: haskell-actions/setup@v2
