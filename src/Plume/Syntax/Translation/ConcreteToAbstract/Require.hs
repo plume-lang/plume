@@ -74,8 +74,6 @@ getPath modName ext = do
     False | isMod -> liftIO (doesDirectoryExist resWithoutExt)
     _ -> return False
 
-  print res
-
   if isDir then return $ resWithoutExt </> "main.plm" else return res
 
 -- | Convert a require expression to an abstract expression
