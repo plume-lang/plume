@@ -48,10 +48,6 @@ program
   :: IORef [Post.UntypedProgram]
 program = unsafePerformIO $ newIORef []
 
-insertReturnStmt :: Pre.Expression -> Pre.Expression
-insertReturnStmt (Pre.EBlock es) = Pre.EBlock es
-insertReturnStmt e = Pre.EBlock [Pre.EReturn e]
-
 isNotDecl :: Pre.Expression -> Bool
 isNotDecl (Pre.EDeclaration {}) = False
 isNotDecl (Pre.EMutUpdate {}) = False
@@ -184,8 +180,7 @@ eraseExpr (Pre.ESwitch e cases) = do
   return $ Post.UESwitch e' cases'
 eraseExpr (Pre.EBlock es) = Post.UEBlock <$> mapM eraseStatement es
 eraseExpr (Pre.EClosure args _ body isAsync) = do
-  let b' = insertReturnStmt body
-  b <- eraseExpr b'
+  b <- eraseExpr body
   return $
     Post.UEClosure
       (map (\(Annotation n _ _) -> n.identifier) args)
