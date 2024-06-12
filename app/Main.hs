@@ -73,7 +73,7 @@ main = setEncoding $ do
       ppBuilding "Parsing file and dependencies..."
       writeIORef extensionType "js"
       runConcreteToAbstract env dir paths' file `with` \ast -> do
-        let ast' = concatMap (removeUselessBlocks False) ast
+        let ast' = concatMap (removeUselessBlocks (False, False)) ast
         ppBuilding "Typechecking..."
         runSynthesize ast' `with` \tlir -> do
           ppBuilding "Compiling and optimizing..."
