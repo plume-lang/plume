@@ -62,25 +62,26 @@ desugarANF t f (Pre.CEMutUpdate name expr body) = do
           <> [Post.DSDeclaration fresh body']
 
   return (Post.DEVar fresh, stmts)
-desugarANF (isNotTop, isReturned, _) f (Pre.CEConditionBranch e1 e2 e3) = do
+desugarANF (isTop, _, _) f (Pre.CEConditionBranch e1 e2 e3) = do
   (e1', stmts1) <- f e1
-  r1@(_, stmts2) <- f e2
-  r2@(_, stmts3) <- f e3
+  r1 <- f e2
+  r2 <- f e3
 
-  if (not (null stmts2) || not (null stmts3))
-    && isNotTop
+  let shRet1 = shouldExprReturn e2
+      shRet2 = shouldExprReturn e3
+
+  let br1 = createBr r1 shRet1
+      br2 = createBr r2 shRet2
+
+  if isTop
     then do
-      let br1 = createBr r1
-      let br2 = createBr r2
-
-      let br = Post.DSExpr $ Post.DEIf e1' br1 br2
-      return (Post.DEVar "nil", stmts1 <> [br])
+      let br = Post.DEIf e1' br1 br2
+      return (br, stmts1)
     else do
-      return
-        ( Post.DEIf e1' (createBr r1) (createBr r2)
-        , stmts1
-        )
+      let expr = Post.DSReturn
+      let br = expr $ Post.DEIf e1' br1 br2
+      return (Post.DEVar "nil", stmts1 <> [br])
  where
-  createBr (e, st) = st <> [(if isReturned then Post.DSReturn else Post.DSExpr) e]
+  createBr (e, st) isRet = st <> [(if isRet then Post.DSReturn else Post.DSExpr) e]
 desugarANF _ _ _ =
   compilerError "Received incorrect expression, not an ANF convertible one"

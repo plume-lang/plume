@@ -147,25 +147,25 @@ insertReturn e True = case List.unsnoc e of
 desugarProgram :: Pre.ClosedProgram -> IO [Post.DesugaredProgram]
 desugarProgram = \case
   Pre.CPFunction x xs y isAsync -> do
-    ys <- desugarStatement (True, shouldReturn y, False) y
+    ys <- desugarStatement (False, shouldReturn y, False) y
     let bl = createBlock ys
     let bl' = insertReturn bl (shouldReturn y)
 
     return [Post.DPFunction x xs bl' isAsync]
   Pre.CPStatement x -> do
-    x' <- desugarStatement (False, False, False) x
+    x' <- desugarStatement (True, False, False) x
     return $ createBlockProg' x'
   Pre.CPNativeFunction fp x y st -> do
     modifyIORef' nativeFunctions $ Set.insert x
     return [Post.DPNativeFunction fp x y st]
   Pre.CPDeclaration n e -> do
-    (e', stmts) <- desugarExpr (False, False, True) e
+    (e', stmts) <- desugarExpr (True, False, True) e
     return (createBlockProg stmts ++ [Post.DPDeclaration n e'])
   Pre.CPMutDeclaration n e -> do
-    (e', stmts) <- desugarExpr (False, False, True) e
+    (e', stmts) <- desugarExpr (True, False, True) e
     return (createBlockProg stmts ++ [Post.DPMutDeclaration n e'])
   Pre.CPMutUpdate n e -> do
-    (e', stmts) <- desugarExpr (False, False, True) e
+    (e', stmts) <- desugarExpr (True, False, True) e
     return (createBlockProg stmts ++ [Post.DPMutUpdate n e'])
   Pre.CPDeclare n -> return [Post.DPDeclare n]
 

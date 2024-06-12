@@ -54,7 +54,7 @@ desugarSwitch info@(_, shouldReturn, isExpr) (fExpr, fStmt) (Pre.CESwitch x case
             let expr' = substituteMany (M.toList m) expr
             (expr'', stmts'') <- fExpr info expr'
             let lastStmt =
-                  if shouldReturn || shouldExprReturn expr'
+                  if (shouldExprReturn expr' && isExpr) || shouldReturn
                     then Post.DSReturn expr''
                     else Post.DSExpr expr''
             let stmts''' = stmts'' <> [lastStmt]
@@ -170,3 +170,18 @@ createCondition x (Pre.CPList pats slice) =
 shouldExprReturn :: Pre.ClosedExpr -> Bool
 shouldExprReturn (Pre.CEBlock _) = False
 shouldExprReturn _ = True
+-- shouldExprReturn (Pre.CEBlock bs) = any shouldStmtReturn bs
+-- shouldExprReturn (Pre.CESwitch _ cases) = any (shouldCaseReturn . snd) cases
+-- shouldExprReturn (Pre.CEConditionBranch _ t e) = shouldExprReturn t || shouldExprReturn e
+-- shouldExprReturn _ = False
+
+-- shouldCaseReturn :: Pre.ClosedExpr -> Bool
+-- shouldCaseReturn (Pre.CEBlock bs) = any shouldStmtReturn bs
+-- shouldCaseReturn (Pre.CESwitch _ cases) = any (shouldExprReturn . snd) cases
+-- shouldCaseReturn (Pre.CEConditionBranch _ t e) = shouldExprReturn t || shouldExprReturn e
+-- shouldCaseReturn _ = True
+
+-- shouldStmtReturn :: Pre.ClosedStatement -> Bool
+-- shouldStmtReturn (Pre.CSReturn _) = True
+-- shouldStmtReturn (Pre.CSConditionBranch _ t e) = shouldStmtReturn t || shouldStmtReturn e
+-- shouldStmtReturn _ = False
