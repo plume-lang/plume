@@ -44,6 +44,7 @@ concreteToAbstract
   :: CST.Expression
   -> TranslatorReader Error AST.Expression
 concreteToAbstract (CST.ELiteral l) = transRet . Right $ AST.ELiteral l
+concreteToAbstract (CST.EPublic e) = concreteToAbstract e
 concreteToAbstract m@(CST.EMacro {}) =
   convertMacro concreteToAbstract m
 concreteToAbstract m@(CST.EMacroFunction {}) =
