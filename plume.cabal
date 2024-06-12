@@ -28,12 +28,16 @@ library
         Plume.Syntax.Parser
         Plume.Syntax.Parser.Parser
         Plume.Syntax.Parser.Lexer
+        Plume.Syntax.Parser.Requires
         Plume.Syntax.Parser.Modules.Literal
         Plume.Syntax.Parser.Modules.Operator
         Plume.Syntax.Parser.Modules.Slice
         Plume.Syntax.Parser.Modules.Type
         Plume.Syntax.Parser.Modules.Pattern
         Plume.Syntax.Parser.Modules.ParseImports
+
+        Plume.Syntax.Require.Resolution
+        Plume.Syntax.Require.Monad
         
         Plume.Syntax.Translation.Generics
         Plume.Syntax.Translation.ConcreteToAbstract
