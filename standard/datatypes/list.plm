@@ -105,10 +105,8 @@ fn join<A>(x: [A], y: A): [A] => switch x {
   case [z, ..zs] => [z, y].list_concat(join(zs, y))
 }
 
-extend monoidal<list> {
-  fn empty<A>(): list<A> => []
-  fn concat<A>(x: [[A]]): [A] => 
-    x.foldl(fn (acc, y) => acc.list_concat(y), [])
+extend<A> default<list<A>> {
+  fn default() => []
 }
 
 fn nub<A extends equality>(x: [A]): [A] => switch x {

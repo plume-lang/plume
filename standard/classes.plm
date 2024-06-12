@@ -70,9 +70,8 @@ interface<T> indexable<T> {
   fn get_index<A>(self: T<A>, i: int): Option<A>
 }
 
-interface<A> monoidal<A> {
-  fn empty(): A
-  fn concat(a: A, b: A): A
+interface<A> default<A> {
+  fn default(): A
 }
 
 interface<M> monadic<M> {
@@ -94,3 +93,9 @@ fn (>>)<M extends monadic, A, B>(x: M<A>, y: M<B>): M<B> =>
 infixl 1 <<
 fn (<<)<M extends monadic, A, B>(x: M<A>, y: M<B>): M<A> => 
   x.bind(fn (a) => y.bind(fn(_) => pure(a)))
+
+infixl 0 |>
+fn (|>)<A, B>(x: A, f: fn(A): B): B => f(x)
+
+infixl 0 <|
+fn (<|)<A, B>(f: fn(A): B, x: A): B => f(x)
