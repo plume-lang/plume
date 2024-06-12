@@ -21,44 +21,44 @@ isExhaustiveBlock es = maybe False isExhaustiveReturn (viaNonEmpty last es)
 nilReturn :: AST.Expression
 nilReturn = AST.EReturn (AST.EVariable "unit" Nothing)
 
-removeUselessBlocks :: Bool -> AST.Expression -> [AST.Expression]
-removeUselessBlocks isInner (AST.EBlock es) 
+removeUselessBlocks :: (Bool, Bool) -> AST.Expression -> [AST.Expression]
+removeUselessBlocks (isInner, isEx') (AST.EBlock es) 
   | isInner = do
-      let isEx = isExhaustiveBlock es
+      let isEx = isEx' || isExhaustiveBlock es
 
       if isEx 
-        then [AST.EBlock $ concatMap (removeUselessBlocks False) es]
-        else [AST.EBlock $ concatMap (removeUselessBlocks False) es <> [nilReturn]]
+        then [AST.EBlock $ concatMap (removeUselessBlocks (False, isEx)) es]
+        else [AST.EBlock $ concatMap (removeUselessBlocks (False, isEx)) es <> [nilReturn]]
   | otherwise = do
-      let isEx = isExhaustiveBlock es
+      let isEx = isEx' || isExhaustiveBlock es
 
       if isEx 
-        then concatMap (removeUselessBlocks False) es
-        else concatMap (removeUselessBlocks False) es <> [nilReturn]
-removeUselessBlocks _ (AST.EApplication f xs) = do
-  f' <- removeUselessBlocks True f
-  xs' <- mapM (removeUselessBlocks True) xs
+        then concatMap (removeUselessBlocks (False, isEx)) es
+        else concatMap (removeUselessBlocks (False, isEx)) es <> [nilReturn]
+removeUselessBlocks (_, isEx) (AST.EApplication f xs) = do
+  f' <- removeUselessBlocks (True, isEx) f
+  xs' <- mapM (removeUselessBlocks (True, isEx)) xs
   [AST.EApplication f' xs']
-removeUselessBlocks isInner (AST.EConditionBranch e1 e2 e3) = do
-  e1' <- removeUselessBlocks True e1
+removeUselessBlocks isInner@(_, isEx) (AST.EConditionBranch e1 e2 e3) = do
+  e1' <- removeUselessBlocks (True, isEx) e1
   let e2' = removeUselessBlocksIf isInner e2
   let e3' = removeUselessBlocksIf isInner e3
   [AST.EConditionBranch e1' e2' e3']
-removeUselessBlocks _ (AST.EList es) = do
-  es' <- mapM (removeUselessBlocks True) es
+removeUselessBlocks (_, isEx) (AST.EList es) = do
+  es' <- mapM (removeUselessBlocks (True, isEx)) es
   [AST.EList es']
-removeUselessBlocks isInner (AST.ESwitch e cases) = do
-  e' <- removeUselessBlocks True e
+removeUselessBlocks isInner@(_, isEx) (AST.ESwitch e cases) = do
+  e' <- removeUselessBlocks (True, isEx) e
   let cases' = map (second (removeUselessBlocksIf isInner)) cases
   [AST.ESwitch e' cases']
-removeUselessBlocks isInner (AST.EDeclaration gens n e1 e2) = do
-  e1' <- removeUselessBlocks True e1
+removeUselessBlocks isInner@(_, isEx) (AST.EDeclaration gens n e1 e2) = do
+  e1' <- removeUselessBlocks (True, isEx) e1
   e2' <- mapM (removeUselessBlocks isInner) e2
   [AST.EDeclaration gens n e1' e2']
 removeUselessBlocks _ (AST.EClosure args ret body isA) = do
   let isBl = isItBlock body
   let isEx = isExhaustiveReturn body
-  let b = removeUselessBlocks False body
+  let b = removeUselessBlocks (False, isEx) body
   case b of
     [AST.EBlock es] -> [AST.EClosure args ret (AST.EBlock es) isA]
     [x] | isEx || not isBl -> [AST.EClosure args ret x isA]
@@ -80,7 +80,7 @@ removeUselessBlocks isInner (AST.ETypeExtension gens ann var mems) = do
   [AST.ETypeExtension gens ann var mems']
 removeUselessBlocks _ e = [e]
 
-removeUselessBlocksExt :: Bool -> AST.ExtensionMember -> AST.ExtensionMember
+removeUselessBlocksExt :: (Bool, Bool) -> AST.ExtensionMember -> AST.ExtensionMember
 removeUselessBlocksExt isInner (AST.ExtDeclaration gens n e) = do
   let e' = removeUselessBlocks isInner e
   case e' of
@@ -88,14 +88,14 @@ removeUselessBlocksExt isInner (AST.ExtDeclaration gens n e) = do
     [x] -> AST.ExtDeclaration gens n x
     _ -> AST.ExtDeclaration gens n (AST.EBlock e')
 
-removeUselessBlocksIf :: Bool -> AST.Expression -> AST.Expression
+removeUselessBlocksIf :: (Bool, Bool) -> AST.Expression -> AST.Expression
 removeUselessBlocksIf b e = do
   let bl = removeUselessBlocks b e
 
   case bl of
     [x] 
       | isBlock x -> AST.EBlock $ getBlock x
-      | isReturn x -> getReturn x
+      | isReturn x -> AST.EBlock bl
       | otherwise -> x
     _ -> AST.EBlock bl
 
@@ -115,6 +115,6 @@ removeUselessBlocksIf b e = do
         isReturn expr | AST.EReturn _ <- removeLoc expr = True
                       | otherwise = False
         
-        getReturn :: AST.Expression -> AST.Expression
-        getReturn (AST.EReturn e') = e'
-        getReturn e' = e'
+        -- getReturn :: AST.Expression -> AST.Expression
+        -- getReturn (AST.EReturn e') = e'
+        -- getReturn e' = e'
