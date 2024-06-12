@@ -5,12 +5,12 @@ module Main where
 
 import Control.Monad.Exception
 import Control.Monad.Parser
-import Data.Either
 import Data.Text.IO hiding (putStr)
 import Plume.Compiler.ClosureConversion.Conversion
 import Plume.Compiler.Desugaring.Desugar
 import Plume.Compiler.TypeErasure.EraseType
 import Plume.Syntax.Parser.Modules.ParseImports
+import Plume.Syntax.Require.Resolution
 import Plume.Syntax.Translation.ConcreteToAbstract
 import Plume.Compiler.Javascript.Translate
 import Plume.TypeChecker.Checker
@@ -43,14 +43,11 @@ setEncoding :: IO a -> IO a
 setEncoding = id
 #endif
 
-fromEither :: a -> Either b a -> a
-fromEither _ (Right a) = a
-fromEither a _ = a
-
 main :: IO ()
 main = setEncoding $ do
   file_input <- maybeAt 0 <$> getArgs
   env <- lookupEnv "PLUME_PATH"
+  mod' <- lookupEnv "PPM_PATH"
 
   case file_input of
     Just file -> do
@@ -72,6 +69,9 @@ main = setEncoding $ do
 
       ppBuilding "Parsing file and dependencies..."
       writeIORef extensionType "js"
+
+      void $ checkModule (env, mod') file
+
       runConcreteToAbstract env dir paths' file `with` \ast -> do
         let ast' = concatMap (removeUselessBlocks (False, False)) ast
         ppBuilding "Typechecking..."
