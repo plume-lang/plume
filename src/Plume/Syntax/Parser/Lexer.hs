@@ -123,6 +123,7 @@ reservedWords =
     , "extends"
     , "interface"
     , "await"
+    , "pub"
     , -- Primitive types
       "int"
     , "str"

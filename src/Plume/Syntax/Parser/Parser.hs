@@ -757,6 +757,17 @@ tDeclare = do
       ty <- L.symbol ":" *> Typ.tType
       return [CST.EVariableDeclare [] name (Just ty)]
 
+-- | Parses a public toplevel expression
+-- | A public toplevel expression is a toplevel expression that is exported
+-- | from the module.
+-- |
+-- | SYNTAX:
+-- |  - pub toplevel_expr
+tPublic :: P.Parser [CST.Expression]
+tPublic = do
+  void $ L.reserved "pub"
+  (CST.EPublic <$>) <$> parseToplevel
+
 -- | Parses a toplevel expression
 -- | A toplevel expression is an expression that is at the top-level of the
 -- | source code. It may be a statement, a require statement, a native
@@ -769,6 +780,7 @@ parseToplevel =
   eLocatedMany $
     P.choice
       [ tNative
+      , tPublic
       , tDeclare
       , tInterface
       , tRequire
