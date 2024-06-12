@@ -1,5 +1,8 @@
 require "number"
 require "tuple"
+require "std:classes"
+require "option"
+require "bool"
 
 native ("native", "js") "std:native" {
   list_concat<A>(x: [A], y: [A]): [A]

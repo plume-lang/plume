@@ -1,4 +1,5 @@
 require "string"
+require "std:classes"
 
 native ("native", "js") "std:native" {
   char_to_string(x: char): str

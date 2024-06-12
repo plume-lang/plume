@@ -1,3 +1,5 @@
+require "std:classes"
+
 extend boolean_algebra<bool> {
   fn and(a: bool, b: bool): bool => if (a) b else false
   fn or(a: bool, b: bool): bool => if (a) true else b

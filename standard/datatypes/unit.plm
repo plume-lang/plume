@@ -1,3 +1,5 @@
+require "std:classes"
+
 type unit { unit }
 
 extend show<unit> {

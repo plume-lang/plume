@@ -1,3 +1,5 @@
+require "std:classes"
+
 type Result<A, B> {
   Ok(A),
   Error(B)

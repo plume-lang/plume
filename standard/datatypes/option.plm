@@ -1,4 +1,5 @@
 require "string"
+require "std:classes"
 
 type Option<T> {
   Some(T),

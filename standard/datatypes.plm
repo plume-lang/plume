@@ -1,11 +1,14 @@
-require "datatypes/unit"
-require "datatypes/number"
-require "datatypes/bool"
-require "datatypes/option"
-require "datatypes/list"
-require "datatypes/string"
-require "datatypes/tuple"
-require "datatypes/char"
+require "std:classes"
+
+pub require "datatypes/unit"
+pub require "datatypes/number"
+pub require "datatypes/bool"
+pub require "datatypes/option"
+pub require "datatypes/list"
+pub require "datatypes/string"
+pub require "datatypes/tuple"
+pub require "datatypes/char"
+pub require "datatypes/result"
 // require "datatypes/complex"
 
 extend<A extends show> show<mut A> {

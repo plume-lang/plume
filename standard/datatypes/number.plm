@@ -1,3 +1,5 @@
+require "std:classes"
+
 native ("js", "native") "std:native" {
   add_int(x: int, y: int): int
   sub_int(x: int, y: int): int
