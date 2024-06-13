@@ -17,6 +17,15 @@ import System.FilePath
 import System.Path.NameManip (guess_dotdot, absolute_path)
 import Data.Maybe (fromJust)
 
+relativize :: FilePath -> FilePath -> FilePath
+relativize from to = joinPath $ go (splitPath from) (splitPath to)
+  where
+    go [] ys = ys
+    go xs [] = map (const "..") xs
+    go (x:xs) (y:ys)
+      | x == y    = go xs ys
+      | otherwise = replicate (length (x:xs)) ".." ++ (y:ys)
+
 -- | Absolutize a relative path to make it avaiable globally
 absolutize :: String -> IO String
 absolutize aPath
