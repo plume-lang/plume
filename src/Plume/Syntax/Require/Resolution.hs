@@ -90,6 +90,10 @@ resolvePath fp isPub = do
 
   path <- getPath fp Nothing
 
+  exists <- liftIO $ doesFileExist path
+  unless exists . liftIO $ do
+    ppFailure ("File " <> fromString path <> " does not exist")
+    exitFailure
 
   stack <- readIORef M.importStack
   if path `elem` stack
@@ -97,7 +101,7 @@ resolvePath fp isPub = do
       let p1 = SourcePos path (mkPos 1) (mkPos 1)
       let p2 = SourcePos path (mkPos 1) (mkPos 1)
 
-      throwError ("Circular dependency detected", (p1, p2))
+      throwError ("Circular dependency detected with " <> toString path, (p1, p2))
     else modifyIORef M.importStack (path :)
 
   case Map.lookup path st.resolved of
