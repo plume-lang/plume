@@ -120,16 +120,18 @@ resolvePath fp isPub = do
       modifyIORef' M.moduleState (\s -> s { M.currentDirectory = cwd })
       
       case ast of
-        Left err -> error (show err)
+        Left err -> liftIO $ do
+          parseError err path contentAsText
+          exitFailure
 
-        Right (ast', _) -> do
+        Right (ast', ops') -> do
           m' <- foldlM checkForUndefined m ast'
 
           modifyIORef' M.moduleState (\s -> s { M.resolved = Map.insert path m' (M.resolved s) })
           modifyIORef' M.resultState (List.nub . (<> ast'))
           modifyIORef' M.importStack (List.drop 1)
 
-          return m'
+          return m' { M.operators = ops' <> ops }
 
 loadModule :: M.MonadResolution m => FilePath -> Text -> m ([(Text, Bool)], SL.SortedList L.CustomOperator)
 loadModule path contentAsText = do
