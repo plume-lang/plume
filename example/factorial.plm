@@ -16,6 +16,6 @@ fn range(from: int, to: int): [int] {
   }
 }
 
-xs = range(0, 21).map(fn(n) => (n, facto(n)))
+xs = range(0, 11).map(fn(n) => (n, facto(n)))
 
 xs.map(fn case (n, f) => println("$n! = $f"))
