@@ -1,0 +1,7 @@
+require "std:io/http"
+
+println("Fetching JSON example")
+
+res = fetch("https://jsonplaceholder.typicode.com/posts/1")
+
+println(res)
