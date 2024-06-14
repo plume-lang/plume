@@ -1,4 +1,4 @@
 require "io/file"
 require "io/http"
-require "io/output"
+pub require "io/output"
 require "io/system"

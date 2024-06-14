@@ -1,3 +1,5 @@
+require "std:classes"
+
 type tuple<A, B> { tuple(A, B) }
 
 extend<A extends show, B extends show> show<tuple<A, B>> {

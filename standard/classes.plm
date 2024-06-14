@@ -70,9 +70,8 @@ interface<T> indexable<T> {
   fn get_index<A>(self: T<A>, i: int): Option<A>
 }
 
-interface<A> monoidal<A> {
-  fn empty(): A
-  fn concat(a: A, b: A): A
+interface<A> default<A> {
+  fn default(): A
 }
 
 interface<M> monadic<M> {

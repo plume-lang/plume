@@ -1,0 +1,48 @@
+require "std:classes"
+require "option"
+require "std:io"
+
+type Map<V> {
+  Node(str, V, Map<V>),
+  Empty
+}
+
+fn showHelper<V extends show>(m: Map<V>, i: int): str =>
+  switch m {
+    case Node(k, v, Empty) => k + " -> " + show_prec(v, i + 1)
+    case Node(k, v, rest) => k + " -> " + show_prec(v, i + 1) + ", " + showHelper(rest, i)
+    case Empty => ""
+  }
+
+extend<V extends show> show<Map<V>> {
+  fn show_prec(m, i) =>
+    "{ " + showHelper(m, i) + " }" 
+}
+
+fn empty<V>(): Map<V> => Empty
+
+fn insert<V>(k: str, v: V, m: Map<V>): Map<V> =>
+  switch m {
+    case Node(k1, v1, rest) => 
+      if (k1 == k) Node(k1, v, rest)
+      else Node(k1, v1, insert(k, v, rest))
+    case Node(k1, v1, rest) => 
+      Node(k1, v1, insert(k, v, rest))
+    case Empty => 
+      Node(k, v, Empty)
+  }
+
+fn from_list<V>(l: list<(str, V)>): Map<V> =>
+  l.foldl(fn(acc, el) => switch el {
+    case (k, v) => insert(k, v, acc)
+  }, Empty)
+
+fn get<V>(m: Map<V>, k: str): Option<V> =>
+  switch m {
+    case Node(k1, v, rest) => 
+      if (k1 == k) Some(v) else get(rest, k)
+    case Node(_, _, rest) => 
+      get(rest, k)
+    case Empty =>
+      None
+  }

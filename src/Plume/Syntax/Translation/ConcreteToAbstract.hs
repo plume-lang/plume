@@ -44,6 +44,7 @@ concreteToAbstract
   :: CST.Expression
   -> TranslatorReader Error AST.Expression
 concreteToAbstract (CST.ELiteral l) = transRet . Right $ AST.ELiteral l
+concreteToAbstract (CST.EPublic e) = concreteToAbstract e
 concreteToAbstract m@(CST.EMacro {}) =
   convertMacro concreteToAbstract m
 concreteToAbstract m@(CST.EMacroFunction {}) =
@@ -151,11 +152,18 @@ concreteToAbstract (CST.ENativeFunction fp n gens t libTy _) = do
   let basePath = makeRelative initialDir dir
 
   -- Native function resolution is kind the same as require resolution
-  -- except we do not parse everything. But we need to resolve the path 
-  -- absolutely to make it work everywhere on the system.
+  -- except we do not parse everything.
   let strModName = fromString $ toString fp -<.> sharedLibExt libTy
   let (isStd, path) = if "std:" `T.isPrefixOf` fp then (True, T.drop 4 strModName) else (False, fromString $ basePath </> toString fp -<.> sharedLibExt libTy)
-  transRet . Right $ AST.ENativeFunction path n gens t' libTy isStd
+
+  -- We need to relativize the path if it is not a standard library, in order
+  -- to be able to use it everywhere from every possible directory on the
+  -- system.
+  let path' = if isStd 
+      then path 
+      else fromString $ relativize initialDir (toString path)
+
+  transRet . Right $ AST.ENativeFunction path' n gens t' libTy isStd
 concreteToAbstract (CST.EList es) = do
   -- Lists can be composed of spread elements, so we need to flatten
   -- the list of expressions into a single expression.

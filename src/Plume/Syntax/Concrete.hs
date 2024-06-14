@@ -13,6 +13,7 @@ module Plume.Syntax.Concrete (
   pattern EListIndex,
   pattern EProperty,
   pattern EVarText,
+  pattern EPublic,
 
   -- Macro related patterns
   pattern EMacroText,
@@ -50,6 +51,9 @@ pattern EPostfix op e = CST.EApplication (EVarText op) [e]
 
 pattern EUnMut :: Expression -> Expression
 pattern EUnMut e = CST.EApplication (CST.EVariable "#deref" Nothing) [e]
+
+pattern EPublic :: Expression -> Expression
+pattern EPublic e = CST.EApplication (CST.EVariable "#public" Nothing) [e]
 
 pattern EListIndex :: Expression -> Expression -> Expression
 pattern EListIndex l i = CST.EApplication (CST.EVariable "get_index" Nothing) [l, i]

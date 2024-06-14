@@ -1,4 +1,5 @@
 require "bool"
+require "std:classes"
 
 native ("native", "js") "std:native" {
   add_str(x: str, y: str): str
