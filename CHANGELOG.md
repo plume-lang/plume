@@ -5,6 +5,76 @@ All notable changes from Plume releases will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0](https://github.com/plume-lang/plume/compare/0.7.4...0.8.0) - 2024-06-11
+
+### Fixed
+
+- fix(codegen): fixed asynchronous block code generation [`#fix(codegen): fixed asynchronous block code generation`](https://github.com/plume-lang/plume/issues/fix(codegen): fixed asynchronous block code generation)
+- fix(compiler): fixed return issue with switch desugaring [`#fix(compiler): fixed return issue with switch desugaring`](https://github.com/plume-lang/plume/issues/fix(compiler): fixed return issue with switch desugaring)
+- fix(std): fixed FFI get_index function [`#fix(std): fixed FFI get_index function`](https://github.com/plume-lang/plume/issues/fix(std): fixed FFI get_index function)
+- fix(compiler): fixed ANF conversion [`#fix(compiler): fixed ANF conversion`](https://github.com/plume-lang/plume/issues/fix(compiler): fixed ANF conversion)
+- fix(tc): fixed asynchronous type-checking [`#fix(tc): fixed asynchronous type-checking`](https://github.com/plume-lang/plume/issues/fix(tc): fixed asynchronous type-checking)
+- fix(compiler): fixed already declared variable in JS codegen [`#fix(compiler): fixed already declared variable in JS codegen`](https://github.com/plume-lang/plume/issues/fix(compiler): fixed already declared variable in JS codegen)
+- fix(std): fixed map execution order [`#fix(std): fixed map execution order`](https://github.com/plume-lang/plume/issues/fix(std): fixed map execution order)
+- fix(tc): fixed asynchronous function compilation [`#fix(tc): fixed asynchronous function compilation`](https://github.com/plume-lang/plume/issues/fix(tc): fixed asynchronous function compilation)
+- fix(compiler): fixed return compilation [`#fix(compiler): fixed return compilation`](https://github.com/plume-lang/plume/issues/fix(compiler): fixed return compilation)
+- fix(tc): fixed block return type-checking [`#fix(tc): fixed block return type-checking`](https://github.com/plume-lang/plume/issues/fix(tc): fixed block return type-checking)
+- fix(std): removed node.js package [`#fix(std): removed node.js package`](https://github.com/plume-lang/plume/issues/fix(std): removed node.js package)
+- fix(git): removed git modules file [`#fix(git): removed git modules file`](https://github.com/plume-lang/plume/issues/fix(git): removed git modules file)
+- fix(std): removed old standard code [`#fix(std): removed old standard code`](https://github.com/plume-lang/plume/issues/fix(std): removed old standard code)
+- fix: fixed non-exhaustive patterns [`#fix: fixed non-exhaustive patterns`](https://github.com/plume-lang/plume/issues/fix: fixed non-exhaustive patterns)
+
+### Commits
+
+- **Breaking change:** feat(tc): updated typechecker to new AST representation [`5711979`](https://github.com/plume-lang/plume/commit/5711979e1699f162d6d8a8cb971238ed98cc2a3c)
+- **Breaking change:** feat(syntax): updated all syntax modules to new AST [`fcdd56a`](https://github.com/plume-lang/plume/commit/fcdd56ad55479f76df889e6731b98fcbf395589f)
+- **Breaking change:** feat(std): updated standard library with new syntaxes and backend [`e33bfe0`](https://github.com/plume-lang/plume/commit/e33bfe04ff71c92f8cf787db73e13de4bc829f25)
+- **Breaking change:** feat(tc): added multi-param extension type-checking [`b9927f8`](https://github.com/plume-lang/plume/commit/b9927f89acaaf8376125714a177c7e894c0f34fd)
+- **Breaking change:** feat(compiler): added js AST [`129d074`](https://github.com/plume-lang/plume/commit/129d0741cee645f212a662ddfe72c4161fdb434e)
+- **Breaking change:** feat(syntax): added await expressions [`ab1b1aa`](https://github.com/plume-lang/plume/commit/ab1b1aac8da127a1bb5da4da8f4f9d6ab0e300c1)
+- **Breaking change:** feat(std): updated standard with new GC library [`1284cf4`](https://github.com/plume-lang/plume/commit/1284cf419816ff8c81530294b729ec33374178b0)
+- **Breaking change:** feat(std): introduced variable argument print and println [`db4cc77`](https://github.com/plume-lang/plume/commit/db4cc775e5d5cd87ec8d1411743d155a8b112b6b)
+- **Breaking change:** feat(std): IO functions are now asynchronous [`dc373bf`](https://github.com/plume-lang/plume/commit/dc373bf91111a7b56b75b04a717922f8d3f9e2d3)
+- **Breaking change:** feat(syntax): added variable argument support [`4064dd1`](https://github.com/plume-lang/plume/commit/4064dd1937c11aa0c59b9f85d4f68296994d409d)
+- **Breaking change:** feat(syntax): added unit-insertion mechanism [`be98ea7`](https://github.com/plume-lang/plume/commit/be98ea7b64ea6c6090d7b0e0f8f664e87b77221e)
+- **Breaking change:** feat(main): added extension library support [`3dbc78f`](https://github.com/plume-lang/plume/commit/3dbc78f0083fd55b5e0d1d4d640932355a3eed0d)
+- **Breaking change:** feat(std): added minimum node.js version [`015de4c`](https://github.com/plume-lang/plume/commit/015de4c2d757929c77d797a793285143ab45dc84)
+- **Breaking change:** feat(syntax): added multi-param typeclass support [`cf911d6`](https://github.com/plume-lang/plume/commit/cf911d67a2016177332a28b63dd6a9795ed1cedf)
+- **Breaking change:** feat(syntax): added function case expressions [`0fbd6d9`](https://github.com/plume-lang/plume/commit/0fbd6d9b4fd2dc99295fe9cc4fa3179cd6c55d47)
+- **Breaking change:** feat(syntax): added muti-library source support [`8ba5ba7`](https://github.com/plume-lang/plume/commit/8ba5ba709ed8c1aa629c414160ede7cd7090558c)
+- **Breaking change:** feat(syntax): removed await abstract expr in favor of syntactic sugar [`b365551`](https://github.com/plume-lang/plume/commit/b36555156f2df022a5b4f47bf03c0d6167a44943)
+- **Breaking change:** feat(js): added asynchronous support in Plume [`7962b01`](https://github.com/plume-lang/plume/commit/7962b01ff5f4d1007ff82f4c5d50a61c8171a47b)
+- **Breaking change:** feat(std): added specific module for unit type [`9460069`](https://github.com/plume-lang/plume/commit/94600692d2b4a1fa30701b7eb9e4adf1d85db4ad)
+- **Breaking change:** feat(std): re-added both xmake and cmake [`7c0abe3`](https://github.com/plume-lang/plume/commit/7c0abe3c4bb34b47d46ae8bb10cc48547064eb1e)
+- **Breaking change:** feat(main): removed unused codes [`c620dc2`](https://github.com/plume-lang/plume/commit/c620dc2e674f3a856729453f301d3e504381c1bd)
+- **Breaking change:** feat(syntax): added exhaustive return insertion [`b95b0a5`](https://github.com/plume-lang/plume/commit/b95b0a5b03b0aafabb8c9bba45e43701f7b0dbe3)
+- **Breaking change:** feat(std): added wait function declaration [`b58812b`](https://github.com/plume-lang/plume/commit/b58812bc2d2d2638187dbe93ba51c0e2d1feaba8)
+- **Breaking change:** feat(std): added nested option function helper [`c782b10`](https://github.com/plume-lang/plume/commit/c782b103db1e2860b3112562accd08071ba540c0)
+- **Breaking change:** feat(main): removed SSA pass temporarily [`e79e609`](https://github.com/plume-lang/plume/commit/e79e6096d7414f34b217f0cb8718d0d442657952)
+- **Breaking change:** feat(main): updated JS translation function call [`93e6909`](https://github.com/plume-lang/plume/commit/93e69099d5a37c11145f363bcfd7d70b7cf7307f)
+- **Breaking change:** feat(git): removed root option from script builder [`3d2127a`](https://github.com/plume-lang/plume/commit/3d2127a68ef899d476f72c95b3a7605159d0c0be)
+
+## [0.7.4](https://github.com/plume-lang/plume/compare/0.7.3...0.7.4) - 2024-05-26
+
+### Commits
+
+- build(git): updated runtime submodule [`414662d`](https://github.com/plume-lang/plume/commit/414662d4bfa48fd73ac9cef60a8216e6b0d55ed3)
+- build(git): updated runtime submodule [`3e9baa0`](https://github.com/plume-lang/plume/commit/3e9baa04acfb2ad56cbb2b3c9a3cfa14869aeab4)
+- build(git): updated runtime submodule [`42625fa`](https://github.com/plume-lang/plume/commit/42625fae81fa2163170e14d6357b61bdac3bcb48)
+
+## [0.7.3](https://github.com/plume-lang/plume/compare/0.7.2...0.7.3) - 2024-05-26
+
+### Fixed
+
+- fix(compiler): fixed dead code elimination with variable declare [`#fix(compiler): fixed dead code elimination with variable declare`](https://github.com/plume-lang/plume/issues/fix(compiler): fixed dead code elimination with variable declare)
+- fix(tc): fixed some typeclass related code [`#fix(tc): fixed some typeclass related code`](https://github.com/plume-lang/plume/issues/fix(tc): fixed some typeclass related code)
+
+### Commits
+
+- **Breaking change:** feat(std): added some list operations [`65b57cf`](https://github.com/plume-lang/plume/commit/65b57cf02b3b6a204f4713b72aa1fd212de15ecb)
+- **Breaking change:** feat(lang): added variable forward declaration syntax support [`1ed49c5`](https://github.com/plume-lang/plume/commit/1ed49c56564a41d13dd1eb8fca4791ddb247b95a)
+- docs(tc): commented full typechecker code [`0490862`](https://github.com/plume-lang/plume/commit/04908620e7c01f5208f7f20b740297fa107bc80e)
+
 ## [0.7.2](https://github.com/plume-lang/plume/compare/0.7.1...0.7.2) - 2024-05-23
 
 ### Fixed
