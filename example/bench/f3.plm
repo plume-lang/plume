@@ -1,7 +1,0 @@
-facto(n: int) =>
-  if n == 0 then
-    return 1
-  else 
-    return n * facto(n - 1)
-  
-@println(facto(20))
