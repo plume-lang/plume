@@ -19,7 +19,7 @@ options = MkOptions
     ( long "ext-type"
     <> short 'e'
     <> metavar "EXT_TYPE"
-    <> help "The type of the output file (native, js, or bytecode)"
+    <> help "The type of the output file (native, or js)"
     <> showDefault
     <> value "native"
     )
