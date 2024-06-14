@@ -25,6 +25,7 @@ import Plume.Syntax.Blocks
 import System.Directory
 import System.FilePath
 import System.IO.Pretty
+import CLI
 import Prelude hiding (putStrLn, readFile)
 #if defined(mingw32_HOST_OS)
 import System.IO (hPutStrLn, hSetEncoding, stdout, utf8)
@@ -51,67 +52,65 @@ setEncoding = id
 
 main :: IO ()
 main = setEncoding $ do
-  args <- getArgs
-  let ext_type = fromString . fromMaybe "native" $ maybeAt 0 args
-  let file_input = maybeAt 1 args
+  MkOptions file_input ext_type file_output remove_prelude <- parseOptions
+  let output = fromMaybe file_input file_output
+
   env <- lookupEnv "PLUME_PATH"
   mod' <- lookupEnv "PPM_PATH"
 
-  case file_input of
-    Just file -> do
-      doesFileExist file >>= \case
-        False -> do
-          ppFailure ("File " <> fromString file <> " does not exist")
-          exitFailure
-        True -> pure ()
+  let file = file_input -<.> "plm"
 
-      cwd <- getCurrentDirectory >>= canonicalizePath
-      let dir = cwd </> takeDirectory file
+  doesFileExist file >>= \case
+    False -> do
+      ppFailure ("File " <> fromString file <> " does not exist")
+      exitFailure
+    True -> pure ()
 
-      content <- readFile file
+  cwd <- getCurrentDirectory >>= canonicalizePath
+  let dir = cwd </> takeDirectory file
 
-      paths <- fromEither [] <$> parse getPaths file content
-      let paths' = case env of
-            Just _ -> ("std:prelude", Nothing) : paths
-            Nothing -> paths
+  content <- readFile file
 
-      ppBuilding "Parsing file and dependencies..."
-      writeIORef extensionType ext_type
+  paths <- fromEither [] <$> parse getPaths file content
+  let paths' = case env of
+        Just _ | not remove_prelude -> ("std:prelude", Nothing) : paths
+        _ -> paths
 
-      void $ checkModule (env, mod') file
+  ppBuilding "Parsing file and dependencies..."
+  writeIORef extensionType (fromString ext_type)
 
-      runConcreteToAbstract env dir paths' file `with` \ast -> do
-        let ast' = concatMap (removeUselessBlocks (False, False)) ast
-        ppBuilding "Typechecking..."
-        runSynthesize ast' `with` \tlir -> do
-          ppBuilding "Compiling and optimizing..."
-          erased <- erase tlir
-          runClosureConversion erased `with` \closed -> do
-            desugared <- desugar closed
+  void $ checkModule (env, mod') file
 
-            case ext_type of
-              "js" -> do
-                let js   = runTranslateJS desugared
-                    code = createMainJSApp js
+  runConcreteToAbstract env dir paths' file `with` \ast -> do
+    let ast' = concatMap (removeUselessBlocks (False, False)) ast
+    ppBuilding "Typechecking..."
+    runSynthesize ast' `with` \tlir -> do
+      ppBuilding "Compiling and optimizing..."
+      erased <- erase tlir
+      runClosureConversion erased `with` \closed -> do
+        desugared <- desugar closed
 
-                writeFileText (replaceExtension file ".js") code
-                ppSuccess ("Bytecode written to " <> fromString (replaceExtension file ".js"))
+        case ext_type of
+          "js" -> do
+            let js   = runTranslateJS desugared
+                code = createMainJSApp js
 
-              _ -> do
-                (bytecode, natives', constants) <- runLLIRAssembler desugared
-                let nativeFuns = getNativeFunctions natives'
-                
-                globals' <- readIORef globals
+            let outputPath = output -<.> "js"
+            writeFileText outputPath code
+            ppSuccess ("Javacsript code written to " <> fromString outputPath)
 
-                (bytecode', labelPool) <- runUnlabelize bytecode
+          _ -> do
+            (bytecode, natives', constants) <- runLLIRAssembler desugared
+            let nativeFuns = getNativeFunctions natives'
 
-                finalBytecode <- runBytecodeAssembler (labelPool, nativeFuns) bytecode'
+            (bytecode', labelPool) <- runUnlabelize bytecode
 
-                sbc <- serialize (finalBytecode, natives', constants)
-                let new_path = file -<.> "bin"
-                writeFileLBS new_path sbc
-                ppSuccess ("Bytecode written to " <> fromString new_path)
-    Nothing -> ppFailure "No input file provided"
+            finalBytecode <- runBytecodeAssembler (labelPool, nativeFuns) bytecode'
+
+            sbc <- serialize (finalBytecode, natives', constants)
+            let newPath = output -<.> "bin"
+            writeFileLBS newPath sbc
+            ppSuccess ("Bytecode written to " <> fromString newPath)
 
 printBytecode :: [Instruction] -> IO ()
 printBytecode bytecode =
