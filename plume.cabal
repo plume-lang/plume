@@ -10,169 +10,151 @@ build-type:      Simple
 extra-doc-files: CHANGELOG.md
 
 library
-    exposed-modules:
-        Plume.Syntax.Internal.Pretty.ANSI
+  exposed-modules:
+    Control.Monad.Exception
+    Control.Monad.IO
+    Control.Monad.Parser
+    GHC.Records
+    Plume.Compiler.Bytecode.Assembler
+    Plume.Compiler.Bytecode.Label
+    Plume.Compiler.Bytecode.Serialize
+    Plume.Compiler.Bytecode.Syntax
+    Plume.Compiler.ClosureConversion.Conversion
+    Plume.Compiler.ClosureConversion.Free
+    Plume.Compiler.ClosureConversion.Syntax
+    Plume.Compiler.Desugaring.Desugar
+    Plume.Compiler.Desugaring.Modules.ANF
+    Plume.Compiler.Desugaring.Modules.Switch
+    Plume.Compiler.Desugaring.Monad
+    Plume.Compiler.Desugaring.Syntax
+    Plume.Compiler.Javascript.Syntax
+    Plume.Compiler.Javascript.Translate
+    Plume.Compiler.LLIR.Assembler
+    Plume.Compiler.LLIR.Free
+    Plume.Compiler.LLIR.Syntax
+    Plume.Compiler.SSA
+    Plume.Compiler.SSA.Bundler
+    Plume.Compiler.SSA.DeadCode
+    Plume.Compiler.TypeErasure.DynamicDispatch.Dispatch
+    Plume.Compiler.TypeErasure.DynamicDispatch.RTTI
+    Plume.Compiler.TypeErasure.EraseType
+    Plume.Compiler.TypeErasure.Syntax
+    Plume.Syntax.Abstract
+    Plume.Syntax.Blocks
+    Plume.Syntax.Common
+    Plume.Syntax.Common.Annotation
+    Plume.Syntax.Common.Internal.Pretty
+    Plume.Syntax.Common.Literal
+    Plume.Syntax.Common.Pattern
+    Plume.Syntax.Common.Type
+    Plume.Syntax.Concrete
+    Plume.Syntax.Concrete.Expression
+    Plume.Syntax.Concrete.Internal.Pretty
+    Plume.Syntax.Concrete.Internal.Show
+    Plume.Syntax.Internal.Pretty.ANSI
+    Plume.Syntax.Parser
+    Plume.Syntax.Parser.Lexer
+    Plume.Syntax.Parser.Modules.Literal
+    Plume.Syntax.Parser.Modules.Operator
+    Plume.Syntax.Parser.Modules.ParseImports
+    Plume.Syntax.Parser.Modules.Pattern
+    Plume.Syntax.Parser.Modules.Slice
+    Plume.Syntax.Parser.Modules.Type
+    Plume.Syntax.Parser.Parser
+    Plume.Syntax.Parser.Requires
+    Plume.Syntax.Require.Monad
+    Plume.Syntax.Require.Resolution
+    Plume.Syntax.Translation.ConcreteToAbstract
+    Plume.Syntax.Translation.ConcreteToAbstract.MacroResolver
+    Plume.Syntax.Translation.ConcreteToAbstract.Require
+    Plume.Syntax.Translation.Generics
+    Plume.Syntax.Translation.Substitution
+    Plume.TypeChecker.Checker
+    Plume.TypeChecker.Checker.Application
+    Plume.TypeChecker.Checker.Closure
+    Plume.TypeChecker.Checker.Condition
+    Plume.TypeChecker.Checker.Datatype
+    Plume.TypeChecker.Checker.Declaration
+    Plume.TypeChecker.Checker.Extension
+    Plume.TypeChecker.Checker.Interface
+    Plume.TypeChecker.Checker.Monad
+    Plume.TypeChecker.Checker.Native
+    Plume.TypeChecker.Checker.Switch
+    Plume.TypeChecker.Constraints.Definition
+    Plume.TypeChecker.Constraints.Solver
+    Plume.TypeChecker.Constraints.Typeclass
+    Plume.TypeChecker.Constraints.Unification
+    Plume.TypeChecker.Monad
+    Plume.TypeChecker.Monad.Conversion
+    Plume.TypeChecker.Monad.Error
+    Plume.TypeChecker.Monad.Free
+    Plume.TypeChecker.Monad.State
+    Plume.TypeChecker.Monad.Type
+    Plume.TypeChecker.TLIR
+    System.IO.Color
+    System.IO.Pretty
 
-        Plume.Syntax.Concrete
-        Plume.Syntax.Concrete.Expression
-        Plume.Syntax.Concrete.Internal.Show
-        Plume.Syntax.Concrete.Internal.Pretty
+  hs-source-dirs:     src
+  default-language:   GHC2021
+  default-extensions:
+    DataKinds
+    OverloadedRecordDot
+    OverloadedStrings
+    TemplateHaskell
 
-        Plume.Syntax.Common
-        Plume.Syntax.Common.Literal
-        Plume.Syntax.Common.Type
-        Plume.Syntax.Common.Pattern
-        Plume.Syntax.Common.Annotation
-        Plume.Syntax.Common.Internal.Pretty
+  ghc-options:        -Wall -Wno-orphans
+  build-depends:
+    , base                         ^>=4.19.0.0
+    , binary
+    , containers
+    , diagnose
+    , directory
+    , filepath
+    , megaparsec                   ^>=9.6.1
+    , MissingH
+    , mtl
+    , parser-combinators
+    , prettyprinter
+    , prettyprinter-ansi-terminal
+    , relude
+    , sorted-list
+    , template-haskell
+    , text
 
-        Plume.Syntax.Parser
-        Plume.Syntax.Parser.Parser
-        Plume.Syntax.Parser.Lexer
-        Plume.Syntax.Parser.Requires
-        Plume.Syntax.Parser.Modules.Literal
-        Plume.Syntax.Parser.Modules.Operator
-        Plume.Syntax.Parser.Modules.Slice
-        Plume.Syntax.Parser.Modules.Type
-        Plume.Syntax.Parser.Modules.Pattern
-        Plume.Syntax.Parser.Modules.ParseImports
-
-        Plume.Syntax.Require.Resolution
-        Plume.Syntax.Require.Monad
-        
-        Plume.Syntax.Translation.Generics
-        Plume.Syntax.Translation.ConcreteToAbstract
-        Plume.Syntax.Translation.ConcreteToAbstract.Require
-        Plume.Syntax.Translation.ConcreteToAbstract.MacroResolver
-        Plume.Syntax.Translation.Substitution
-
-        Plume.Syntax.Blocks
-
-        Plume.Syntax.Abstract
-
-        Plume.TypeChecker.TLIR
-
-        Plume.TypeChecker.Monad
-        Plume.TypeChecker.Monad.State
-        Plume.TypeChecker.Monad.Type
-        Plume.TypeChecker.Monad.Error
-        Plume.TypeChecker.Monad.Free
-        Plume.TypeChecker.Monad.Conversion
-
-        Plume.TypeChecker.Checker
-        Plume.TypeChecker.Checker.Monad
-        Plume.TypeChecker.Checker.Application
-        Plume.TypeChecker.Checker.Declaration
-        Plume.TypeChecker.Checker.Closure
-        Plume.TypeChecker.Checker.Condition
-        Plume.TypeChecker.Checker.Extension
-        Plume.TypeChecker.Checker.Datatype
-        Plume.TypeChecker.Checker.Switch
-        Plume.TypeChecker.Checker.Native
-        Plume.TypeChecker.Checker.Interface
-        
-        Plume.TypeChecker.Constraints.Definition
-        Plume.TypeChecker.Constraints.Unification
-        Plume.TypeChecker.Constraints.Solver
-        Plume.TypeChecker.Constraints.Typeclass
-
-        Plume.Compiler.ClosureConversion.Syntax
-        Plume.Compiler.ClosureConversion.Free
-        Plume.Compiler.ClosureConversion.Conversion
-
-        Plume.Compiler.TypeErasure.Syntax
-        Plume.Compiler.TypeErasure.EraseType
-        Plume.Compiler.TypeErasure.DynamicDispatch.Dispatch
-        Plume.Compiler.TypeErasure.DynamicDispatch.RTTI
-
-        Plume.Compiler.Desugaring.Syntax
-        Plume.Compiler.Desugaring.Desugar
-        Plume.Compiler.Desugaring.Monad
-        Plume.Compiler.Desugaring.Modules.ANF
-        Plume.Compiler.Desugaring.Modules.Switch
-
-        Plume.Compiler.SSA
-        Plume.Compiler.SSA.DeadCode
-        Plume.Compiler.SSA.Bundler
-
-        Plume.Compiler.LLIR.Syntax
-        Plume.Compiler.LLIR.Assembler
-        Plume.Compiler.LLIR.Free
-
-        Plume.Compiler.Bytecode.Assembler
-        Plume.Compiler.Bytecode.Label
-        Plume.Compiler.Bytecode.Serialize
-        Plume.Compiler.Bytecode.Syntax
-
-        Plume.Compiler.Javascript.Syntax
-        Plume.Compiler.Javascript.Translate
-
-        System.IO.Pretty
-        System.IO.Color
-
-        Control.Monad.IO
-        Control.Monad.Parser
-        Control.Monad.Exception
-
-        GHC.Records
-
-    hs-source-dirs:     src
-    default-language:   GHC2021
-    default-extensions: 
-      OverloadedStrings
-      OverloadedRecordDot
-      TemplateHaskell
-      DataKinds
-    ghc-options:        -Wall -Wno-orphans
-    build-depends:
-        base ^>=4.19.0.0,
-        megaparsec ^>=9.6.1,
-        containers,
-        mtl,
-        parser-combinators,
-        relude,
-        prettyprinter,
-        prettyprinter-ansi-terminal,
-        filepath,
-        directory,
-        text,
-        binary,
-        template-haskell,
-        MissingH,
-        sorted-list,
-        diagnose,
-
-    mixins:
-        base hiding (Prelude),
-        relude (Relude as Prelude),
-        relude
+  mixins:
+    base hiding (Prelude),
+    relude (Relude as Prelude),
+    relude
 
 executable plume
-    main-is:            Main.hs
-    hs-source-dirs:     app
-    default-language:   GHC2021
-    default-extensions: OverloadedStrings
-    ghc-options:        -Wall -O2
-    build-depends:
-        base ^>=4.19.0.0,
-        plume,
-        relude,
-        filepath,
-        directory
+  main-is:            Main.hs
+  hs-source-dirs:     app
+  default-language:   GHC2021
+  default-extensions: OverloadedStrings
+  ghc-options:        -Wall -O2
+  other-modules:      CLI
+  build-depends:
+    , base                  ^>=4.19.0.0
+    , directory
+    , filepath
+    , optparse-applicative
+    , plume
+    , relude
 
-    if os(mingw32)
-      build-depends: Win32
+  if os(windows)
+    build-depends: Win32
 
-    mixins:
-        base hiding (Prelude),
-        relude (Relude as Prelude),
-        relude
+  mixins:
+    base hiding (Prelude),
+    relude (Relude as Prelude),
+    relude
 
 test-suite plume-test
-    type:             exitcode-stdio-1.0
-    main-is:          Main.hs
-    hs-source-dirs:   test
-    default-language: GHC2021
-    ghc-options:      -Wall
-    build-depends:
-        base ^>=4.19.0.0,
-        plume
+  type:             exitcode-stdio-1.0
+  main-is:          Main.hs
+  hs-source-dirs:   test
+  default-language: GHC2021
+  ghc-options:      -Wall
+  build-depends:
+    , base   ^>=4.19.0.0
+    , plume
