@@ -88,7 +88,7 @@ unboxStatement _ = compilerError "Incorrect statement"
 createConditionExpr :: [Post.DesugaredExpr] -> Post.DesugaredExpr
 createConditionExpr [] = Post.DELiteral (LBool True)
 createConditionExpr [x] = x
-createConditionExpr (x : xs) = x `and''` createConditionExpr xs
+createConditionExpr (x : xs) = x `and'` createConditionExpr xs
 
 createIfsStatement
   :: [Post.DesugaredExpr]
