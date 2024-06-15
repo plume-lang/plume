@@ -142,7 +142,9 @@ loadModule path contentAsText = do
   imports <- liftIO $ parse P.getPaths path contentAsText
 
   case imports of
-    Left e -> error (show e)
+    Left e -> liftIO $ do
+      parseError e path contentAsText
+      exitFailure
 
     Right modules -> do
       isStd <- isStandardPath path

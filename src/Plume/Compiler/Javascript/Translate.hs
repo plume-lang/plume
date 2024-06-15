@@ -29,7 +29,7 @@ assembleNative (Pre.DPNativeFunction lib name _ isStd) = do
   [Post.JSVariableDeclaration name nameCall]
   where
     requireCall = Post.JSCall (Post.JSIdentifier "require") [
-        if isStd then 
+        if isStd == Just "standard" then 
           createStandardPath lib 
         else Post.JSLiteral (Cmm.LString ("./" <> lib))
       ]

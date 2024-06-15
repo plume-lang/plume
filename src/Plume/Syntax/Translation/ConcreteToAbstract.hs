@@ -154,7 +154,10 @@ concreteToAbstract (CST.ENativeFunction fp n gens t libTy _) = do
   -- Native function resolution is kind the same as require resolution
   -- except we do not parse everything.
   let strModName = fromString $ toString fp -<.> sharedLibExt libTy
-  let (isStd, path) = if "std:" `T.isPrefixOf` fp then (True, T.drop 4 strModName) else (False, fromString $ basePath </> toString fp -<.> sharedLibExt libTy)
+  let (isStd, path)
+        | "std:" `T.isPrefixOf` fp = (Just "standard", T.drop 4 strModName)
+        | "mod:" `T.isPrefixOf` fp = (Just "module", T.drop 4 strModName)
+        | otherwise = (Nothing, fromString $ basePath </> toString fp -<.> sharedLibExt libTy)
 
   transRet . Right $ AST.ENativeFunction path n gens t' libTy isStd
 concreteToAbstract (CST.EList es) = do

@@ -162,17 +162,22 @@ encodeProgram (xs, libs, lits) = do
   encodeInteger $ length xs
   mapM_ encodeInstruction xs
 
-prepareLibs :: Libraries -> [(Text, Bool, [Text])]
+prepareLibs :: Libraries -> [(Text, Maybe Text, [Text])]
 prepareLibs m = do
   let (_, ls) = sequence $ Map.toList m
       ls'     = sortBy (compare `on` (\(MkNativeLibrary _ i _ _) -> i)) ls
 
   map (\(MkNativeLibrary p _ s n) -> (p, s, Map.keys n)) ls'
 
-encodeNative :: (Text, Bool, [Text]) -> Put
+encodeType :: Maybe Text -> Put
+encodeType (Just "standard") = putWord8 1
+encodeType (Just "module") = putWord8 2
+encodeType _ = putWord8 0
+
+encodeNative :: (Text, Maybe Text, [Text]) -> Put
 encodeNative (path, isStandard, nats) = do
   encodeText path
-  encodeInteger $ fromEnum isStandard
+  encodeType isStandard
   encodeInteger (length nats)
 
 serialize :: Program -> IO BSL.ByteString

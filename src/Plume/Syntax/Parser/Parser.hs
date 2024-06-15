@@ -605,7 +605,7 @@ tNative = do
   xs <- P.choice [nativeGroup path, nativeOne path]
   
   if extTy `elem` libTy
-    then return (map (\p -> p extTy False) xs)
+    then return (map (\p -> p extTy Nothing) xs)
     else return []
   where
     nativeGroup p = L.braces (P.many (parseNative p))

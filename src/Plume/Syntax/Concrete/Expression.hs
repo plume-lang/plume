@@ -16,7 +16,7 @@ import Plume.Syntax.Common.Type
 import Text.Megaparsec.Pos
 import Prelude hiding (intercalate)
 
-type IsStandard = Bool
+type IsStandard = Maybe Text
 
 -- | A position is a tuple of two source positions.
 -- | The first position is the start position and the second position

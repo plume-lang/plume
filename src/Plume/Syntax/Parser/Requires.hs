@@ -38,6 +38,7 @@ parseImports =
     *> sepEndBy1
       ( choice
           [ try eRequire
+          , Other <$ stringLiteral
           , Other <$ anySingle
           ]
       )
@@ -76,6 +77,7 @@ parseOperators = do
     sepEndBy1 
       ( choice
           [ try ((Operator <$>) <$> parseOperator)
+          , [OtherOperator] <$ stringLiteral
           , [OtherOperator] <$ anySingle
           ]
       )
