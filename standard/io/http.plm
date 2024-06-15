@@ -1,6 +1,17 @@
 require "std:datatypes/result"
 require "async"
+require "std:classes"
 
-native "native" "std:native" fetch(url: str): Result<str, str>
+type Response {  }
+
+native "native" "std:native" {
+  fetch(url: str): Result<str, str>
+  create_server(port: int, message: Option<str>, callback: fn(Response): unit): unit
+  respond(res: Response, body: str, status: int): unit
+}
 
 native "js" "std:native" fetch(url: str): async<Result<str, str>>
+
+extend show<Response> {
+  fn show_prec(_, _) => "Response"
+}
