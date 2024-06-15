@@ -1,0 +1,19 @@
+require "std:io/http"
+require "mod:plume-lang/http-parser"
+
+port = 8080
+
+create_server(
+  port, Some("Server running on port $port"), 
+  fn(res, body: str) => switch body.parse_request() {
+    case Ok(Request(method, path, headers)) {
+      user_agent = headers.get("User-Agent")
+
+      println(user_agent)
+
+      res.respond("Hello world", 200)
+    }
+
+    case Error(e) => println(e)
+  }
+)
