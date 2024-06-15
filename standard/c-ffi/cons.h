@@ -7,6 +7,9 @@ Value make_some(GarbageCollector gc, Value v);
 Value make_none(GarbageCollector gc);
 Value MAKE_CHAR(GarbageCollector gc, char c);
 
+bool is_some(Value v);
+Value get_some(Value v);
+
 Value make_unit(GarbageCollector gc);
 
 Value make_ok(GarbageCollector gc, Value v);

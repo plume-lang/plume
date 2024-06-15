@@ -1,9 +1,11 @@
 add_rules("mode.release")
 add_requires("libcurl", { system = false })
+add_requires("llhttp", { system = false })
 
 target("plume-natives")
   set_kind("shared")
   add_packages("libcurl")
+  add_packages("llhttp")
 
   add_files("c-ffi/**.c")
   add_includedirs("../runtime/include")

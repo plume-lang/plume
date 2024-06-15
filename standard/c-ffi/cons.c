@@ -13,6 +13,20 @@ Value make_some(GarbageCollector gc, Value v) {
   return MAKE_LIST(gc, values, 4);
 }
 
+bool is_some(Value v) {
+  HeapValue* p = GET_PTR(v);
+  Value* l = p->as_ptr;
+  return l[0] == kNull && strcmp(GET_STRING(l[1]), "Option") == 0 &&
+         strcmp(GET_STRING(l[2]), "Some") == 0;
+}
+
+Value get_some(Value v) {
+  HeapValue* p = GET_PTR(v);
+  Value* l = p->as_ptr;
+
+  return l[3];
+}
+
 Value make_unit(GarbageCollector gc) {
   Value* values = malloc(sizeof(Value) * 3);
   values[0] = MAKE_SPECIAL();
