@@ -1,5 +1,6 @@
 require "string"
 require "std:classes"
+require "tuple"
 
 type Option<T> {
   Some(T),
@@ -91,5 +92,13 @@ fn simplify_option<T>(x: Option<Option<T>>): Option<T> {
   return switch x {
     case Some(Some(a)) => Some(a)
     case ? => None
+  }
+}
+
+extend<A extends equality> equality<Option<A>> {
+  fn (==) (a: Option<A>, b: Option<A>): bool => switch (a, b) {
+    case (Some(x), Some(y)) => x == y
+    case (None, None) => true
+    case ? => false
   }
 }
