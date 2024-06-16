@@ -1,8 +1,12 @@
 require "std:datatypes/result"
 require "async"
+require "std:datatypes/map"
 require "std:classes"
 
 type Response {  }
+
+fn to_header(m: Map<str>): str =>
+  m.to_list().map(fn case (k, v) => "$k: $v").join_str("\r\n")
 
 native "native" "std:native" {
   fetch(url: str): Result<str, str>
