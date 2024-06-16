@@ -145,6 +145,8 @@ concreteToAbstract (CST.ETypeExtension g ann var ems) = do
     fmap flat . sequence <$> mapM concreteToAbstractExtensionMember ems
   transRet $ AST.ETypeExtension g ann' var <$> ems'
 concreteToAbstract (CST.ENativeFunction fp n gens t libTy _) = do
+  sc <- readIORef mode
+
   t' <- transformType t
   dir <- asks fst
   initialDir <- liftIO $ readIORef initialCWD
@@ -154,12 +156,32 @@ concreteToAbstract (CST.ENativeFunction fp n gens t libTy _) = do
   -- Native function resolution is kind the same as require resolution
   -- except we do not parse everything.
   let strModName = fromString $ toString fp -<.> sharedLibExt libTy
-  let (isStd, path)
-        | "std:" `T.isPrefixOf` fp = (Just "standard", T.drop 4 strModName)
-        | "mod:" `T.isPrefixOf` fp = (Just "module", T.drop 4 strModName)
-        | otherwise = (Nothing, fromString $ basePath </> toString fp -<.> sharedLibExt libTy)
+  let (_, path)
+        | "std:" `T.isPrefixOf` fp = 
+            (Just "standard" :: Maybe String, T.drop 4 strModName)
+        | "mod:" `T.isPrefixOf` fp = 
+            (Just "module", T.drop 4 strModName)
+        | otherwise = 
+            (Nothing, fromString $ basePath </> toString fp -<.> sharedLibExt libTy)
 
-  transRet . Right $ AST.ENativeFunction path n gens t' libTy isStd
+  newPath <- case sc of
+    Just "standard" -> do 
+      p <- liftIO $ readIORef stdPath
+      case p of
+        Just p' -> do
+          let diff = filepathDifference p' (toString path)
+          return (fromString diff)
+        Nothing -> return path
+    Just "module" -> do
+      p <- liftIO $ readIORef modulePath
+      case p of
+        Just p' -> do
+          let diff = filepathDifference (p' </> "modules") (toString path)
+          return (fromString diff)
+        Nothing -> return path
+    _ -> return path
+
+  transRet . Right $ AST.ENativeFunction newPath n gens t' libTy sc
 concreteToAbstract (CST.EList es) = do
   -- Lists can be composed of spread elements, so we need to flatten
   -- the list of expressions into a single expression.

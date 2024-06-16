@@ -26,6 +26,10 @@ stdPath = unsafePerformIO $ newIORef Nothing
 modulePath :: IORef (Maybe FilePath)
 modulePath = unsafePerformIO $ newIORef Nothing
 
+{-# NOINLINE mode #-}
+mode :: IORef (Maybe Text)
+mode = unsafePerformIO $ newIORef Nothing
+
 -- | Keeping track of the current position in the file
 -- | Used to provide better error messages
 {-# NOINLINE positionRef #-}

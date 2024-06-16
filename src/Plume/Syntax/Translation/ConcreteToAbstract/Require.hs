@@ -17,6 +17,10 @@ import System.FilePath
 import System.Path.NameManip (guess_dotdot, absolute_path)
 import Data.Maybe (fromJust)
 
+filepathDifference :: FilePath -> FilePath -> FilePath
+filepathDifference (x:xs) (y:ys) | x == y = filepathDifference xs ys
+filepathDifference _ ys = ys
+
 relativize :: FilePath -> FilePath -> FilePath
 relativize from to = joinPath $ go (splitPath from) (splitPath to)
   where
@@ -56,12 +60,19 @@ fromEither a _ = a
 -- |  - Can be a module with a specific extension if the extension is provided,
 -- |    for instance native functions are loaded from shared libraries with the
 -- |    extension ".so" on Linux, ".dylib" on macOS and ".dll" on Windows.
-getPath :: FilePath -> Maybe FilePath -> IOReader (FilePath, Bool) FilePath
+getPath :: FilePath -> Maybe FilePath -> IOReader (FilePath, Bool) (FilePath, Maybe Text)
 getPath modName ext = do
   cwd <- asks fst
   let strModName = toString modName -<.> fromMaybe "plm" ext
   let isStd = "std:" `isPrefixOf` modName
   let isMod = "mod:" `isPrefixOf` modName
+  
+  scope <- readIORef mode
+  let newScope = case scope of
+        _ | isStd -> Just "standard"
+        _ | isMod -> Just "module"
+        _ -> scope
+
   let modPath 
         | isStd = do
             p <- liftIO $ readIORef stdPath
@@ -83,14 +94,20 @@ getPath modName ext = do
     False | isMod -> liftIO (doesDirectoryExist resWithoutExt)
     _ -> return False
 
-  if isDir then return $ resWithoutExt </> "main.plm" else return res
+  if isDir 
+      then return (resWithoutExt </> "main.plm", newScope) 
+      else return (res, newScope)
 
 -- | Convert a require expression to an abstract expression
 -- | This function is used to load a module and parse it
 convertRequire
   :: Translator Error CST.Expression AST.Expression
 convertRequire f (CST.ERequire modName) = do
-  path <- getPath (toString modName) Nothing
+  oldScope <- readIORef mode
+  (path, scope) <- getPath (toString modName) Nothing
+  
+  writeIORef mode scope
+
   liftIO (doesFileExist path) >>= \case
     False -> do
       pos <- readIORef positionRef
@@ -116,6 +133,7 @@ convertRequire f (CST.ERequire modName) = do
           -- Fetching imports from the module file
           paths <- liftIO $! fromEither [] <$> parse getPaths path content
           exprs <- translateImports paths newCurrentDirectory f
+          writeIORef mode oldScope
         
           res <- parseFile (path, content) newCurrentDirectory
 
@@ -124,7 +142,8 @@ convertRequire f (CST.ERequire modName) = do
               Left err -> throwError err
               Right cst -> sequenceMapM f cst >>= \case
                 Left err -> throwError err
-                Right ast -> bireturn . Spread $ exprs <> flat ast
+                Right ast -> do
+                  bireturn . Spread $ exprs <> flat ast
 
 convertRequire _ _ = throwError $ CompilerError "Received invalid require expression"
 
