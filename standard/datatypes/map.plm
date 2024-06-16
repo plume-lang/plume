@@ -1,6 +1,6 @@
 require "std:classes"
 require "option"
-require "std:io"
+require "tuple"
 
 type Map<V> {
   Node(str, V, Map<V>),
@@ -37,6 +37,12 @@ fn from_list<V>(l: list<(str, V)>): Map<V> =>
     case (k, v) => insert(k, v, acc)
   }, Empty)
 
+fn to_list<V extends equality>(m: Map<V>): list<(str, V)> =>
+  switch m {
+    case Node(k, v, rest) => [(k, v)] + to_list(rest)
+    case Empty => []
+  }
+
 fn get<V>(m: Map<V>, k: str): Option<V> =>
   switch m {
     case Node(k1, v, rest) => 
@@ -46,3 +52,11 @@ fn get<V>(m: Map<V>, k: str): Option<V> =>
     case Empty =>
       None
   }
+
+extend foldable<Map> {
+  fn foldl(m, f, acc) =>
+    switch m {
+      case Node(?, v, rest) => rest.foldl(f, f(acc, v))
+      case Empty => acc
+    }
+}
