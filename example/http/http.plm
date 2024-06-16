@@ -1,7 +1,7 @@
 require "std:io/http"
 require "mod:plume-lang/http-parser"
 
-port = 8080
+port = 8000
 
 create_server(
   port, Some("Server running on port $port"), 
@@ -14,6 +14,9 @@ create_server(
       res.respond("Hello world", 200)
     }
 
-    case Error(e) => println(e)
+    case Error(e) {
+      println(e)
+      println(body)
+    }
   }
 )
