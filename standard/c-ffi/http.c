@@ -39,7 +39,7 @@ Value fetch(size_t argc, Module* mod, Value* args) {
 
   struct MemoryStruct mem;
   mem.gc = gc;
-  mem.memory = malloc(1);
+  mem.memory = gc_malloc(&mod->gc, 1);
   mem.size = 0;
 
   CURL* curl = curl_easy_init();
@@ -91,10 +91,9 @@ Value call_callback(size_t argc, Module* mod, Value* args) {
 
 #define BUFFER_SIZE 1024
 
-Value handle_client(int client_socket, Module *mod, Value handler);
+void handle_client(int client_socket, Module *mod, Value handler);
 
 Value create_server(size_t argc, Module* mod, Value* args) {
-
   int PORT = GET_INT(args[0]);
   Value start_message = args[1];
   Value handler = args[2];
@@ -188,7 +187,9 @@ Value create_server(size_t argc, Module* mod, Value* args) {
     }
 #endif
 
+    gc_pause(&mod->gc);
     handle_client(client_socket, mod, handler);
+    gc_resume(&mod->gc);
 
 #ifdef _WIN32
     closesocket(client_socket);
@@ -204,30 +205,31 @@ Value create_server(size_t argc, Module* mod, Value* args) {
   close(server_socket);
 #endif
 
+  gc_run(&mod->gc);
   return 0;
 }
 
-Value handle_client(int client_socket, Module *mod, Value handler) {
-  char buffer[BUFFER_SIZE];
+void handle_client(int client_socket, Module *mod, Value handler) {
+  char *buffer = (char *)gc_malloc(&mod->gc, BUFFER_SIZE);
   int bytes_read = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
 
   if (bytes_read < 0) {
     perror("recv failed");
-    return make_unit(mod->gc);
+    return;
   }
 
   buffer[bytes_read] = '\0';
-
+  
   HeapValue* response_obj = gc_malloc(&mod->gc, sizeof(HeapValue));
   response_obj->type = TYPE_API;
   response_obj->as_any = &client_socket;
 
-  Value ret = mod->call_function(mod, handler, 3, (Value[]) {
-    MAKE_PTR(response_obj),
-    MAKE_STRING(mod->gc, buffer),
-  });
+  Value res = MAKE_PTR(response_obj);
+  Value buf = MAKE_STRING(mod->gc, buffer);
+  Value ret = mod->call_function(mod, handler, 3, (Value[]) { res, buf });
 
-  return make_unit(mod->gc);
+  gc_free(&mod->gc, buffer);
+  gc_free(&mod->gc, response_obj);
 }
 
 Value respond(size_t argc, Module* mod, Value* args) {
@@ -252,6 +254,7 @@ Value respond(size_t argc, Module* mod, Value* args) {
           status, strlen(content), content);
 
   send(client_socket, response, strlen(response), 0);
+  gc_free(&mod->gc, response);
 
   return make_unit(mod->gc);
 }

@@ -4,7 +4,7 @@
 #include <value.h>
 
 Value make_some(GarbageCollector gc, Value v) {
-  Value* values = malloc(sizeof(Value) * 4);
+  Value* values = gc_malloc(&gc, sizeof(Value) * 4);
   values[0] = MAKE_SPECIAL();
   values[1] = MAKE_STRING(gc, "Option");
   values[2] = MAKE_STRING(gc, "Some");
@@ -28,7 +28,7 @@ Value get_some(Value v) {
 }
 
 Value make_unit(GarbageCollector gc) {
-  Value* values = malloc(sizeof(Value) * 3);
+  Value* values = gc_malloc(&gc, sizeof(Value) * 3);
   values[0] = MAKE_SPECIAL();
   values[1] = MAKE_STRING(gc, "unit");
   values[2] = MAKE_STRING(gc, "unit");
@@ -37,7 +37,7 @@ Value make_unit(GarbageCollector gc) {
 }
 
 Value make_none(GarbageCollector gc) {
-  Value* values = malloc(sizeof(Value) * 3);
+  Value* values = gc_malloc(&gc, sizeof(Value) * 3);
   values[0] = MAKE_SPECIAL();
   values[1] = MAKE_STRING(gc, "Option");
   values[2] = MAKE_STRING(gc, "None");
@@ -54,7 +54,7 @@ Value MAKE_CHAR(GarbageCollector gc, char c) {
 }
 
 Value make_ok(GarbageCollector gc, Value v) {
-  Value* values = malloc(sizeof(Value) * 4);
+  Value* values = gc_malloc(&gc, sizeof(Value) * 4);
   values[0] = MAKE_SPECIAL();
   values[1] = MAKE_STRING(gc, "Result");
   values[2] = MAKE_STRING(gc, "Ok");
@@ -64,7 +64,7 @@ Value make_ok(GarbageCollector gc, Value v) {
 }
 
 Value make_err(GarbageCollector gc, Value v) {
-  Value* values = malloc(sizeof(Value) * 4);
+  Value* values = gc_malloc(&gc, sizeof(Value) * 4);
   values[0] = MAKE_SPECIAL();
   values[1] = MAKE_STRING(gc, "Result");
   values[2] = MAKE_STRING(gc, "Error");
@@ -110,6 +110,11 @@ void print_helper(Value v) {
 
     case TYPE_FUNCTION: case TYPE_FUNCENV: {
       printf("<function>");
+      break;
+    }
+
+    case TYPE_API: {
+      printf("<api>");
       break;
     }
   }

@@ -112,7 +112,7 @@ Value input(int arg_n, Module* mod, Value* args) {
   ASSERT(get_type(prompt)== TYPE_STRING, "Input expects a string argument");
 
   
-  char* buffer = malloc(1024);
+  char* buffer = gc_malloc(&mod->gc, 1024);
   printf("%s", GET_STRING(prompt));
   scanf("%s", buffer);
 
@@ -162,7 +162,7 @@ Value read_file(size_t argc, Module *mod, Value *args) {
   long length = ftell(file);
   fseek(file, 0, SEEK_SET);
 
-  char *contents = malloc(length + 1);
+  char *contents = gc_malloc(&mod->gc, length + 1);
   fread(contents, 1, length, file);
   contents[length] = '\0';
 
