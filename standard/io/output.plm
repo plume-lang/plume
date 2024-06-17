@@ -5,7 +5,7 @@ native ("native", "js") "std:native" {
   ffi_println(x: str): int
 }
 
-fn print<A extends show>(xs: ..A): unit {
+fn vprint<A extends show>(xs: ..A): unit {
   xs.map(fn (x) {
     ffi_print(x.show())
     ffi_print(" ")
@@ -14,12 +14,22 @@ fn print<A extends show>(xs: ..A): unit {
   return unit
 }
 
-fn println<A extends show>(xs: ..A): unit {
+fn vprintln<A extends show>(xs: ..A): unit {
   xs.map(fn (x) {
     ffi_print(x.show())
     ffi_print(" ")
   })
 
   ffi_print("\n")
+  return unit
+}
+
+fn print<A extends show>(x: A): unit {
+  ffi_print(x.show())
+  return unit
+}
+
+fn println<A extends show>(x: A): unit {
+  ffi_println(x.show())
   return unit
 }
