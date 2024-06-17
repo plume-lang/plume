@@ -422,7 +422,7 @@ sMutDeclaration = do
 
   body <- P.optional $ L.reserved "in" *> eBlock
 
-  return $ CST.EDeclaration [] name value body
+  return $ CST.EDeclaration [] (name { Cmm.isMutable = True }) value body
 
 -- | Parses a declaration
 -- | A declaration is a statement that is used to declare a immutable
