@@ -148,6 +148,7 @@ eraseStatement (Pre.EConditionBranch e1 e2 e3) = do
 eraseStatement e = Post.USExpr <$> eraseExpr e
 
 eraseExpr :: Pre.TypedExpression -> IO Post.UntypedExpr
+eraseExpr (Pre.EUnMut e) = Post.UEUnMut <$> eraseExpr e
 eraseExpr (Pre.EDeclaration _ (Annotation n _ True) e1 e2) = do
   e1' <- eraseExpr e1
   e2' <- maybeM e2 eraseExpr
@@ -164,7 +165,6 @@ eraseExpr (Pre.EVariable x _) = pure $ Post.UEVar x.identifier
 eraseExpr (Pre.EApplication f args) =
   Post.UEApplication <$> eraseExpr f <*> mapM eraseExpr args
 eraseExpr (Pre.ELiteral l) = pure $ Post.UELiteral l
-eraseExpr (Pre.EUnMut e) = Post.UEUnMut <$> eraseExpr e
 eraseExpr (Pre.EList es) = Post.UEList <$> mapM eraseExpr es
 eraseExpr (Pre.EDeclaration _ (Annotation n _ _) e1 e2) = case e2 of
   Just e2' -> Post.UEDeclaration n.identifier <$> eraseExpr e1 <*> eraseExpr e2'
