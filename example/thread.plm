@@ -1,0 +1,30 @@
+require "std:io/thread"
+
+mut x = 6
+
+th1 = create_thread(fn(thread) {
+  println("Hello from thread")
+  thread_sleep(1000)
+  println("thread 1: " + x.show())
+  x = 7
+  return 8
+})
+
+th2 = create_thread(fn(thread) {
+  println("Hello from thread")
+  thread_sleep(1000)
+  println("thread 2: " + x.show())
+  thread_sleep(1000)
+  println("thread 2: " + x.show())
+  return 8
+})
+
+println("Hello from main thread")
+
+th1.join_thread()
+
+println("Thread 1 finished")
+
+th2.join_thread()
+
+println("Thread 2 finished")
