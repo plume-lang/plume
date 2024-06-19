@@ -7,11 +7,17 @@ create_server(
   port, Some("Server running on port $port"), 
   fn(res, body: str) => switch body.parse_request() {
     case Ok(Request(method, path, headers)) {
-      user_agent = headers.get("User-Agent")
+      user_agent = headers.get("User-Agent").or_else("Unknown")
 
-      println(user_agent)
-
-      res.respond("Hello world", 200)
+      res.respond_with_headers("
+        <html>
+            <body>
+              <h1>$user_agent</h1>
+            </body>
+        </html>
+      ", 200, from_list([
+        ("Content-Type", "text/html")
+      ]))
     }
 
     case Error(e) {
