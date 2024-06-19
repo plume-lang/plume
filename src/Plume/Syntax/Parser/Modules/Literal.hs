@@ -35,7 +35,7 @@ parseStringWithInterpolation = lexeme $ do
 
   where
     showApp :: Expression -> Expression
-    showApp x = EApplication (EProperty "to_str" x) []
+    showApp x = EApplication (EProperty "show" x) []
 
     buildString :: [Char] -> Expression
     buildString [] = ELiteral (LString "")
