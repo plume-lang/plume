@@ -13,10 +13,11 @@
 #define sleep_(x) sleep(x / 1000)
 #endif
 
-#define MAX_THREADS 10
+#define MAX_THREADS 50
 
 struct threads {
   thread_t threads[MAX_THREADS];
+  Value returns[MAX_THREADS];
   int count;
   pthread_mutex_t mutex_count;
 };
@@ -58,6 +59,9 @@ void* thread_function(void *arg) {
   
   gc_pause(&mod->gc);
   Value result = mod->call_threaded(mod, handler, 2, (Value[]) { data->thread });
+
+  threads.returns[threads.count] = result;
+
   gc_resume(&mod->gc);
 
   return NULL;
@@ -127,7 +131,6 @@ Value join_thread(size_t argc, Module* mod, Value* args) {
       }
     }
 
-    // gc_resume(&mod->gc);
-    return MAKE_INTEGER(res);
+    return threads.returns[th_id];
 #endif
 }
