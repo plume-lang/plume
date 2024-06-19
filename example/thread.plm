@@ -1,30 +1,31 @@
-require "std:io/thread"
+require "std:io/async"
 
 mut x = 6
 
-th1 = create_thread(fn(thread) {
+async fn th1(i: int) {
   println("Hello from thread")
-  thread_sleep(1000)
-  println("thread 1: " + x.show())
-  x = 7
-  return 8
-})
+  sleep(1000)
+  println("thread 1: $x")
+  x = 7 + i
 
-th2 = create_thread(fn(thread) {
+  return 8
+}
+
+async fn th2() {
   println("Hello from thread")
   thread_sleep(1000)
-  println("thread 2: " + x.show())
+  println("thread 2: $x")
   thread_sleep(1000)
-  println("thread 2: " + x.show())
-  return 8
-})
+  println("thread 2: $x")
+
+  return 9
+}
 
 println("Hello from main thread")
 
-th1.join_thread()
+res2 = await th2()
+res = await th1(5)
 
-println("Thread 1 finished")
-
-th2.join_thread()
-
-println("Thread 2 finished")
+println("Finished all threads")
+println(res)
+println(res2)
