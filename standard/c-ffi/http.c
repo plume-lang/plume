@@ -258,3 +258,36 @@ Value respond(size_t argc, Module* mod, Value* args) {
 
   return make_unit(mod->gc);
 }
+
+Value respond_with(size_t argc, Module* mod, Value* args) {
+  ASSERT_ARGC("respond_with", argc, 4);
+  Value response_obj = args[0];
+  Value content = args[1];
+  Value status = args[2];
+  Value headers = args[3];
+  ASSERT_TYPE("respond_with", response_obj, TYPE_API);
+  ASSERT_TYPE("respond_with", content, TYPE_STRING);
+  ASSERT_TYPE("respond_with", status, TYPE_INTEGER);
+  ASSERT_TYPE("respond_with", headers, TYPE_STRING);
+
+  HeapValue* response_hp = GET_PTR(response_obj);
+  int client_socket = *(int*) response_hp->as_any;
+
+  const char* content_str = GET_STRING(content);
+  int status_int = GET_INT(status);
+  const char* headers_str = GET_STRING(headers);
+
+  char* response = gc_malloc(&mod->gc, strlen(content_str) + 100);
+  sprintf(response,
+          "HTTP/1.1 %d OK\r\n"
+          "%s\r\n"
+          "Content-Length: %zu\r\n"
+          "\r\n"
+          "%s",
+          status_int, headers_str, strlen(content_str), content_str);
+
+  send(client_socket, response, strlen(response), 0);
+  gc_free(&mod->gc, response);
+
+  return make_unit(mod->gc);
+}
