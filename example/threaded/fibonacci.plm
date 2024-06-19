@@ -1,0 +1,10 @@
+require "../basic/fibonacci"
+require "../basic/helper"
+require "std:io/async"
+
+xs = range(0, 31).map(async fn(n) {
+  f = fib(n)
+  println("fib($n) = $f")
+})
+
+ys = xs.map(fn (x) => x.join_thread())
