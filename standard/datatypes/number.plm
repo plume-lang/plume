@@ -97,5 +97,5 @@ extend to_str<float> {
 }
 
 macro e = 2.718282
-fn expf(x: float): float => pow_float(@e, x)
+fn expf(x: float): float => pow_float(#e, x)
 fn exp(x: int): float => expf(x.int_to_float())
