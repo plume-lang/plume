@@ -1,20 +1,12 @@
-fn facto (n: int): int =>
+require "helper"
+
+fn facto_with_tco(n: int, acc: int): int =>
   switch n {
-    case 0 => 1
-    case ? {
-      f = facto(n - 1)
-      return n * f
-    }
+    case 0 => acc
+    case ? => facto_with_tco(n - 1, n * acc)
   }
 
-
-fn range(from: int, to: int): [int] {
-  if from == to {
-    return []
-  } else {
-    return [from] + range(from + 1, to)
-  }
-}
+fn facto (n: int): int => facto_with_tco(n, 1)
 
 xs = range(0, 11).map(fn(n) => (n, facto(n)))
 

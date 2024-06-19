@@ -1,3 +1,5 @@
+require "helper"
+
 fn fib_with_tco(n: int, a: int, b: int): int {
   if n == 0 {
     return a
@@ -6,4 +8,10 @@ fn fib_with_tco(n: int, a: int, b: int): int {
   }
 }
 
-println(fib_with_tco(30, 0, 1))
+fn fib(n: int) => fib_with_tco(n, 0, 1)
+
+xs = range(0, 31).map(fn (n) => (n, fib(n)))
+
+xs.map(fn case (n, fib_n) {
+  println("fib($n) = $fib_n")
+})
