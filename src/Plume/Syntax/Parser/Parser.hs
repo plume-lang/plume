@@ -174,6 +174,24 @@ eIf = do
 
   CST.EConditionBranch cond thenBlock <$> eBlock
 
+eIfThenMacro :: P.Parser CST.Expression
+eIfThenMacro = do
+  void $ L.reserved "#if"
+  cond <- parseExpression
+  
+  CST.EMacroIf cond <$> eBlockMacro
+  where eBlockMacro = CST.EBlock . concat <$> L.braces (P.many parseToplevel)
+
+eIfThenElseMacro :: P.Parser CST.Expression
+eIfThenElseMacro = do
+  void $ L.reserved "#if"
+  cond <- parseExpression
+  thenBlock <- eBlockMacro
+  void $ L.reserved "#else"
+  
+  CST.EMacroIfElse cond thenBlock <$> eBlockMacro
+  where eBlockMacro = CST.EBlock . concat <$> L.braces (P.many parseToplevel)
+
 -- | Parses a switch expression
 -- | A switch expression is a conditional expression that may have multiple
 -- | cases. It is the equivalent of a case-of expression in Haskell.
@@ -219,11 +237,11 @@ eAwait = do
 -- | Parses a macro expression
 -- | A macro expression is a special kind of expression that is used to
 -- | reference a macro variable or a macro function.
--- | Both are prefixed by the `@` symbol.
+-- | Both are prefixed by the `#` symbol.
 -- |
 -- | SYNTAX:
--- |  - @variable
--- |  - @function(arg1, arg2, ...)
+-- |  - #variable
+-- |  - #function(arg1, arg2, ...)
 -- | where `variable` and `function` are identifiers and `arg1`, `arg2`, ...
 -- | are expressions.
 eMacroExpr :: P.Parser CST.Expression
@@ -235,12 +253,12 @@ eMacroExpr =
  where
   parseMacroVar :: P.Parser CST.Expression
   parseMacroVar = do
-    name <- P.char '@' *> L.identifier
+    name <- P.char '#' *> L.identifier
     return $ CST.EMacroVariable name
 
   parseMacroCall :: P.Parser CST.Expression
   parseMacroCall = do
-    name <- P.try $ P.char '@' *> L.identifier <* L.symbol "("
+    name <- P.try $ P.char '#' *> L.identifier <* L.symbol "("
     args <- parseExpression `P.sepBy` L.comma
     void $ L.symbol ")"
 
@@ -311,6 +329,8 @@ parseTerm :: P.Parser CST.Expression
 parseTerm =
   P.choice
     [ Lit.parseLiteral
+    , P.try eIfThenElseMacro
+    , eIfThenMacro
     , eIf
     , eAwait
     , eSwitch
@@ -472,6 +492,33 @@ sFunction = do
       cl
       Nothing
 
+sAsyncFunction :: P.Parser CST.Expression
+sAsyncFunction = do
+  extTy <- readIORef P.extensionType
+
+  when (extTy /= "native") $ 
+    fail "Async functions are only allowed in native context."
+
+  void $ L.reserved "async"
+  void $ L.reserved "fn"
+  name <- L.identifier <|> L.parens L.operator
+  generics <- P.option [] $ L.angles $ Typ.parseGeneric `P.sepBy` L.comma
+  args <- L.parens $ mutArg `P.sepBy` L.comma
+  retTy <- P.optional $ L.symbol ":" *> Typ.tType
+  body <- L.symbol "=>" *> parseExpression <|> eBlock
+
+  let threadBody = CST.EApplication (CST.EVariable "create_thread" Nothing) [CST.EClosure [] Nothing body False]
+
+  let cl = CST.EClosure args retTy threadBody False
+
+  return $
+    CST.EDeclaration
+      generics
+      (Cmm.fromText name Cmm.:@: Nothing)
+      cl
+      Nothing
+
+
 -- | Parses a statement
 -- | A statement is an expression that can be used both in top-level scope
 -- | and in local scope (inside a block).
@@ -481,6 +528,7 @@ parseStatement =
     P.choice
       [ sMutDeclaration
       , sDeclaration
+      , P.try sAsyncFunction
       , sFunction
       , sReturn
       , parseExpression

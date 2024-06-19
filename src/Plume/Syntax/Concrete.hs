@@ -20,7 +20,9 @@ module Plume.Syntax.Concrete (
   pattern EMacroApplication,
   pattern EMacroVariable,
   pattern EMacroFunction,
-  pattern EMacro
+  pattern EMacro,
+  pattern EMacroIf,
+  pattern EMacroIfElse
 ) where
 
 -- Main core AST module
@@ -75,3 +77,9 @@ pattern EMacroFunction n a e = CST.EDeclaration [] (Cmm.Annotation (Cmm.MkIdenti
 
 pattern EMacro :: Text -> Expression -> Expression
 pattern EMacro n e = CST.EDeclaration [] (Cmm.Annotation (Cmm.MkIdentifier n True) Nothing False) e Nothing
+
+pattern EMacroIf :: Expression -> Expression -> Expression
+pattern EMacroIf c e = EMacroApplication "if" [c, e]
+
+pattern EMacroIfElse :: Expression -> Expression -> Expression -> Expression
+pattern EMacroIfElse c e1 e2 = EMacroApplication "if_else" [c, e1, e2]

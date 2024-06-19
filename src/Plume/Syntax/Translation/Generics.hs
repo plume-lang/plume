@@ -73,6 +73,8 @@ data Error
   | ModuleNotFound Text Position
   | NoPositionSaved
   | ParserError ParsingError FilePath FileContent
+  | MacroError Text Position
+  deriving (Show)
 
 instance Throwable Error where
   showError = \case
@@ -90,6 +92,7 @@ instance Throwable Error where
       "Module " <> name <> " not found at " <> show pos
     NoPositionSaved -> "No position saved"
     ParserError err _ _ -> showError err
+    MacroError err _ -> err
 
 -- | A translator error is a type that represents an error that can occur
 -- | during the translation process. It is a type alias for an Either type
@@ -253,4 +256,9 @@ interpretError (ArgumentsMismatch args n p) =
     , Nothing
     , p
     )
+    "while performing macro resolution"
+interpretError (MacroError e p) = 
+  printErrorFromString 
+    mempty 
+    (toString e, Nothing, p) 
     "while performing macro resolution"

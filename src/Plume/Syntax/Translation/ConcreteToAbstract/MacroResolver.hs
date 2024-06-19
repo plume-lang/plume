@@ -9,6 +9,13 @@ import Plume.Syntax.Concrete qualified as CST
 import Plume.Syntax.Translation.Generics
 import Plume.Syntax.Translation.Substitution
 import Plume.Syntax.Common
+import Control.Monad.Parser
+
+getBlock :: Spreadable [AST.Expression] AST.Expression -> [AST.Expression]
+getBlock (Spread a) = a
+getBlock (Single (AST.EBlock es)) = es
+getBlock (Single e) = getBlock (Single $ removeLocation e)
+getBlock Empty = []
 
 -- | Macro body can be a single expression, a spread of expressions
 -- | but it can't be empty
@@ -25,9 +32,64 @@ data MacroState = MacroState
 macroState :: IORef MacroState
 macroState = unsafePerformIO $ newIORef $ MacroState mempty mempty
 
+removeLocation :: AST.Expression -> AST.Expression
+removeLocation (AST.ELocated e _) = removeLocation e
+removeLocation e = e
+
 -- | Convert all macro expressions (macro variables and macro applications)
 -- | with their corresponding values
 convertMacro :: Translator Error CST.Expression AST.Expression
+convertMacro _ (CST.EMacroVariable "JS_BACKEND") = do
+  ext <- readIORef extensionType
+  case ext of
+    "js" -> return $ Right $ Spread [AST.ELiteral (LBool True)]
+    _ -> return $ Right $ Spread [AST.ELiteral (LBool False)]
+convertMacro _ (CST.EMacroVariable "NATIVE_BACKEND") = do
+  ext <- readIORef extensionType
+  case ext of
+    "native" -> return $ Right $ Spread [AST.ELiteral (LBool True)]
+    _ -> return $ Right $ Spread [AST.ELiteral (LBool False)]
+convertMacro f (CST.EMacroIf cond thenExpr) = do
+  cond' <- shouldBeAlone <$> f cond
+  thenExpr' <- f thenExpr
+  
+  case removeLocation <$> cond' of
+    Left e -> return $ Left e
+    Right (AST.ELiteral (LBool True)) -> case mapSpreadable removeLocation <$> thenExpr' of
+      Left e -> return $ Left e
+      Right e -> do
+        let e' = getBlock e
+        return $ Right $ Spread e'
+    Right (AST.ELiteral (LBool False)) -> return $ Right Empty
+    _ -> do
+      pos <- readIORef positionRef
+      case pos of
+        Just p -> throwError $ MacroError "Condition couldn't be evaluated" p
+        Nothing -> throwError NoPositionSaved
+convertMacro f (CST.EMacroIfElse cond thenExpr elseExpr) = do
+  cond' <- shouldBeAlone <$> f cond
+  thenExpr' <- f thenExpr
+  elseExpr' <- f elseExpr
+
+  case removeLocation <$> cond' of
+    Left e -> return $ Left e
+    Right (AST.ELiteral (LBool True)) -> 
+      case mapSpreadable removeLocation <$> thenExpr' of
+        Left e -> return $ Left e
+        Right e -> do
+          let e' = getBlock e
+          return $ Right $ Spread e'
+    Right (AST.ELiteral (LBool False)) -> 
+      case mapSpreadable removeLocation <$> elseExpr' of
+        Left e -> return $ Left e
+        Right e -> do
+          let e' = getBlock e
+          return $ Right $ Spread e'
+    _ -> do
+      pos <- readIORef positionRef
+      case pos of
+        Just p -> throwError $ MacroError "Condition couldn't be evaluated" p
+        Nothing -> throwError NoPositionSaved
 convertMacro f (CST.EMacroFunction name args expr) = do
   let args' = map (\(Annotation n _ _) -> n.identifier) args
   f expr `with` \body -> do

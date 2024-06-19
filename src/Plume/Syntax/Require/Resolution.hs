@@ -163,7 +163,7 @@ checkModule (env, mod') fp = do
   , M.currentDirectory = takeDirectory fp
   , M.standardPath = env
   , M.modulePath = mod'
-  , M.boundArgs = ["#property", "#deref"]
+  , M.boundArgs = ["#property", "#deref", "if", "if_else", "JS_BACKEND", "NATIVE_BACKEND"]
   }
 
   let fp' = takeFileName fp
