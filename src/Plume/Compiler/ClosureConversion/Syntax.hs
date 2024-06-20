@@ -48,6 +48,7 @@ data ClosedStatement
   | CSConditionBranch ClosedExpr ClosedStatement ClosedStatement
   | CSMutDeclaration Text ClosedExpr
   | CSMutUpdate Update ClosedExpr
+  | CSWhile ClosedExpr ClosedStatement
   deriving (Eq, Show, Ord)
 
 data ClosedProgram

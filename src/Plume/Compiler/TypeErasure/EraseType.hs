@@ -145,6 +145,10 @@ eraseStatement (Pre.EConditionBranch e1 e2 e3) = do
     <$> eraseExpr e1
     <*> eraseStatement e2
     <*> eraseStatement e3
+eraseStatement (Pre.EWhile c b) = do
+  c' <- eraseExpr c
+  b' <- eraseStatement b
+  return $ Post.USWhile c' b'
 eraseStatement e = Post.USExpr <$> eraseExpr e
 
 eraseExpr :: Pre.TypedExpression -> IO Post.UntypedExpr

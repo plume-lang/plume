@@ -38,6 +38,7 @@ data UntypedStatement
   | USConditionBranch UntypedExpr UntypedStatement UntypedStatement
   | USMutDeclaration Text UntypedExpr
   | USMutUpdate Text UntypedExpr
+  | USWhile UntypedExpr UntypedStatement
   deriving (Eq, Show, Ord)
 
 type IsAsync = Bool

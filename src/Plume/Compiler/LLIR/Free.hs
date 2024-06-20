@@ -44,6 +44,7 @@ instance Free Pre.DesugaredStatement where
   free res (Pre.DSMutDeclaration n e) = Set.singleton n <> free res e
   free res (Pre.DSMutUpdate n e) = free res n <> free res e
   free res (Pre.DSIf e s1 s2) = free res e <> free res s1 <> free res s2
+  free res (Pre.DSWhile e s) = free res e <> free res s
 
 instance Free Pre.DesugaredProgram where
   free _ (Pre.DPFunction name _ _ _) = Set.singleton name
@@ -56,8 +57,8 @@ instance Free Pre.DesugaredProgram where
 
 instance Name Pre.DesugaredProgram where  
   getNames (Pre.DPFunction {}) = Set.empty
-  getNames (Pre.DPDeclaration _ _) = Set.empty
-  getNames (Pre.DPMutDeclaration _ _) = Set.empty
+  getNames (Pre.DPDeclaration n _) = Set.singleton n
+  getNames (Pre.DPMutDeclaration n _) = Set.singleton n
   getNames (Pre.DPMutUpdate _ _) = Set.empty
   getNames (Pre.DPNativeFunction _ name _ _) = Set.singleton name
   getNames (Pre.DPStatement _) = mempty

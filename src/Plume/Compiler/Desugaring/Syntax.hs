@@ -26,9 +26,9 @@ data DesugaredExpr
   | DEGreaterThan DesugaredExpr Int
   | DEListLength DesugaredExpr
   | DEUnMut DesugaredExpr
+  | DEDeclaration Text DesugaredExpr
   deriving (Eq, Ord)
   
-
 data DesugaredStatement
   = DSExpr DesugaredExpr
   | DSReturn DesugaredExpr
@@ -36,6 +36,7 @@ data DesugaredStatement
   | DSMutDeclaration Text DesugaredExpr
   | DSMutUpdate Update DesugaredExpr
   | DSIf DesugaredExpr [DesugaredStatement] [DesugaredStatement]
+  | DSWhile DesugaredExpr [DesugaredStatement]
   deriving (Eq, Ord)
 
 type LibraryPath = Text
@@ -75,6 +76,7 @@ instance Show DesugaredExpr where
   show (DEDictionary es) =
     "{" <> intercalate ", " (map showMap (IntMap.toList es)) <> "}"
     where showMap (i, e) = show i <> ": " <> show e
+  show (DEDeclaration n e) = "let " <> toString n <> " = " <> show e
 
 instance Show DesugaredStatement where
   show (DSExpr e) = show e
@@ -86,6 +88,7 @@ instance Show DesugaredStatement where
     "sif (" <> show e1 <> ") then " <> intercalate ", " (map show e2)
       <> " else "
       <> intercalate ", " (map show e3)
+  show (DSWhile e body) = "while (" <> show e <> ") " <> intercalate ", " (map show body)
 
 instance Show DesugaredProgram where
   show (DPFunction name args body _) =
@@ -110,6 +113,7 @@ instance Substitutable DesugaredStatement DesugaredExpr where
   substitute s (DSMutUpdate n e) = DSMutUpdate n $ substitute s e
   substitute s (DSIf e1 e2 e3) =
     DSIf (substitute s e1) (map (substitute s) e2) (map (substitute s) e3)
+  substitute s (DSWhile e body) = DSWhile (substitute s e) (map (substitute s) body)
 
 instance Substitutable DesugaredExpr DesugaredExpr where
   substitute s (DEVar x)
@@ -136,6 +140,7 @@ instance Substitutable DesugaredExpr DesugaredExpr where
     DEGreaterThan (substitute s e1) e2
   substitute s (DEListLength e) = DEListLength (substitute s e)
   substitute s (DEUnMut e) = DEUnMut (substitute s e)
+  substitute s (DEDeclaration n e) = DEDeclaration n (substitute s e)
 
 doesContainReturn :: DesugaredStatement -> Bool
 doesContainReturn (DSReturn _) = True
