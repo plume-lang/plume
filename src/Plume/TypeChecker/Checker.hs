@@ -11,6 +11,7 @@ import Plume.TypeChecker.Checker.Closure
 import Plume.TypeChecker.Checker.Condition
 import Plume.TypeChecker.Checker.Datatype
 import Plume.TypeChecker.Checker.Declaration
+import Plume.TypeChecker.Checker.While
 import Plume.TypeChecker.Checker.Extension
 import Plume.TypeChecker.Checker.Interface (synthInterface)
 import Plume.TypeChecker.Checker.Native
@@ -88,6 +89,7 @@ synthesize (Pre.EVariableDeclare gens name ty) = do
 synthesize app@(Pre.EApplication {}) = synthApp synthesize app
 synthesize clos@(Pre.EClosure {}) = synthClosure synthesize clos
 synthesize decl@(Pre.EDeclaration {}) = synthDecl False synthesize decl
+synthesize whil@(Pre.EWhile {}) = synthWhile synthesize whil
 synthesize cond@(Pre.EConditionBranch {}) = synthCond synthesize cond
 synthesize ext@(Pre.ETypeExtension {}) = synthExt synthesize ext
 synthesize ty@(Pre.EType {}) = synthDataType ty

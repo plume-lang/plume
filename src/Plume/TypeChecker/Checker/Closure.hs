@@ -16,7 +16,7 @@ synthClosure infer (Pre.EClosure args ret body _) = local id $ do
 
   -- Creating a new environment with the arguments as type schemes
   let argSchemes = createEnvFromAnnotations convertedArgs
-  insertEnvWith @"typeEnv" (<>) argSchemes
+
 
   old <- gets isAsynchronous
   oldRet <- gets returnType
@@ -26,8 +26,10 @@ synthClosure infer (Pre.EClosure args ret body _) = local id $ do
   -- and the return type of the closure
   (isAsync, (retTy, ps, body')) <-
     local (\s -> s {returnType = Just convertedRet}) $ do
+      insertEnvWith @"typeEnv" (<>) argSchemes
       res <- infer body
       isAsync <- gets isAsynchronous
+      deleteManyEnv @"typeEnv" (Map.keys argSchemes)
       return (isAsync, res)
 
   modify (\s -> s {isAsynchronous = old})

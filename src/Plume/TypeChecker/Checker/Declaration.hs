@@ -161,6 +161,8 @@ synthDecl
 
     let closTy' = Identity closTy
 
+    -- print (name, isMut', isMut)
+
     pure (retTy, psb <> remainingPs, declFun (Annotation name closTy' isMut') <$> clos <*> body')
 synthDecl _ _ _ = throw $ CompilerError "Only declarations are supported"
 
