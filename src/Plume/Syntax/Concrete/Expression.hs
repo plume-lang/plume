@@ -97,6 +97,7 @@ data Expression t f
   | EInstanceVariable Identifier (f t)
   | EInstanceAccess (Expression t f) Int
   | EInstanceDict Text (f t) [Expression t f]
+  | EWhile (Expression t f) (Expression t f)
 
 -- | A type constructor is a type that is used to construct a type.
 -- | It may be either a type-constructor function or a type-constructor

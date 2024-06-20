@@ -267,6 +267,9 @@ checkForUndefined m (HLIR.ETypeExtension _ ann _ exts) = do
 checkForUndefined m (HLIR.ENativeFunction _ name _ _ _ _) = do
   pure m { M.variables = Set.insert (name, False) (M.variables m) }
 checkForUndefined m (HLIR.EAwait e) = checkForUndefined m e
+checkForUndefined m (HLIR.EWhile e1 e2) = do
+  m' <- checkForUndefined m e1
+  checkForUndefined m' e2
 checkForUndefined _ _ = error "Unsupported expression"
 
 toExpr :: HLIR.ExtensionMember -> HLIR.Expression

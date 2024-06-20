@@ -310,6 +310,52 @@ eCaseClosure = do
 
   return $ CST.EClosure [fnCaseArg Cmm.:@: Nothing] Nothing switch False
 
+eClosureAsync:: P.Parser CST.Expression
+eClosureAsync = do
+  extTy <- readIORef P.extensionType
+
+  when (extTy /= "native") $ 
+    fail "Async functions are only allowed in native context."
+
+  void $ L.reserved "async"
+  void $ L.reserved "fn"
+  args <- L.parens $ mutArg `P.sepBy` L.comma
+  retTy <- P.optional $ L.symbol ":" *> Typ.tType
+  body <- L.symbol "=>" *> parseExpression <|> eBlock
+
+  let threadBody = CST.EApplication (CST.EVariable "create_thread" Nothing) [CST.EClosure [] Nothing body False]
+
+  let cl = CST.EClosure args retTy threadBody False
+
+  return cl
+
+eClosureAsyncCase :: P.Parser CST.Expression
+eClosureAsyncCase = do
+  extTy <- readIORef P.extensionType
+
+  when (extTy /= "native") $ 
+    fail "Async functions are only allowed in native context."
+
+  void $ L.reserved "async"
+  void $ L.reserved "fn"
+  void $ L.reserved "case"
+
+  fnCaseArg <- Cmm.fromText <$> liftIO freshRef
+
+  pat <- Pat.parsePattern
+
+  retTy <- P.optional $ L.symbol ":" *> Typ.tType
+  body <- L.symbol "=>" *> parseExpression <|> eBlock
+
+  let switch = CST.ESwitch (CST.EVariable fnCaseArg Nothing) [(pat, body)]
+
+  let threadBody = CST.EApplication (CST.EVariable "create_thread" Nothing) [CST.EClosure [] Nothing switch False]
+
+  let cl = CST.EClosure [fnCaseArg Cmm.:@: Nothing] retTy threadBody False
+
+  return cl
+
+
 -- | Parses a tuple expression
 -- | A tuple expression is a collection of expressions that are separated by
 -- | commas and enclosed in parentheses.
@@ -336,6 +382,8 @@ parseTerm =
     , eSwitch
     , eList
     , eMacroExpr
+    , P.try eClosureAsyncCase
+    , P.try eClosureAsync
     , P.try eCaseClosure
     , eClosure
     , eTuple
@@ -518,6 +566,12 @@ sAsyncFunction = do
       cl
       Nothing
 
+sWhile :: P.Parser CST.Expression
+sWhile = do
+  void $ L.reserved "while"
+  cond <- parseExpression
+  
+  CST.EWhile cond <$> eBlock
 
 -- | Parses a statement
 -- | A statement is an expression that can be used both in top-level scope
@@ -531,6 +585,7 @@ parseStatement =
       , P.try sAsyncFunction
       , sFunction
       , sReturn
+      , sWhile
       , parseExpression
       ]
 

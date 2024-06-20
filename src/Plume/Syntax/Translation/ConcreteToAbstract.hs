@@ -209,6 +209,10 @@ concreteToAbstract (CST.EVariableDeclare gens n t) = do
 concreteToAbstract (CST.EAwait e) = do
   e' <- shouldBeAlone <$> concreteToAbstract e
   transRet $ AST.EApplication (AST.EVariable "wait" Nothing) . (: []) <$> e'
+concreteToAbstract (CST.EWhile e1 e2) = do
+  e1' <- shouldBeAlone <$> concreteToAbstract e1
+  e2' <- shouldBeAlone <$> concreteToAbstract e2
+  transRet $ AST.EWhile <$> e1' <*> e2'
 concreteToAbstract _ = throwError' (CompilerError "Unsupported expression")
 
 transformSch :: MonadIO m => Common.PlumeScheme -> m Common.PlumeScheme
