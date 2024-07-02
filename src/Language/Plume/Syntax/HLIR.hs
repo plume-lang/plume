@@ -12,6 +12,7 @@ module Language.Plume.Syntax.HLIR
     Declaration (..),
     Expression (..),
     Locate(..),
+    Pattern (..),
 
     -- * Patterns for expressions
     pattern MkExprBinary,
@@ -52,6 +53,15 @@ data Expression f t
   | MkExprLocated Pos.Position (Expression f t)
   | MkExprBlock [Expression f t] (f t)
   | MkExprReturn (Expression f t)
+  | MkExprSwitch (Expression f t) [(Pattern f t, Expression f t)] (f t)
+  deriving (Eq, Ord, Show)
+
+data Pattern f t
+  = MkPatternLiteral Lit.Literal
+  | MkPatternVariable (Ann.Annotation (f t))
+  | MkPatternWildcard (f t)
+  | MkPatternLocated Pos.Position (Pattern f t)
+  | MkPatternSpecial (Ann.Annotation (f t)) [Pattern f t]
   deriving (Eq, Ord, Show)
 
 pattern MkExprBinary
@@ -70,6 +80,7 @@ pattern MkExprUnary op operand = MkExprCall (MkExprVariable (MkAnnotation op Not
 type family HLIR (str :: Symbol) where
   HLIR "declaration" = Declaration Identity Ty.PlumeType
   HLIR "expression" = Expression Identity Ty.PlumeType
+  HLIR "pattern" = Pattern Identity Ty.PlumeType
   HLIR "type" = Identity Ty.PlumeType
 
 -- AST represents the Abstract Syntax Tree of the Plume language. It is an
@@ -79,6 +90,7 @@ type family HLIR (str :: Symbol) where
 type family AST (str :: Symbol) where
   AST "declaration" = Declaration Maybe Ty.PlumeType
   AST "expression" = Expression Maybe Ty.PlumeType
+  AST "pattern" = Pattern Maybe Ty.PlumeType
   AST "type" = Maybe Ty.PlumeType
 
 instance Locate (Declaration f t) where
@@ -86,3 +98,6 @@ instance Locate (Declaration f t) where
 
 instance Locate (Expression f t) where
   locate = MkExprLocated
+
+instance Locate (Pattern f t) where
+  locate = MkPatternLocated
