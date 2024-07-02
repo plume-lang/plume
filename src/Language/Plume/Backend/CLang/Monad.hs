@@ -3,6 +3,7 @@ module Language.Plume.Backend.CLang.Monad where
 import Language.Plume.Syntax.CLang qualified as CLang
 import GHC.IO qualified as IO
 import Data.Map qualified as Map
+import qualified Data.Set as Set
 
 type MonadCLang m = MonadIO m
 
@@ -24,7 +25,7 @@ resultState = IO.unsafePerformIO $ newIORef []
 
 {-# NOINLINE reserved #-}
 reserved :: IORef (Set Text)
-reserved = IO.unsafePerformIO $ newIORef mempty
+reserved = IO.unsafePerformIO $ newIORef (Set.fromList ["unreachable"])
 
 freshSymbol :: MonadCLang m => Text -> m Text
 freshSymbol n = do
@@ -32,7 +33,6 @@ freshSymbol n = do
   i <- readIORef symbolCounter
 
   pure $ n <> "__clang__" <> show i
-  
 
 withVariable :: MonadCLang m => Text -> CLang.CLang "expression" -> m a -> m a
 withVariable name e m = do
@@ -45,30 +45,6 @@ withVariable name e m = do
 {-# NOINLINE environment #-}
 environment :: IORef (Map Text (CLang.CLang "expression"))
 environment = IO.unsafePerformIO $ newIORef mempty
-
-emitExpr :: MonadCLang m => CLang.CLang "expression" -> m ()
-emitExpr e = do
-  block <- readIORef currentBlock
-  case block of
-    Just b -> modifyIORef' blocks $ update b (<> [e])
-    Nothing -> pure ()
-
-update :: (Eq a, Monoid b) => a -> (b -> b) -> [(a, b)] -> [(a, b)]
-update k f [] = [(k, f mempty)]
-update k f ((k', v) : xs) = if k == k' then (k, f v) : xs else (k', v) : update k f xs
-
-emitBlock :: MonadCLang m => Text -> m ()
-emitBlock name = do
-  modifyIORef' blocks $ update name id
-  writeIORef currentBlock (Just name)
-
-emitDecl :: MonadCLang m => CLang.CLang "expression" -> CLang.CLang "type" -> m (CLang.CLang "expression")
-emitDecl e t = do
-  name <- freshSymbol "tmp"
-  emitExpr $ CLang.MkExprLet name t e
-
-  pure $ CLang.MkExprVariable name t
-  
 
 reset :: MonadCLang m => m a -> m a
 reset m = do

@@ -25,7 +25,7 @@ encodeUnicode16 = concatMap escapeChar
       | otherwise = printf "\\u%04x" (fromEnum c)
 
 fromType :: M.MonadCLang m => LLIR.PlumeType -> m Text
-fromType LLIR.MkTyInt = pure "long long"
+fromType LLIR.MkTyInt = pure "int"
 fromType LLIR.MkTyFloat = pure "float"
 fromType LLIR.MkTyChar = pure "char"
 fromType LLIR.MkTyString = pure "char*"
@@ -90,13 +90,12 @@ generateToplevel (LLIR.MkDeclStruct name annots) = do
 
 generate :: M.MonadCLang m => LLIR.LLIR "expression" -> m (CLang.CLang "expression")
 generate (LLIR.MkExprLiteral lit) = pure $ CLang.MkExprLiteral lit
-generate (LLIR.MkExprVariable name ty) = do
+generate (LLIR.MkExprVariable name _) = do
   reserved <- readIORef M.reserved
-  ty' <- fromType ty
   
   if Set.member name reserved
-    then pure $ CLang.MkExprVariable name ty'
-    else pure $ CLang.MkExprVariable (fromString . varify . toString $ name) ty'
+    then pure $ CLang.MkExprVariable name 
+    else pure $ CLang.MkExprVariable (fromString . varify . toString $ name)
 generate (LLIR.MkExprCall (LLIR.MkExprVariable "+" _) [x, y] _) = do
   x' <- generate x
   y' <- generate y

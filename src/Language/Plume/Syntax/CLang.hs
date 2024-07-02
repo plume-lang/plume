@@ -31,7 +31,7 @@ data Declaration
 
 data Expression
   = MkExprLiteral Lit.Literal
-  | MkExprVariable Text CLangType
+  | MkExprVariable Text
   | MkExprLet Text CLangType Expression
   | MkExprCall Expression [Expression]
   | MkExprIf Expression [Expression] [Expression]
@@ -90,7 +90,7 @@ showAnnot (Ann.MkAnnotation name ty) = toString ty <> " " <> toString name
 
 instance Show Expression where
   show (MkExprLiteral lit) = show lit
-  show (MkExprVariable name _) = toString name
+  show (MkExprVariable name) = toString name
   show (MkExprLet name ty expr) = toString ty <> " " <> toString name <> " = " <> show expr <> ";"
   show (MkExprCall expr args) = show expr <> "(" <> intercalate ", " (map show args) <> ")"
   show (MkExprIf cond t f) = "if (" <> show cond <> ") " <> "{ " <> intercalate "; " (map show t) <> " } else { " <> intercalate "; " (map show f) <> " }"
