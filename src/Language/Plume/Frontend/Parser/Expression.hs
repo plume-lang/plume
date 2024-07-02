@@ -10,6 +10,7 @@ import Data.Foldable qualified as Fold
 import Language.Plume.Frontend.Parser.Internal.Literal qualified as Lit
 import Language.Plume.Frontend.Parser.Internal.Position qualified as Loc
 import Language.Plume.Frontend.Parser.Internal.Annotation qualified as Ann
+import Language.Plume.Frontend.Parser.Internal.Pattern qualified as Pat
 
 -- Make a unary operator sequence
 -- A unary operator sequence is a sequence of unary operators
@@ -56,11 +57,25 @@ parseExprIf = Loc.localize $ do
 
   HLIR.MkExprIf cond thenBranch <$> parseExpression
 
+parseExprSwitch :: (MonadIO m) => P.Parser m (HLIR.AST "expression")
+parseExprSwitch = Loc.localize $ do
+  void $ Lex.reserved "switch"
+  expr <- parseExpression
+  cases <- Lex.braces $ P.many $ do
+    void $ Lex.reserved "case"
+    pat <- Pat.parsePattern
+    body <- parseBlockOrExpr
+
+    return (pat, body)
+  
+  pure $ HLIR.MkExprSwitch expr cases Nothing
+
 parseTerm :: (MonadIO m) => P.Parser m (HLIR.AST "expression")
 parseTerm = P.choice
   [ parseExprLit,
     parseExprLambda,
     parseExprIf,
+    parseExprSwitch,
     parseExprReturn,
     parseExprVar,
     Lex.parens parseExpression
@@ -100,7 +115,7 @@ parseExpression = P.makeExprParser parseTerm table
       ]
 
 parseBlockOrExpr :: (MonadIO m) => P.Parser m (HLIR.AST "expression")
-parseBlockOrExpr = P.choice [
+parseBlockOrExpr = Lex.scn *> P.choice [
     flip HLIR.MkExprBlock Nothing <$>
       Lex.braces (parseExpression `P.sepEndBy` endOfLine),
     Lex.symbol "=>" *> parseExpression
