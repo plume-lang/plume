@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Language.Plume.Frontend.TypeChecking.Expression where
 
 import Language.Plume.Syntax.HLIR qualified as HLIR
@@ -6,6 +7,7 @@ import Language.Plume.Frontend.TypeChecking.Monad qualified as M
 import Data.Map qualified as Map
 import Control.Monad.Result qualified as Err
 import Control.Monad.Position qualified as Pos
+import Language.Plume.Backend.Closure.Conversion (mapAndUnzip3M)
 
 typecheckE
   :: M.MonadChecker m
@@ -65,13 +67,9 @@ typecheckE (HLIR.MkExprLambda args ret body) = do
 typecheckE (HLIR.MkExprLocated pos e) =
   Pos.pushPosition pos *> typecheckE e <* Pos.popPosition
 typecheckE (HLIR.MkExprLiteral lit) = do
-  let typeOfLit = case lit of
-        HLIR.MkInteger _ -> HLIR.MkTyInt
-        HLIR.MkFloat _ -> HLIR.MkTyFloat
-        HLIR.MkString _ -> HLIR.MkTyString
-        HLIR.MkChar _ -> HLIR.MkTyChar
+  let typ = typeOfLit lit
 
-  pure (HLIR.MkExprLiteral lit, typeOfLit)
+  pure (HLIR.MkExprLiteral lit, typ)
 typecheckE (HLIR.MkExprBlock es _) = do
   (newEs, _) <- mapAndUnzipM typecheckS es
 
@@ -83,6 +81,26 @@ typecheckE (HLIR.MkExprAnnotation e ann) = do
   ty `U.unify` ann
   pure (HLIR.MkExprAnnotation newE ann, ann)
 typecheckE (HLIR.MkExprReturn e) = typecheckE e
+typecheckE (HLIR.MkExprSwitch e cases _) = do
+  (newE, ty) <- typecheckE e
+  (caseTys, newCases) <- mapAndUnzipM (synthCase ty) cases
+  
+  forM_ caseTys $ \(patTy, _) -> ty `U.unify` patTy
+  
+  ((_, x), xs) <- case caseTys of
+    [] -> M.throw Err.EmptySwitch
+    (x:xs) -> pure (x, xs)
+
+  forM_ xs $ \(_, exprTy) -> x `U.unify` exprTy
+
+  pure (HLIR.MkExprSwitch newE newCases (Identity ty), ty)
+
+typeOfLit :: HLIR.Literal -> HLIR.PlumeType
+typeOfLit = \case
+  HLIR.MkInteger _ -> HLIR.MkTyInt
+  HLIR.MkFloat _ -> HLIR.MkTyFloat
+  HLIR.MkString _ -> HLIR.MkTyString
+  HLIR.MkChar _ -> HLIR.MkTyChar
 
 typecheckS
   :: M.MonadChecker m
@@ -102,3 +120,64 @@ typecheckS (HLIR.MkExprReturn e) = do
 typecheckS e = do
   (newE, _) <- typecheckE e
   pure (newE, HLIR.MkTyUnit)
+
+synthCase
+  :: M.MonadChecker m
+  => HLIR.PlumeType
+  -> (HLIR.AST "pattern", HLIR.AST "expression")
+  -> m (
+      (HLIR.PlumeType, HLIR.PlumeType), 
+      (HLIR.HLIR "pattern", HLIR.HLIR "expression")
+    )
+synthCase scrutTy (pat, expr) = M.local id $ do
+  -- Synthesize the pattern and infer the expression
+  (patTy, patExpr, patEnv) <- synthPattern pat
+
+  -- Pattern type should unify with the scrutinee type
+  scrutTy `U.unify` patTy
+
+  (expr', exprTy) <- M.local (\s -> s { M.variables = patEnv <> s.variables }) (typecheckE expr)
+  pure ((patTy, exprTy), (patExpr, expr'))
+
+synthPattern
+  :: M.MonadChecker m
+  => HLIR.AST "pattern"
+  -> m (HLIR.PlumeType, HLIR.HLIR "pattern", Map Text HLIR.PlumeScheme)
+synthPattern HLIR.MkPatternWildcard{} = do
+  t <- M.newTypeVar
+  pure (t, HLIR.MkPatternWildcard (Identity t), mempty)
+synthPattern (HLIR.MkPatternVariable ann) = do
+  env <- M.gets M.variables
+  let t = Map.lookup ann.name env
+  case t of
+    Just t' -> do
+      inst <- M.instantiate t'
+      let ann' = HLIR.MkAnnotation ann.name (Identity inst)
+      return (inst, HLIR.MkPatternSpecial ann' [], mempty)
+    Nothing -> do
+      ty <- M.newTypeVar
+      let ann' = HLIR.MkAnnotation ann.name (Identity ty)
+      return
+        ( ty
+        , HLIR.MkPatternVariable ann'
+        , Map.singleton ann.name (HLIR.MkTyScheme [] ty)
+        )
+synthPattern (HLIR.MkPatternLiteral l) = do
+  let ty = typeOfLit l
+  pure (ty, HLIR.MkPatternLiteral l, mempty)
+synthPattern (HLIR.MkPatternLocated pos p) =
+  Pos.pushPosition pos *> synthPattern p <* Pos.popPosition
+synthPattern (HLIR.MkPatternSpecial ann pats) = do
+  env <- M.gets M.variables
+  let t = Map.lookup ann.name env
+  case t of
+    Just t' -> do
+      inst <- M.instantiate t'
+      ret <- M.newTypeVar
+      (patsTy, pats', env') <- mapAndUnzip3M synthPattern pats
+      inst `U.unify` (patsTy HLIR.:->: ret)
+
+      let ann' = HLIR.MkAnnotation ann.name (Identity inst)
+
+      return (ret, HLIR.MkPatternSpecial ann' pats', mconcat env')
+    Nothing -> M.throw $ Err.VariableNotFound ann.name
