@@ -201,6 +201,14 @@ checkForUndefined (HLIR.MkExprAnnotation e ann) m = do
   checkForUndefined e m
 checkForUndefined (HLIR.MkExprLocated _ e) m = checkForUndefined e m
 checkForUndefined (HLIR.MkExprReturn e) m = checkForUndefined e m
+checkForUndefined (HLIR.MkExprSwitch e cases _) m = do
+  checkForUndefined e m
+  mapM_ (\(p, e') -> checkForUndefined e' m *> checkForPattern p m) cases
+
+checkForPattern :: MonadModule m => HLIR.AST "pattern" -> M.ModuleUnit -> m ()
+checkForPattern (HLIR.MkPatternVariable _) _ = pure ()
+checkForPattern (HLIR.MkPatternLocated _ p) m = checkForPattern p m
+checkForPattern _ _ = pure ()
 
 checkForTypeF
   :: (Monad f, MonadModule m, Traversable f)

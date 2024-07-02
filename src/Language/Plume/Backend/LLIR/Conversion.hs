@@ -112,7 +112,7 @@ convertE (MLIR.MkExprTupleAccess e i t) = do
 
   annots <- case ty of
     LLIR.MkTyId name -> findStruct name
-    _ -> error "TupleAccess is not well-typed."
+    t' -> error $ "TupleAccess is not well-typed. Received: " <> show t'
 
   let field
         | i == 0 = "closure"

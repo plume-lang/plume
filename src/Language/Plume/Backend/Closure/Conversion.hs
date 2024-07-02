@@ -87,7 +87,7 @@ convertClosure (MLIR.MkExprCall callee args t) = do
               newArgs = newEnv:args'
 
           pure (decl $ MLIR.MkExprClosureCall newCallee newArgs t, tyRet)
-        _ -> error "expected function type"
+        t' -> error $ "expected function type, received: " <> show t'
 convertClosure (MLIR.MkExprBlock exprs t) = do
   (exprs', _) <- convertClosureMany exprs
 
@@ -165,7 +165,7 @@ runClosureConversion
   => [MLIR.MLIR "declaration"]
   -> m [MLIR.MLIR "declaration"]
 runClosureConversion decls = do
-  writeIORef C.reserved $ Set.fromList ["*", "+", "/", "-", ">", "<", "==", "!="]
+  writeIORef C.reserved $ Set.fromList ["*", "+", "/", "-", ">", "<", "==", "!=", "unreachable"]
   decls' <- mapM convertClosureD decls
 
   pure (concat decls')
