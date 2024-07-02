@@ -49,3 +49,6 @@ CMakeFiles
 node_modules
 
 example/**/*.js
+
+output.c
+output.out
