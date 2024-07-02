@@ -1,5 +1,0 @@
-native ("native", "js") "std:native" {
-  get_args(): [str]
-  execute_command(path: str): int
-  input(pre: str): str
-}

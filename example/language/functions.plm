@@ -1,6 +1,0 @@
-fn test<A>(x: A): A {
-  return x
-}
-
-@println(test("test"))
-@println(test(1))

@@ -1,7 +1,0 @@
-fn welcome<A extends to_str>(name: A) {
-  println("Hello, $name!")
-}
-
-welcome("world")
-welcome(42)
-welcome("user")
