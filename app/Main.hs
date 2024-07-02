@@ -16,7 +16,12 @@ import qualified Language.Plume.Backend.CFG.Conversion as CFG
 
 main :: IO ()
 main = do
-  let filePath = "example/file.plm"
+  args <- getArgs
+
+  let filePath = case args of
+        [file] -> file
+        _ -> "example/hello-world.plm"
+
   fileContent <- readFileBS filePath
   let fileContentAsText :: Text = decodeUtf8 fileContent
 
@@ -45,7 +50,3 @@ main = do
           ir <- CLang.runCLang cfg
 
           writeFile "output.c" (intercalate "\n" (map show ir))
-
-          -- llvm <- LLVM.runLLVMPass llir
-
-          -- writeFile "output.ll" (toString llvm)
