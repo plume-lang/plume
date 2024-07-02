@@ -19,6 +19,7 @@ data PlumeError
   | VariableNotFound Text
   | TypeNotFound Text
   | TypeMismatch Ty.PlumeType Ty.PlumeType
+  | EmptySwitch
 
 instance Show PlumeError where
   show (ParseError e) = P.errorBundlePretty e
@@ -32,6 +33,7 @@ instance Show PlumeError where
     = "Type " <> show name <> " not found"
   show (TypeMismatch t1 t2)
     = S.show t1 <> " is not equivalent to " <> S.show t2
+  show EmptySwitch = "Empty switch statement"
 
 showError :: P.ParseError -> String
 showError = P.errorBundlePretty
