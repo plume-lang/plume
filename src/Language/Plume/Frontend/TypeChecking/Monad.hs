@@ -18,6 +18,10 @@ data CheckerState = MkCheckerState {
   returnType :: Maybe HLIR.PlumeType
 }
 
+{-# NOINLINE templates #-}
+templates :: IORef (Map Text HLIR.PlumeScheme)
+templates = IO.unsafePerformIO . newIORef $ mempty
+
 {-# NOINLINE symbolCounter #-}
 symbolCounter :: IORef Int
 symbolCounter = IO.unsafePerformIO . newIORef $ 0
@@ -29,18 +33,18 @@ currentLevel = IO.unsafePerformIO . newIORef $ 0
 {-# NOINLINE checkerState #-}
 checkerState :: IORef CheckerState
 checkerState = IO.unsafePerformIO . newIORef $
-  MkCheckerState Map.empty Map.empty Nothing
+  MkCheckerState defaultVariables Map.empty Nothing
 
-get :: MonadChecker m => m CheckerState
+get :: MonadIO m => m CheckerState
 get = liftIO $ readIORef checkerState
 
-put :: MonadChecker m => CheckerState -> m ()
+put :: MonadIO m => CheckerState -> m ()
 put st = liftIO $ writeIORef checkerState st
 
-modify :: MonadChecker m => (CheckerState -> CheckerState) -> m ()
+modify :: MonadIO m => (CheckerState -> CheckerState) -> m ()
 modify f = put . f =<< get
 
-local :: MonadChecker m => (CheckerState -> CheckerState) -> m a -> m a
+local :: MonadIO m => (CheckerState -> CheckerState) -> m a -> m a
 local f m = do
   st <- get
   put $ f st
@@ -48,11 +52,11 @@ local f m = do
   put st
   pure result
 
-gets :: MonadChecker m => (CheckerState -> a) -> m a
+gets :: MonadIO m => (CheckerState -> a) -> m a
 gets f = f <$> get
 
 -- Create new fresh types
-newTypeVar :: MonadChecker m => m HLIR.PlumeType
+newTypeVar :: MonadIO m => m HLIR.PlumeType
 newTypeVar = do
   i <- liftIO $ readIORef symbolCounter
   lvl <- liftIO $ readIORef currentLevel
@@ -60,12 +64,12 @@ newTypeVar = do
   t <- newIORef $ HLIR.Unbound (T.pack $ "t" <> show i) lvl
   pure $ HLIR.MkTyVar t
 
-instantiate :: MonadChecker m => HLIR.PlumeScheme -> m HLIR.PlumeType
+instantiate :: MonadIO m => HLIR.PlumeScheme -> m HLIR.PlumeType
 instantiate (HLIR.MkTyScheme vars ty) = do
   subst <- Map.fromList <$> traverse (\v -> (v,) <$> newTypeVar) vars
   substType subst ty
 
-substType :: MonadChecker m => Map Text HLIR.PlumeType -> HLIR.PlumeType -> m HLIR.PlumeType
+substType :: MonadIO m => Map Text HLIR.PlumeType -> HLIR.PlumeType -> m HLIR.PlumeType
 substType subst (HLIR.MkTyId idtf) =
   pure $ case Map.lookup idtf subst of
     Just ty -> ty

@@ -19,7 +19,13 @@ typecheckE (HLIR.MkExprVariable ann) = do
     Just sch -> do
       ty <- M.instantiate sch
       pure (HLIR.MkExprVariable (ann { HLIR.value = Identity ty }), ty)
-    Nothing -> M.throw (Err.VariableNotFound ann.name)
+    Nothing -> do
+      templates <- readIORef M.templates
+      case Map.lookup ann.name templates of
+        Just sch -> do
+          ty <- M.instantiate sch
+          pure (HLIR.MkExprVariable (ann { HLIR.value = Identity ty }), ty)
+        Nothing -> M.throw (Err.VariableNotFound ann.name)
 typecheckE (HLIR.MkExprCall callee args _) = do
   (newCallee, calleeTy) <- typecheckE callee
   (newArgs, newArgsTys) <- mapAndUnzipM typecheckE args
@@ -64,8 +70,12 @@ typecheckE (HLIR.MkExprLambda args ret body) = do
           (Map.toList newEnv)
 
   pure (HLIR.MkExprLambda wfArgs wfRetTy newBody, preFunTy)
-typecheckE (HLIR.MkExprLocated pos e) =
-  Pos.pushPosition pos *> typecheckE e <* Pos.popPosition
+typecheckE (HLIR.MkExprLocated pos e) = do
+  Pos.pushPosition pos
+  (e', ty) <- typecheckE e
+  void Pos.popPosition
+
+  pure (HLIR.MkExprLocated pos e', ty)
 typecheckE (HLIR.MkExprLiteral lit) = do
   let typ = typeOfLit lit
 
@@ -101,6 +111,7 @@ typeOfLit = \case
   HLIR.MkFloat _ -> HLIR.MkTyFloat
   HLIR.MkString _ -> HLIR.MkTyString
   HLIR.MkChar _ -> HLIR.MkTyChar
+  HLIR.MkBool _ -> HLIR.MkTyBool
 
 typecheckS
   :: M.MonadChecker m
