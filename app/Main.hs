@@ -37,16 +37,15 @@ main = do
         typedAST <- Tc.typecheck astWithoutRequires
 
         handle typedAST $ \typedAST' -> do
-          let mlir = map TLIR.declToMLIR typedAST'
+          let mlir = concatMap TLIR.declToMLIR typedAST'
 
           cc <- CC.runClosureConversion mlir
           mono <- Mono.monomorphize cc
-          anf <- concat <$> mapM ANF.convert mono
+          handle mono $ \mono' -> do
+            anf <- concat <$> mapM ANF.convert mono'
 
-          -- mapM_ print anf
+            llir <- LLIR.convertToLLIR anf
+            let cfg = map CFG.convert llir
+            ir <- CLang.runCLang cfg
 
-          llir <- LLIR.convertToLLIR anf
-          let cfg = map CFG.convert llir
-          ir <- CLang.runCLang cfg
-
-          writeFile "output.c" (intercalate "\n" (map show ir))
+            writeFile "output.c" (intercalate "\n" (map show ir))
