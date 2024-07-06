@@ -7,19 +7,22 @@ import Language.Plume.Syntax.MLIR qualified as MLIR
 unIdentity :: Identity a -> a
 unIdentity (Identity a) = a
 
-declToMLIR :: HLIR.HLIR "declaration" -> MLIR.MLIR "declaration"
+declToMLIR :: HLIR.HLIR "declaration" -> [MLIR.MLIR "declaration"]
 declToMLIR (HLIR.MkDeclFunction name gens args (Identity ret) body) = do
   let args' = map (fmap unIdentity) args
 
-  MLIR.MkDeclFunction name gens args' ret (exprToMLIR body)
+  [MLIR.MkDeclFunction name gens args' ret (exprToMLIR body)]
 declToMLIR (HLIR.MkDeclVariable ann qvs expr) =
-  MLIR.MkDeclVariable (fmap unIdentity ann) qvs (exprToMLIR expr)
+  [MLIR.MkDeclVariable (fmap unIdentity ann) qvs (exprToMLIR expr)]
 declToMLIR (HLIR.MkDeclLocated _ decl) =
   declToMLIR decl
 declToMLIR (HLIR.MkDeclPublic _) = error "public declarations not supported"
 declToMLIR (HLIR.MkDeclRequire _) = error "require declarations not supported"
 declToMLIR (HLIR.MkDeclNative name gens args ret) =
-  MLIR.MkDeclNative name gens args ret
+  [MLIR.MkDeclNative name gens args ret]
+declToMLIR (HLIR.MkDeclGenericProperty {}) = []
+declToMLIR (HLIR.MkDeclExtend gens name args ret body) = 
+  [MLIR.MkDeclExtend gens name (map (fmap unIdentity) args) (unIdentity ret) (exprToMLIR body)]
 
 exprToMLIR :: HLIR.HLIR "expression" -> MLIR.MLIR "expression"
 exprToMLIR (HLIR.MkExprLiteral lit) = MLIR.MkExprLiteral lit

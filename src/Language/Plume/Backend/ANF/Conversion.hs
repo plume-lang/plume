@@ -80,6 +80,10 @@ convertE (MLIR.MkExprReturn expr) = do
   (expr', exprs) <- convertE expr
 
   pure (MLIR.MkExprReturn expr', exprs)
+convertE (MLIR.MkExprLocated loc expr) = do
+  (expr', exprs) <- convertE expr
+
+  pure (MLIR.MkExprLocated loc expr', exprs)
 
 convert :: M.MonadANF m => MLIR.MLIR "declaration" -> m [MLIR.MLIR "declaration"]
 convert (MLIR.MkDeclFunction name g args ret body) = do
@@ -93,6 +97,7 @@ convert (MLIR.MkDeclVariable name qvs expr) = do
 
   pure (stmts' <> [MLIR.MkDeclVariable name qvs expr'])
 convert (MLIR.MkDeclNative name g args ret) = pure [MLIR.MkDeclNative name g args ret]
+convert (MLIR.MkDeclExtend {}) = error "TODO"
 
 buildDeclFromExpr :: MLIR.MLIR "expression" -> MLIR.MLIR "declaration"
 buildDeclFromExpr (MLIR.MkExprLet name ty expr _ _) = do
