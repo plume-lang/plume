@@ -2,6 +2,7 @@ module Control.Monad.Position where
 
 import Language.Plume.Syntax.HLIR qualified as HLIR
 import GHC.IO qualified as IO
+import qualified Text.Megaparsec.Pos as Pos
 
 {-# NOINLINE positionStack #-}
 positionStack :: IORef [HLIR.Position]
@@ -24,4 +25,13 @@ fetchPosition = do
   stack <- readIORef positionStack
   case stack of
     [] -> error "fetchPosition: empty stack"
+    (x:_) -> pure x
+
+fetchPositionWithDefault :: MonadIO m => m HLIR.Position
+fetchPositionWithDefault = do
+  stack <- readIORef positionStack
+  case stack of
+    [] -> do
+      let pos = Pos.initialPos "default"
+      pure (pos, pos)
     (x:_) -> pure x
