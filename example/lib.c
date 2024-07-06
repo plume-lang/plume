@@ -8,7 +8,10 @@ char *int_to_str(int n) {
   return str;
 }
 
-void* unreachable() {
-  printf("Unreachable code reached\n");
-  exit(1);
+void ffi_print(char* str) {
+  printf("%s\n", str);
+}
+
+void ffi_println(char* str) {
+  printf("%s\n", str);
 }
