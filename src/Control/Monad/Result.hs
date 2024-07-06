@@ -20,6 +20,9 @@ data PlumeError
   | TypeNotFound Text
   | TypeMismatch Ty.PlumeType Ty.PlumeType
   | EmptySwitch
+  | FieldNotFound Text Ty.PlumeType
+  | InconsistentArgument Text
+  | CompilerError Text
 
 instance Show PlumeError where
   show (ParseError e) = P.errorBundlePretty e
@@ -34,6 +37,11 @@ instance Show PlumeError where
   show (TypeMismatch t1 t2)
     = S.show t1 <> " is not equivalent to " <> S.show t2
   show EmptySwitch = "Empty switch statement"
+  show (FieldNotFound name ty)
+    = "Field " <> show name <> " not found in " <> S.show ty
+  show (InconsistentArgument name)
+    = "Inconsistent argument " <> show name
+  show (CompilerError msg) = "Compiler error: " <> show msg
 
 showError :: P.ParseError -> String
 showError = P.errorBundlePretty
