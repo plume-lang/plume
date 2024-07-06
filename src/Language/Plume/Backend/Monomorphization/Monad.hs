@@ -3,8 +3,12 @@ module Language.Plume.Backend.Monomorphization.Monad where
 import GHC.IO qualified as IO
 import Language.Plume.Syntax.MLIR qualified as MLIR
 import Data.Map qualified as Map
+import qualified Control.Monad.Except as Err
+import qualified Control.Monad.Result as Err
+import qualified Language.Plume.Syntax.HLIR as HLIR
+import qualified Control.Monad.Position as Pos
 
-type MonadMono m = MonadIO m
+type MonadMono m = (MonadIO m, Err.MonadError (Err.PlumeError, HLIR.Position) m)
 type Substitution = Map MLIR.QuVar MLIR.PlumeType
 
 {-# NOINLINE symbolCounter #-}
@@ -25,6 +29,10 @@ freshSymbol n = do
 {-# NOINLINE functionTable #-}
 functionTable :: IORef (Map Text (MLIR.PlumeScheme, MLIR.MLIR "declaration"))
 functionTable = IO.unsafePerformIO $ newIORef mempty
+
+{-# NOINLINE templateTable #-}
+templateTable :: IORef (Map Text [(MLIR.PlumeScheme, Substitution)])
+templateTable = IO.unsafePerformIO $ newIORef mempty
 
 {-# NOINLINE reserved #-}
 reserved :: IORef (Set Text)
@@ -55,8 +63,12 @@ data MonoUnit = MkMonoUnit
 dependencies :: IORef [(Text, MonoUnit)]
 dependencies = IO.unsafePerformIO $ newIORef mempty
 
+canUnify :: MonadMono m => MLIR.PlumeType -> MLIR.PlumeType -> m Bool
+canUnify t1 t2 = do
+  Err.catchError (substFromUnify t1 t2 >> pure True) (\_ -> pure False)
+
 substFromUnify
-  :: MonadIO m
+  :: MonadMono m
   => MLIR.PlumeType
   -> MLIR.PlumeType
   -> m Substitution
@@ -80,7 +92,9 @@ substFromUnify (MLIR.MkTyExists q1 t1) (MLIR.MkTyExists q2 t2) = do
   s <- substFromUnify t1 t2
 
   pure $ foldr Map.delete s [q1, q2]
-substFromUnify t1 t2 = error $ "substFromUnify: " <> show t1 <> " " <> show t2
+substFromUnify t1 t2 = do
+  pos <- Pos.fetchPositionWithDefault
+  Err.throwError (Err.TypeMismatch t1 t2, pos)
 
 apply
   :: MonadIO m

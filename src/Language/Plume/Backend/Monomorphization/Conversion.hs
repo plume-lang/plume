@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Language.Plume.Backend.Monomorphization.Conversion where
 
 import Language.Plume.Backend.Monomorphization.Monad qualified as M
@@ -6,6 +7,19 @@ import Language.Plume.Frontend.TypeChecking.Monad qualified as M
 import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Data.Text qualified as Text
+import qualified Control.Monad.Result as Err
+import qualified Control.Monad.Position as Pos
+import qualified GHC.IO as IO
+
+{-# NOINLINE alreadyDefined #-}
+alreadyDefined :: IORef (Set Text)
+alreadyDefined = IO.unsafePerformIO $ newIORef mempty
+
+findMatching :: M.MonadMono m => [(MLIR.PlumeScheme, M.Substitution)] -> MLIR.PlumeType -> m (Maybe M.Substitution)
+findMatching [] _ = pure Nothing
+findMatching ((MLIR.MkTyScheme _ ty, sub) : xs) t = M.canUnify ty t >>= \case
+  True -> pure (Just sub)
+  False -> findMatching xs t
 
 createSchemeFrom
   :: M.MonadMono m
@@ -54,6 +68,37 @@ convertMono (MLIR.MkDeclNative name gens args ret) = do
   modifyIORef' M.reserved (Set.insert name)
 
   modifyIORef M.resultState (<> [MLIR.MkDeclNative name gens args ret])
+convertMono (MLIR.MkDeclExtend gens name args ret body) = do
+  body' <- convertMonoE body
+
+  templates <- readIORef M.templates
+
+  case Map.lookup name templates of
+    Just sch -> do
+      schTy <- M.instantiate sch
+
+      let funTy = map (.value) args MLIR.:->: ret
+      subst <- M.substFromUnify funTy schTy
+      newTy <- M.apply subst schTy
+
+      b <- M.containsTypeVar newTy
+      if b
+        then do
+          M.throw $ Err.CompilerError "Type variable in monomorphization"
+        else do
+          let tys = Map.elems subst
+          let formatName = name <> "_" <> Text.intercalate "_" (map show tys)
+
+          substBody <- applyE subst body'
+
+          newBody <- convertMonoE substBody
+
+          let fun = MLIR.MkDeclFunction formatName gens args ret newBody
+          modifyIORef' M.templateTable (Map.insertWith (<>) name [(MLIR.MkTyScheme [] newTy, subst)])
+          convertMono fun
+
+    Nothing -> do
+      M.throw $ Err.VariableNotFound name
 
 convertMonoE
   :: M.MonadMono m
@@ -72,6 +117,7 @@ convertMonoE (MLIR.MkExprVariable name ty) = do
 
       case Map.lookup name scheme of
         Just (MLIR.MkTyScheme _ sch, body) -> do
+          defined <- readIORef alreadyDefined
           subst <- M.substFromUnify sch ty
           newTy <- M.apply subst sch
 
@@ -82,13 +128,35 @@ convertMonoE (MLIR.MkExprVariable name ty) = do
               let tys = Map.elems subst
               let formatName = name <> "_" <> Text.intercalate "_" (map show tys)
 
-              let newBody = replaceNameWith name formatName body
-              substBody <- applyD subst newBody
+              when (Set.notMember formatName defined) $ do
+                let newBody = replaceNameWith name formatName body
+                substBody <- applyD subst newBody
 
-              convertMono substBody
+                convertMono substBody
+
+                modifyIORef' alreadyDefined (Set.insert formatName)
 
               pure $ MLIR.MkExprVariable formatName newTy
-        Nothing -> pure $ MLIR.MkExprVariable name ty
+        Nothing -> do
+          templates <- readIORef M.templateTable
+
+          case Map.lookup name templates of
+            Just schs -> do
+              findMatching schs ty >>= \case
+                Just subst -> do
+                  newTy <- M.apply subst ty
+
+                  b <- M.containsTypeVar newTy
+                  if b
+                    then pure $ MLIR.MkExprVariable name ty
+                    else do
+                      let tys = Map.elems subst
+                      let formatName = name <> "_" <> Text.intercalate "_" (map show tys)
+
+                      pure $ MLIR.MkExprVariable formatName newTy
+                Nothing -> pure $ MLIR.MkExprVariable name ty
+            
+            Nothing -> pure $ MLIR.MkExprVariable name ty
 convertMonoE (MLIR.MkExprLambda args ret body) = do
   let argsSet = Set.fromList $ map (.name) args
   body' <- M.withLocals argsSet $ convertMonoE body
@@ -144,6 +212,12 @@ convertMonoE (MLIR.MkExprReturn e) = do
   e' <- convertMonoE e
 
   pure $ MLIR.MkExprReturn e'
+convertMonoE (MLIR.MkExprLocated p e) = do
+  Pos.pushPosition p
+  e' <- convertMonoE e
+  void Pos.popPosition
+
+  pure $ MLIR.MkExprLocated p e'
 
 applyE
   :: MonadIO m
@@ -207,6 +281,11 @@ applyE s (MLIR.MkExprReturn e) = do
   e' <- applyE s e
 
   pure $ MLIR.MkExprReturn e'
+applyE s (MLIR.MkExprLocated p e) = do
+  e' <- applyE s e
+
+  pure $ MLIR.MkExprLocated p e'
+
 
 applyD
   :: MonadIO m
@@ -226,6 +305,12 @@ applyD subst (MLIR.MkDeclVariable name gens expr) = do
 
   pure $ MLIR.MkDeclVariable name' gens' expr'
 applyD _ d@(MLIR.MkDeclNative {}) = pure d
+applyD subst (MLIR.MkDeclExtend gens name args ret body) = do
+  args' <- mapM (traverse (M.apply subst)) args
+  ret' <- M.apply subst ret
+  body' <- applyE subst body
+
+  pure $ MLIR.MkDeclExtend gens name args' ret' body'
 
 insertAfter
   :: Text
@@ -263,10 +348,12 @@ replaceNameWith old new (MLIR.MkDeclVariable name gens expr)
 replaceNameWith _ _ d = d
 
 monomorphize
-  :: M.MonadMono m
+  :: MonadIO m
   => [MLIR.MLIR "declaration"]
-  -> m [MLIR.MLIR "declaration"]
+  -> m (Either (Err.PlumeError, MLIR.Position) [MLIR.MLIR "declaration"])
 monomorphize decls = do
-  mapM_ convertMono decls
+  err <- runExceptT (mapM_ convertMono decls)
 
-  readIORef M.resultState
+  res <- readIORef M.resultState
+
+  return $ err $> res
