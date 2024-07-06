@@ -4,6 +4,7 @@ import Language.Plume.Syntax.MLIR qualified as MLIR
 import Language.Plume.Backend.Closure.Monad qualified as C
 import Data.Map qualified as Map
 import Data.Set qualified as Set
+import Language.Plume.Backend.LLIR.Conversion (typeOfLit)
 
 isBlock :: MLIR.MLIR "expression" -> Bool
 isBlock (MLIR.MkExprBlock {}) = True
@@ -54,8 +55,10 @@ convertClosure (MLIR.MkExprCall callee args t) = do
   reserved <- readIORef C.reserved
 
   case callee' of
-    MLIR.MkExprVariable varName _ | varName `Set.member` reserved -> do
-      pure (MLIR.MkExprCall callee' args' t, ty)
+    MLIR.MkExprVariable varName _ | varName `Set.member` reserved -> case ty of
+      (_ MLIR.:->: ret) -> 
+        pure (MLIR.MkExprCall callee' args' t, ret)
+      _ -> error $ "expected function type, received: " <> show ty
     _ ->
       case ty of
         (tyArgs MLIR.:->: tyRet) -> do
@@ -98,7 +101,7 @@ convertClosure (MLIR.MkExprIf cond then' else') = do
   (else'', _) <- convertClosure else'
 
   pure (MLIR.MkExprIf cond' then'' else'', t2)
-convertClosure (MLIR.MkExprLiteral l) = pure (MLIR.MkExprLiteral l, MLIR.MkTyInt)
+convertClosure (MLIR.MkExprLiteral l) = pure (MLIR.MkExprLiteral l, typeOfLit l)
 convertClosure (MLIR.MkExprVariable name ty) = do
   globals <- readIORef C.globals
 
@@ -126,6 +129,10 @@ convertClosure (MLIR.MkExprReturn expr) = do
   (expr', ty) <- convertClosure expr
 
   pure (MLIR.MkExprReturn expr', ty)
+convertClosure (MLIR.MkExprLocated p e) = do
+  (e', ty) <- convertClosure e
+
+  pure (MLIR.MkExprLocated p e', ty)
 
 convertClosureD
   :: C.MonadClosure m
@@ -147,6 +154,11 @@ convertClosureD (MLIR.MkDeclVariable name qvs expr) = do
 convertClosureD (MLIR.MkDeclNative name gens args ret) = do
   modifyIORef C.reserved (Set.insert name)
   pure [MLIR.MkDeclNative name gens args ret]
+convertClosureD (MLIR.MkDeclExtend gens name args _ body) = do
+  modifyIORef C.reserved (Set.insert name)
+  (body', t) <- convertClosure body
+
+  pure [MLIR.MkDeclExtend gens name args t body']
 
 convertClosureMany
   :: C.MonadClosure m

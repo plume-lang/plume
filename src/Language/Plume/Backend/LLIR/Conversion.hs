@@ -29,6 +29,7 @@ convert (MLIR.MkDeclVariable ann _ expr) = do
   modifyIORef' M.resultState (<> [fun])
 convert (MLIR.MkDeclNative name gens args ret) = do
   modifyIORef' M.resultState (<> [LLIR.MkDeclNative name gens args ret])
+convert (MLIR.MkDeclExtend {}) = error "TODO"
 
 findStruct :: M.MonadLLIR m => Text -> m [LLIR.Annotation LLIR.PlumeType]
 findStruct name = do
@@ -43,6 +44,7 @@ typeOfLit (MLIR.MkInteger _) = LLIR.MkTyInt
 typeOfLit (MLIR.MkFloat _) = LLIR.MkTyFloat
 typeOfLit (MLIR.MkChar _) = LLIR.MkTyChar
 typeOfLit (MLIR.MkString _) = LLIR.MkTyString
+typeOfLit (MLIR.MkBool _) = LLIR.MkTyBool
 
 convertE
   :: M.MonadLLIR m
@@ -68,8 +70,11 @@ convertE (MLIR.MkExprVariable name ty) = do
 convertE (MLIR.MkExprCall callee args _) = do
   (callee', ty) <- convertE callee
   (args', _) <- mapAndUnzipM convertE args
-
-  pure (LLIR.MkExprCall callee' args' ty, ty)
+  
+  case ty of
+    _ MLIR.:->: ret -> 
+      pure (LLIR.MkExprCall callee' args' ty, ret)
+    _ -> error "Call is not well-typed."
 convertE (MLIR.MkExprLet ann _ expr _ body) = do
   (expr', ty) <- convertE expr
 
@@ -153,6 +158,8 @@ convertE (MLIR.MkExprReturn e) = do
   (e', ty) <- convertE e
 
   pure (LLIR.MkExprReturn e', ty)
+convertE (MLIR.MkExprLocated _ e) =
+  convertE e
 
 convertToLLIR
   :: MonadIO m

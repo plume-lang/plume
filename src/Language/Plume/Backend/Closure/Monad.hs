@@ -53,6 +53,7 @@ instance Free (MLIR.Expression Ty.PlumeType) where
   free (MLIR.MkExprTupleAccess expr _ _) = free expr
   free (MLIR.MkExprClosureCall e args _) = free e <> free args
   free (MLIR.MkExprReturn e) = free e
+  free (MLIR.MkExprLocated _ e) = free e
 
 instance Free a => Free (Maybe a) where
   free = foldMap free
