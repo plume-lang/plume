@@ -92,6 +92,15 @@ parseExpression = P.makeExprParser parseTerm table
             pure $ \e -> HLIR.MkExprCall e args Nothing
         ],
         [
+          P.Postfix $
+            makeUnaryOp $ do
+              void $ MC.char '.'
+              name <- Lex.nonLexedID
+              args <- P.try (Lex.parens (parseExpression `P.sepBy` Lex.comma))
+              let finalCall = HLIR.MkExprVariable (HLIR.MkAnnotation name Nothing)
+              pure $ \e -> HLIR.MkExprCall finalCall (e:args) Nothing
+        ],
+        [
           P.InfixL (HLIR.MkExprBinary "+" <$ Lex.symbol "+"),
           P.InfixL (HLIR.MkExprBinary "-" <$ Lex.symbol "-")
         ],

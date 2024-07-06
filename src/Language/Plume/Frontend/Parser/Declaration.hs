@@ -48,11 +48,41 @@ parseDeclNative = do
 
   HLIR.MkDeclNative name generics' args <$> Ann.annotatedType'
 
+parseDeclExtend :: (MonadIO m) => P.Parser m (HLIR.AST "declaration")
+parseDeclExtend = do
+  void $ Lex.reserved "extend"
+  void $ Lex.reserved "fn"
+
+  name <- Lex.identifier
+
+  generics <- P.option [] $ Lex.angles (Lex.identifier `P.sepBy` Lex.comma)
+  let generics' = map HLIR.MkTyId generics
+
+  argsTys <- Lex.parens (Ann.annotate Ann.annotatedType `P.sepBy` Lex.comma)
+  retTy <- Ann.annotatedType
+
+  HLIR.MkDeclExtend generics' name argsTys retTy <$> Expr.parseBlockOrExpr
+
+parseDeclFnGenProp :: (MonadIO m) => P.Parser m (HLIR.AST "declaration")
+parseDeclFnGenProp = do
+  void $ Lex.reserved "declare"
+  void $ Lex.reserved "fn"
+  name <- Lex.identifier
+  generics <- P.option [] $ Lex.angles (Lex.identifier `P.sepBy` Lex.comma)
+  let generics' = map HLIR.MkTyId generics
+
+  argsTys <- map (.value) <$> Lex.parens (Ann.annotate Ann.annotatedType' `P.sepBy` Lex.comma)
+  retTy <- Ann.annotatedType'
+
+  pure $ HLIR.MkDeclGenericProperty name generics' (argsTys HLIR.:->: retTy)
+
 parseDeclaration :: (MonadIO m) => P.Parser m (HLIR.AST "declaration")
 parseDeclaration = P.choice
   [ parseDeclFunc,
     parseDeclVar,
     parseDeclNative,
+    parseDeclExtend,
+    parseDeclFnGenProp,
     parseDeclRequire,
     parseDeclPublic
   ]

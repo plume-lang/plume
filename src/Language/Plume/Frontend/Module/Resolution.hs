@@ -170,6 +170,27 @@ getModuleUnit (HLIR.MkDeclNative name generics args ret) m = do
   checkForType ret mu
 
   pure mu
+getModuleUnit (HLIR.MkDeclGenericProperty name _ _) m = do
+  let mu = m
+        { M.variables = Set.insert name (M.variables m)
+        }
+
+  pure mu
+getModuleUnit (HLIR.MkDeclExtend generics name args ret body) m = do
+  let args' = map (.name) args
+  let generics' = map getGeneric generics
+  let mu = m
+        { M.variables = Set.insert name (M.variables m)
+        , M.types = Set.fromList generics' <> M.types m
+        }
+
+  mapM_ (traverse (`checkForTypeF` mu)) args
+  checkForTypeF ret mu
+
+  let tmpMu = mu { M.variables = M.variables m <> Set.fromList args' <> Set.singleton name }
+  checkForUndefined body tmpMu
+
+  pure mu
 getModuleUnit _ m = pure m
 
 checkForUndefined

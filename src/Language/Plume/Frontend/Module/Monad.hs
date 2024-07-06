@@ -69,9 +69,9 @@ instance Monoid ModuleUnit where
       "" "" False []
       (Set.fromList
         [
-          "+", "-", "/", "*", "and", "or", "!=", "=="
+          "+", "-", "/", "*", "and", "or", "!=", "==", "true", "false"
         ])
       (Set.fromList
         [
-          "int", "float", "str", "char", "unit"
+          "int", "float", "str", "char", "unit", "bool"
         ])
