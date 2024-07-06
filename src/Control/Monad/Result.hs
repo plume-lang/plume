@@ -3,6 +3,8 @@ module Control.Monad.Result where
 import Language.Plume.Frontend.Parser qualified as P
 import Language.Plume.Syntax.Internal.Type qualified as Ty
 import GHC.Show qualified as S
+import qualified Data.Text as Text
+import qualified GHC.IO as IO
 
 fromEither :: a -> Either b a -> a
 fromEither _ (Right a) = a
@@ -22,6 +24,7 @@ data PlumeError
   | EmptySwitch
   | FieldNotFound Text Ty.PlumeType
   | InconsistentArgument Text
+  | ExtensionNotFound Text Ty.PlumeType
   | CompilerError Text
 
 instance Show PlumeError where
@@ -41,7 +44,24 @@ instance Show PlumeError where
     = "Field " <> show name <> " not found in " <> S.show ty
   show (InconsistentArgument name)
     = "Inconsistent argument " <> show name
+  show (ExtensionNotFound name ty)
+    = "Extension " <> show name <> " not found for type " <> S.show ty
   show (CompilerError msg) = "Compiler error: " <> show msg
 
 showError :: P.ParseError -> String
 showError = P.errorBundlePretty
+
+compilerError :: HasCallStack => Text -> a
+compilerError msg = do
+  let err = "PLUME INTERNAL ERROR: " <> msg
+
+  let cs = getCallStack callStack
+      callstack = Text.unlines $ map (("    - " <>) . fromString . prettySrcLoc . snd) cs
+      pCallstack =
+        if null cs
+          then ""
+          else "\n  A bug occured in Plume compiler.\n  CallStack:\n" <> callstack
+
+  IO.unsafePerformIO $ do
+    putStrLn . toString $ err <> pCallstack
+    exitFailure
