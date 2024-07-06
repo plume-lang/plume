@@ -82,7 +82,7 @@ parseTerm = P.choice
   ]
 
 parseExpression :: (MonadIO m) => P.Parser m (HLIR.AST "expression")
-parseExpression = P.makeExprParser parseTerm table
+parseExpression = Loc.localize $ P.makeExprParser parseTerm table
   where
     table =
       [

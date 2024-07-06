@@ -3,6 +3,7 @@ module Language.Plume.Backend.TLIR where
 import Language.Plume.Syntax.Internal.Annotation as Ann
 import Language.Plume.Syntax.HLIR qualified as HLIR
 import Language.Plume.Syntax.MLIR qualified as MLIR
+import Control.Monad.Result (compilerError)
 
 unIdentity :: Identity a -> a
 unIdentity (Identity a) = a
@@ -16,8 +17,8 @@ declToMLIR (HLIR.MkDeclVariable ann qvs expr) =
   [MLIR.MkDeclVariable (fmap unIdentity ann) qvs (exprToMLIR expr)]
 declToMLIR (HLIR.MkDeclLocated _ decl) =
   declToMLIR decl
-declToMLIR (HLIR.MkDeclPublic _) = error "public declarations not supported"
-declToMLIR (HLIR.MkDeclRequire _) = error "require declarations not supported"
+declToMLIR (HLIR.MkDeclPublic _) = compilerError "public declarations not supported"
+declToMLIR (HLIR.MkDeclRequire _) = compilerError "require declarations not supported"
 declToMLIR (HLIR.MkDeclNative name gens args ret) =
   [MLIR.MkDeclNative name gens args ret]
 declToMLIR (HLIR.MkDeclGenericProperty {}) = []
@@ -36,7 +37,7 @@ exprToMLIR (HLIR.MkExprLambda args (Identity ret) body) =
 exprToMLIR (HLIR.MkExprIf cond then_ else_) =
   MLIR.MkExprIf (exprToMLIR cond) (exprToMLIR then_) (exprToMLIR else_)
 exprToMLIR (HLIR.MkExprBlock exprs t) = MLIR.MkExprBlock (map exprToMLIR exprs) (unIdentity t)
-exprToMLIR (HLIR.MkExprLocated _ e) = exprToMLIR e
+exprToMLIR (HLIR.MkExprLocated p e) = MLIR.MkExprLocated p (exprToMLIR e)
 exprToMLIR (HLIR.MkExprReturn e) = MLIR.MkExprReturn (exprToMLIR e)
 exprToMLIR (HLIR.MkExprSwitch e cases _) = do
   let e' = exprToMLIR e
@@ -52,10 +53,10 @@ createIfs (((conds, lets), expr):as) = do
   let bl = if null lets then expr else MLIR.MkExprBlock (lets <> [expr]) MLIR.MkTyUnit
   
   MLIR.MkExprIf conds' bl (createIfs as)
-createIfs [] = error "empty conditions"
+createIfs [] = compilerError "empty conditions"
 
 createIfCondition :: [MLIR.MLIR "expression"] -> MLIR.MLIR "expression"
-createIfCondition [] = error "empty conditions"
+createIfCondition [] = compilerError "empty conditions"
 createIfCondition [a] = a
 createIfCondition (a:as) = a `and'` createIfCondition as
 
@@ -86,4 +87,4 @@ createCondition (HLIR.MkPatternLiteral l@(MLIR.MkFloat _)) e = do
 createCondition (HLIR.MkPatternLiteral l@(MLIR.MkChar _)) e = do
   let binTy = binaryTy MLIR.MkTyChar
   ([MLIR.MkExprCall (MLIR.MkExprVariable "==" binTy) [e, MLIR.MkExprLiteral l] binTy], [])
-createCondition _ _ = error "special patterns not supported"
+createCondition _ _ = compilerError "special patterns not supported"

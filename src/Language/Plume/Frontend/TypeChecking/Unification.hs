@@ -6,6 +6,7 @@ import Language.Plume.Syntax.Internal.Type qualified as Ty
 import Language.Plume.Frontend.TypeChecking.Monad qualified as M
 import Control.Monad.Result qualified as Err
 import Data.Map qualified as Map
+import Control.Monad.Result (compilerError)
 
 doesOccur :: IORef Ty.TyVar -> Ty.PlumeType -> IO ()
 doesOccur tvr (Ty.MkTyVar tv') = do
@@ -39,7 +40,7 @@ resolveGeneric = \case
       Ty.Link t -> resolveGeneric t
       Ty.Unbound _ _ -> pure $ Ty.MkTyVar tv
 
-  Ty.MkTyExists _ _ -> error "Existential types should not be present in the type checker"
+  Ty.MkTyExists _ _ -> compilerError "Existential types should not be present in the type checker"
 
 -- Unify two types
 unify :: M.MonadChecker m => Ty.PlumeType -> Ty.PlumeType -> m ()

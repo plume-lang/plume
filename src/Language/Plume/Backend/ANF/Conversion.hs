@@ -1,6 +1,7 @@
 module Language.Plume.Backend.ANF.Conversion where
 import qualified Language.Plume.Syntax.MLIR as MLIR
 import qualified Language.Plume.Backend.ANF.Monad as M
+import Control.Monad.Result (compilerError)
 
 buildExprs :: M.MonadANF m => [(MLIR.MLIR "expression", [MLIR.MLIR "expression"])] -> m [MLIR.MLIR "expression"]
 buildExprs ((expr, exprs) : xs) = do
@@ -97,10 +98,10 @@ convert (MLIR.MkDeclVariable name qvs expr) = do
 
   pure (stmts' <> [MLIR.MkDeclVariable name qvs expr'])
 convert (MLIR.MkDeclNative name g args ret) = pure [MLIR.MkDeclNative name g args ret]
-convert (MLIR.MkDeclExtend {}) = error "TODO"
+convert (MLIR.MkDeclExtend {}) = compilerError "TODO"
 
 buildDeclFromExpr :: MLIR.MLIR "expression" -> MLIR.MLIR "declaration"
 buildDeclFromExpr (MLIR.MkExprLet name ty expr _ _) = do
   let ann = MLIR.MkAnnotation name ty
   MLIR.MkDeclVariable ann [] expr
-buildDeclFromExpr e = error $ "Cannot build declaration from expression: " <> show e
+buildDeclFromExpr e = compilerError $ "Cannot build declaration from expression: " <> show e

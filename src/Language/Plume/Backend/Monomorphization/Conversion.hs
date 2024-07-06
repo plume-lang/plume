@@ -10,6 +10,7 @@ import Data.Text qualified as Text
 import qualified Control.Monad.Result as Err
 import qualified Control.Monad.Position as Pos
 import qualified GHC.IO as IO
+import qualified Control.Monad.Except as Err
 
 {-# NOINLINE alreadyDefined #-}
 alreadyDefined :: IORef (Set Text)
@@ -154,7 +155,9 @@ convertMonoE (MLIR.MkExprVariable name ty) = do
                       let formatName = name <> "_" <> Text.intercalate "_" (map show tys)
 
                       pure $ MLIR.MkExprVariable formatName newTy
-                Nothing -> pure $ MLIR.MkExprVariable name ty
+                Nothing -> do
+                  pos <- Pos.fetchPosition
+                  Err.throwError (Err.ExtensionNotFound name ty, pos)
             
             Nothing -> pure $ MLIR.MkExprVariable name ty
 convertMonoE (MLIR.MkExprLambda args ret body) = do

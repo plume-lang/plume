@@ -6,6 +6,7 @@ import Language.Plume.Syntax.CLang qualified as CLang
 import Data.Char qualified as Char
 import Data.Set qualified as Set
 import Text.Printf
+import Control.Monad.Result (compilerError)
 
 isIdent :: Char -> Bool
 isIdent x = Char.isLetter x || x == '_' || x == '$'
@@ -134,7 +135,7 @@ generate (LLIR.MkExprLet name ty expr _) = do
   let name' = fromString . varify . toString $ name
   ty' <- fromType ty
   pure $ CLang.MkExprLet name' ty' expr'
-generate (LLIR.MkExprBlock _) = error "todo"
+generate (LLIR.MkExprBlock _) = compilerError "Block expressions are not supported in C"
 generate (LLIR.MkExprField e name _ _) = do
   e' <- generate e
   pure $ CLang.MkExprField e' name

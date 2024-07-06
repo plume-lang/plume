@@ -2,7 +2,6 @@
 
 module Language.Plume.Syntax.Internal.Type where
 
-import Data.String qualified as S
 import GHC.Show qualified as S
 import GHC.IO qualified as IO
 
@@ -77,7 +76,7 @@ instance Show PlumeType where
       Link ty -> show ty
       Unbound name _ -> "#" <> toString name
   show (xs :->: ret) =
-    "(" <> S.unwords (map show xs) <> " -> " <> show ret <> ")"
+    "fn(" <> intercalate ", " (map show xs) <> "): " <> show ret
   show (MkTyApp ty args) =
-    "(" <> show ty <> " " <> S.unwords (map show args) <> ")"
+    show ty <> "<" <> intercalate ", " (map show args) <> ">"
   show (MkTyExists name ty) = "∃" <> toString name <> ". " <> show ty

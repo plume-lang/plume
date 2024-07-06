@@ -5,6 +5,7 @@ import Language.Plume.Backend.Closure.Monad qualified as C
 import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Language.Plume.Backend.LLIR.Conversion (typeOfLit)
+import Control.Monad.Result (compilerError)
 
 isBlock :: MLIR.MLIR "expression" -> Bool
 isBlock (MLIR.MkExprBlock {}) = True
@@ -53,12 +54,16 @@ convertClosure (MLIR.MkExprCall callee args t) = do
   (args', _) <- mapAndUnzipM convertClosure args
 
   reserved <- readIORef C.reserved
+  
+  let isReserved = case getVarName callee' of
+        Just name -> name `Set.member` reserved
+        Nothing -> False
 
   case callee' of
-    MLIR.MkExprVariable varName _ | varName `Set.member` reserved -> case ty of
+    _ | isReserved -> case ty of
       (_ MLIR.:->: ret) -> 
         pure (MLIR.MkExprCall callee' args' t, ret)
-      _ -> error $ "expected function type, received: " <> show ty
+      _ -> compilerError $ "expected function type, received: " <> show ty
     _ ->
       case ty of
         (tyArgs MLIR.:->: tyRet) -> do
@@ -90,7 +95,7 @@ convertClosure (MLIR.MkExprCall callee args t) = do
               newArgs = newEnv:args'
 
           pure (decl $ MLIR.MkExprClosureCall newCallee newArgs t, tyRet)
-        t' -> error $ "expected function type, received: " <> show t'
+        t' -> compilerError $ "expected function type, received: " <> show t'
 convertClosure (MLIR.MkExprBlock exprs t) = do
   (exprs', _) <- convertClosureMany exprs
 
@@ -121,10 +126,10 @@ convertClosure (MLIR.MkExprField expr field t) = do
   (expr', ty) <- convertClosure expr
 
   pure (MLIR.MkExprField expr' field t, ty)
-convertClosure (MLIR.MkExprPack {}) = error "TODO"
-convertClosure (MLIR.MkExprLet {}) = error "TODO"
-convertClosure (MLIR.MkExprTupleAccess {}) = error "todo"
-convertClosure (MLIR.MkExprClosureCall {}) = error "todo"
+convertClosure (MLIR.MkExprPack {}) = compilerError "TODO"
+convertClosure (MLIR.MkExprLet {}) = compilerError "TODO"
+convertClosure (MLIR.MkExprTupleAccess {}) = compilerError "TODO"
+convertClosure (MLIR.MkExprClosureCall {}) = compilerError "TODO"
 convertClosure (MLIR.MkExprReturn expr) = do
   (expr', ty) <- convertClosure expr
 
@@ -181,3 +186,9 @@ runClosureConversion decls = do
   decls' <- mapM convertClosureD decls
 
   pure (concat decls')
+
+
+getVarName :: MLIR.MLIR "expression" -> Maybe Text
+getVarName (MLIR.MkExprVariable name _) = Just name
+getVarName (MLIR.MkExprLocated _ e) = getVarName e
+getVarName _ = Nothing

@@ -6,6 +6,7 @@ import Language.Plume.Syntax.MLIR qualified as MLIR
 import Language.Plume.Backend.LLIR.Monad qualified as M
 import Data.Map qualified as Map
 import Data.Set qualified as Set
+import Control.Monad.Result (compilerError)
 
 convert
   :: M.MonadLLIR m
@@ -29,7 +30,7 @@ convert (MLIR.MkDeclVariable ann _ expr) = do
   modifyIORef' M.resultState (<> [fun])
 convert (MLIR.MkDeclNative name gens args ret) = do
   modifyIORef' M.resultState (<> [LLIR.MkDeclNative name gens args ret])
-convert (MLIR.MkDeclExtend {}) = error "TODO"
+convert (MLIR.MkDeclExtend {}) = compilerError "TODO"
 
 findStruct :: M.MonadLLIR m => Text -> m [LLIR.Annotation LLIR.PlumeType]
 findStruct name = do
@@ -37,7 +38,7 @@ findStruct name = do
 
   case filter (\case LLIR.MkDeclStruct name' _ -> name == name'; _ -> False) decls of
     [LLIR.MkDeclStruct _ fields] -> pure fields
-    _ -> error "Struct not found."
+    _ -> compilerError "Struct not found."
 
 typeOfLit :: MLIR.Literal -> LLIR.PlumeType
 typeOfLit (MLIR.MkInteger _) = LLIR.MkTyInt
@@ -74,7 +75,7 @@ convertE (MLIR.MkExprCall callee args _) = do
   case ty of
     _ MLIR.:->: ret -> 
       pure (LLIR.MkExprCall callee' args' ty, ret)
-    _ -> error "Call is not well-typed."
+    _ -> compilerError "Call is not well-typed."
 convertE (MLIR.MkExprLet ann _ expr _ body) = do
   (expr', ty) <- convertE expr
 
@@ -117,16 +118,16 @@ convertE (MLIR.MkExprTupleAccess e i t) = do
 
   annots <- case ty of
     LLIR.MkTyId name -> findStruct name
-    t' -> error $ "TupleAccess is not well-typed. Received: " <> show t'
+    t' -> compilerError $ "TupleAccess is not well-typed. Received: " <> show t'
 
   let field
         | i == 0 = "closure"
         | i == 1 = "env"
-        | otherwise = error "TupleAccess is not well-typed."
+        | otherwise = compilerError "TupleAccess is not well-typed."
 
   case maybeAt i annots of
     Just (LLIR.MkAnnotation _ finalTy) -> pure (LLIR.MkExprField e' field ty finalTy, t)
-    Nothing -> error "TupleAccess is not well-typed."
+    Nothing -> compilerError "TupleAccess is not well-typed."
 convertE (MLIR.MkExprPack envTy (lam, env) (LLIR.MkTyTuple [funTy, _])) = do
   envTyName <- M.freshSymbol "env"
   let stct = LLIR.MkDeclStruct envTyName envTy
@@ -151,9 +152,9 @@ convertE (MLIR.MkExprClosureCall callee (env:args) t) = do
 
   pure (LLIR.MkExprCall callee' (newEnv:args') t, ct)
 convertE (MLIR.MkExprPack {}) =
-  error "Pack is not well-typed."
+  compilerError "Pack is not well-typed."
 convertE (MLIR.MkExprClosureCall {}) =
-  error "ClosureCall is not well-typed."
+  compilerError "ClosureCall is not well-typed."
 convertE (MLIR.MkExprReturn e) = do
   (e', ty) <- convertE e
 
