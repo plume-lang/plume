@@ -1,0 +1,23 @@
+native puts(x: str): int
+native unreachable<A>(): A
+native int_to_str(x: int): str
+
+fn fib(n: int) => 
+  switch n {
+    case 0 => 0
+    case 1 => 1
+    case ? => fib(n - 1) + fib(n - 2)
+  }
+
+fn fib_with_tco(n: int, a: int, b: int) =>
+  switch n {
+    case 0 => a
+    case 1 => b
+    case ? => fib_with_tco(n - 1, b, a + b)
+  }
+
+fn main() {
+  puts(int_to_str(fib_with_tco(40, 0, 1)))
+
+  return 0
+}

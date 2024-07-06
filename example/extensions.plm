@@ -1,0 +1,19 @@
+native int_to_str(x: int): str
+native puts(x: str): int
+native printf(x: str): int
+
+declare fn display<A>(x: A): str
+
+extend fn display(x: int): str => int_to_str(x)
+extend fn display(x: str): str => x
+extend fn display(x: bool): str => if x then "true" else "false"
+
+fn print<A>(x: A): int => printf(x.display())
+fn println<A>(x: A): int => puts(x.display())
+
+fn main() {
+  println("tset")
+  println(42)
+  println(true)
+  println(false)
+}

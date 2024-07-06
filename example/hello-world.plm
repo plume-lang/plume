@@ -1,0 +1,5 @@
+native puts(x: str): int
+
+fn main() {
+  puts("Hello, world!")
+}
