@@ -41,6 +41,8 @@ data Declaration f t
   | MkDeclPublic (Declaration f t)
   | MkDeclLocated Pos.Position (Declaration f t)
   | MkDeclNative Text [t] [t] t
+  | MkDeclExtend [t] Text [Ann.Annotation (f t)] (f t) (Expression f t)
+  | MkDeclGenericProperty Text [t] t
   deriving (Eq, Ord, Show)
 
 data Expression f t

@@ -89,6 +89,7 @@ showAnnot :: Ann.Annotation CLangType -> String
 showAnnot (Ann.MkAnnotation name ty) = toString ty <> " " <> toString name
 
 instance Show Expression where
+  show (MkExprLiteral (MkBool b)) = if b then "1" else "0"
   show (MkExprLiteral lit) = show lit
   show (MkExprVariable name) = toString name
   show (MkExprLet name ty expr) = toString ty <> " " <> toString name <> " = " <> show expr <> ";"

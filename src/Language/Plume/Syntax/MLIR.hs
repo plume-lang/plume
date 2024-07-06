@@ -4,6 +4,7 @@ module Language.Plume.Syntax.MLIR (
   module Ann,
   module Lit,
   module Ty,
+  module Pos,
 
   -- * Types
   Declaration (..),
@@ -16,6 +17,7 @@ module Language.Plume.Syntax.MLIR (
 import Language.Plume.Syntax.Internal.Annotation as Ann
 import Language.Plume.Syntax.Internal.Literal as Lit
 import Language.Plume.Syntax.Internal.Type as Ty
+import Language.Plume.Syntax.Internal.Position as Pos
 import GHC.TypeLits
 import GHC.Show qualified as S
 
@@ -23,6 +25,7 @@ data Declaration t
   = MkDeclFunction Text [t] [Ann.Annotation t] t (Expression t)
   | MkDeclVariable (Ann.Annotation t) [t] (Expression t)
   | MkDeclNative Text [t] [t] t
+  | MkDeclExtend [t] Text [Ann.Annotation t] t (Expression t)
   deriving (Eq, Ord, Show)
 
 data Expression t
@@ -38,6 +41,7 @@ data Expression t
   | MkExprPack [Ann.Annotation t] (Expression t, [Ann.Annotation (Expression t)]) t
   | MkExprClosureCall (Expression t) [Expression t] t
   | MkExprReturn (Expression t)
+  | MkExprLocated Pos.Position (Expression t)
   deriving (Eq, Ord)
 
 type family MLIR (str :: Symbol) where
@@ -59,3 +63,4 @@ instance Show t => Show (Expression t) where
   show (MkExprPack anns (f, env) _) = "pack " <> S.show f <> " with " <> foldr (\a b -> S.show a <> ", " <> b) "" anns <> " in " <> S.show env
   show (MkExprClosureCall e args _) = S.show e <> "(" <> foldr (\a b -> S.show a <> ", " <> b) "" args <> ")"
   show (MkExprReturn e) = "return " <> S.show e
+  show (MkExprLocated _ e) = S.show e
