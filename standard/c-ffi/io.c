@@ -47,7 +47,7 @@ Value does_file_exist(int arg_n, Module* mod, Value* args) {
 }
 
 Value get_args(int arg_n, Module* mod, Value* args) {
-  return MAKE_LIST(mod->gc, mod->argv, mod->argc);
+  return MAKE_LIST(mod->argv, mod->argc);
 }
 
 Value print_int(int arg_n, Module* mod, Value* args) {
@@ -112,43 +112,12 @@ Value input(int arg_n, Module* mod, Value* args) {
   ASSERT(get_type(prompt)== TYPE_STRING, "Input expects a string argument");
 
   
-  char* buffer = gc_malloc(&mod->gc, 1024);
+  char* buffer = malloc(1024);
   printf("%s", GET_STRING(prompt));
   scanf("%s", buffer);
 
-  return MAKE_STRING(mod->gc, buffer);
+  return MAKE_STRING(buffer);
 }
-
-Value copy_ref(int arg_n, Module* mod, Value* args) {
-  if (arg_n != 1) THROW("CopyRef expects 1 argument");
-
-  if (IS_PTR(args[0])) {
-    HeapValue* p = GET_PTR(args[0]);
-    p->refcount++;
-  }
-
-  return args[0];
-}
-
-Value free_ref(int arg_n, Module* mod, Value* args) {
-  if (arg_n != 2) THROW("FreeRef expects 2 arguments");
-
-  if (IS_PTR(args[0])) {
-    HeapValue* p = GET_PTR(args[0]);
-    p->refcount--;
-    if (p->refcount == 0) {
-      if (p->type == TYPE_STRING) {
-        free(p->as_string);
-      } else {
-        free(p->as_ptr);
-      }
-      free(p);
-    }
-  }
-
-  return args[0];
-}
-
 
 // Function that reads a file and returns Option<str>
 Value read_file(size_t argc, Module *mod, Value *args) {
@@ -162,10 +131,10 @@ Value read_file(size_t argc, Module *mod, Value *args) {
   long length = ftell(file);
   fseek(file, 0, SEEK_SET);
 
-  char *contents = gc_malloc(&mod->gc, length + 1);
+  char *contents = malloc(length + 1);
   fread(contents, 1, length, file);
   contents[length] = '\0';
 
   fclose(file);
-  return make_some(mod->gc, MAKE_STRING(mod->gc, contents));
+  return make_some(mod->gc, MAKE_STRING(contents));
 }
