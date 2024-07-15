@@ -5,6 +5,7 @@ import Plume.Compiler.Desugaring.Syntax qualified as Pre
 import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Syntax.Common.Literal qualified as Cmm
 import Data.IntMap qualified as IntMap
+import qualified Data.Text as Text
 
 class Assemble a b where
   assemble :: a -> b
@@ -25,7 +26,7 @@ createStandardPath name = Post.JSBinary "+" path (Post.JSLiteral (Cmm.LString ("
     path = Post.JSMember (Post.JSMember (Post.JSIdentifier "process") "env") "PLUME_PATH"
 
 createModulePath :: Text -> Post.Expression
-createModulePath name = Post.JSBinary "+" path (Post.JSLiteral (Cmm.LString ("/modules/" <> name)))
+createModulePath name = Post.JSBinary "+" path (Post.JSLiteral (Cmm.LString ((if Text.isPrefixOf "modules" name then "/" else "/modules/") <> name)))
   where 
     path = Post.JSMember (Post.JSMember (Post.JSIdentifier "process") "env") "PPM_PATH"
 
