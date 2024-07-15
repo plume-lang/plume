@@ -156,9 +156,9 @@ concreteToAbstract (CST.ENativeFunction fp n gens t libTy _) = do
   -- Native function resolution is kind the same as require resolution
   -- except we do not parse everything.
   let strModName = fromString $ toString fp -<.> sharedLibExt libTy
-  let (_, path)
+  let (ty, path)
         | "std:" `T.isPrefixOf` fp = 
-            (Just "standard" :: Maybe String, T.drop 4 strModName)
+            (Just "standard" :: Maybe Text, T.drop 4 strModName)
         | "mod:" `T.isPrefixOf` fp = 
             (Just "module", T.drop 4 strModName)
         | otherwise = 
@@ -181,7 +181,7 @@ concreteToAbstract (CST.ENativeFunction fp n gens t libTy _) = do
         Nothing -> return path
     _ -> return path
 
-  transRet . Right $ AST.ENativeFunction newPath n gens t' libTy sc
+  transRet . Right $ AST.ENativeFunction newPath n gens t' libTy (sc <|> ty)
 concreteToAbstract (CST.EList es) = do
   -- Lists can be composed of spread elements, so we need to flatten
   -- the list of expressions into a single expression.

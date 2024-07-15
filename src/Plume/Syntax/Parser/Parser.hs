@@ -314,27 +314,25 @@ eClosureAsync:: P.Parser CST.Expression
 eClosureAsync = do
   extTy <- readIORef P.extensionType
 
-  when (extTy /= "native") $ 
-    fail "Async functions are only allowed in native context."
-
   void $ L.reserved "async"
   void $ L.reserved "fn"
   args <- L.parens $ mutArg `P.sepBy` L.comma
   retTy <- P.optional $ L.symbol ":" *> Typ.tType
   body <- L.symbol "=>" *> parseExpression <|> eBlock
 
-  let threadBody = CST.EApplication (CST.EVariable "create_thread" Nothing) [CST.EClosure [] Nothing body False]
+  let cl
+        | extTy == "native" = do
+          let threadBody = CST.EApplication (CST.EVariable "create_thread" Nothing) [CST.EClosure [] Nothing body False]
 
-  let cl = CST.EClosure args retTy threadBody False
+          CST.EClosure args retTy threadBody False
+        
+        | otherwise = CST.EClosure args retTy body True
 
   return cl
 
 eClosureAsyncCase :: P.Parser CST.Expression
 eClosureAsyncCase = do
   extTy <- readIORef P.extensionType
-
-  when (extTy /= "native") $ 
-    fail "Async functions are only allowed in native context."
 
   void $ L.reserved "async"
   void $ L.reserved "fn"
@@ -349,9 +347,13 @@ eClosureAsyncCase = do
 
   let switch = CST.ESwitch (CST.EVariable fnCaseArg Nothing) [(pat, body)]
 
-  let threadBody = CST.EApplication (CST.EVariable "create_thread" Nothing) [CST.EClosure [] Nothing switch False]
+  let cl 
+        | extTy == "native" = do
+          let threadBody = CST.EApplication (CST.EVariable "create_thread" Nothing) [CST.EClosure [] Nothing switch False]
 
-  let cl = CST.EClosure [fnCaseArg Cmm.:@: Nothing] retTy threadBody False
+          CST.EClosure [fnCaseArg Cmm.:@: Nothing] retTy threadBody False
+        
+        | otherwise = CST.EClosure [fnCaseArg Cmm.:@: Nothing] retTy switch True
 
   return cl
 
