@@ -24,6 +24,11 @@ createStandardPath name = Post.JSBinary "+" path (Post.JSLiteral (Cmm.LString ("
   where 
     path = Post.JSMember (Post.JSMember (Post.JSIdentifier "process") "env") "PLUME_PATH"
 
+createModulePath :: Text -> Post.Expression
+createModulePath name = Post.JSBinary "+" path (Post.JSLiteral (Cmm.LString ("/modules/" <> name)))
+  where 
+    path = Post.JSMember (Post.JSMember (Post.JSIdentifier "process") "env") "PPM_PATH"
+
 assembleNative :: Pre.DesugaredProgram -> [Post.Statement]
 assembleNative (Pre.DPNativeFunction lib name _ isStd) = do
   [Post.JSVariableDeclaration name nameCall]
@@ -31,6 +36,8 @@ assembleNative (Pre.DPNativeFunction lib name _ isStd) = do
     requireCall = Post.JSCall (Post.JSIdentifier "require") [
         if isStd == Just "standard" then 
           createStandardPath lib 
+        else if isStd == Just "module" then
+          createModulePath lib
         else Post.JSLiteral (Cmm.LString ("./" <> lib))
       ]
     nameCall = Post.JSMember requireCall name
