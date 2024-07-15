@@ -34,12 +34,12 @@ type Control<A> {
 
 // Implementing a while loop using a recursive function and 
 // the Control type.
-fn while<A>(cond: fn(): bool, body: fn(): Control<A>): Option<A> =>
+fn while_<A>(cond: fn(): bool, body: fn(): Control<A>): Option<A> =>
   if cond() {
     return switch body() {
       case Return(x) => Some(x)
       case Break => None
-      case Continue => while(cond, body)
+      case Continue => while_(cond, body)
     }
   } else {
     return None

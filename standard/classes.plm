@@ -39,6 +39,7 @@ interface<A> numeric<A> {
   fn (-)(a: A, b: A): A
 }
 
+infix 3 ^
 interface<A> product<A> {
   fn (*)(a: A, b: A): A
   fn (/)(a: A, b: A): A
@@ -93,3 +94,29 @@ fn (>>)<M extends monadic, A, B>(x: M<A>, y: M<B>): M<B> =>
 infixl 1 <<
 fn (<<)<M extends monadic, A, B>(x: M<A>, y: M<B>): M<A> => 
   x.bind(fn (a) => y.bind(fn(_) => pure(a)))
+
+infixr 0 +=
+fn (+=)<A extends numeric>(var: mut A, x: A): A {
+  var = *var + x
+  return *var
+}
+
+infixr 0 -=
+fn (-=)<A extends numeric>(var: mut A, x: A): A {
+  var = *var - x
+  return *var
+}
+
+infixr 0 *=
+fn (*=)<A extends product>(var: mut A, x: A): A {
+  var = *var * x
+  return *var
+}
+
+infixr 0 /=
+fn (/=)<A extends product>(var: mut A, x: A): A {
+  var = *var / x
+  return *var
+}
+
+infixr 0 ^=

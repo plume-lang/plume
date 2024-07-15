@@ -27,7 +27,6 @@ native ("native", "js") "std:native" {
 require "string"
 require "bool"
 
-infix 3 ^
 infixr 2 !=
 
 extend numeric<int> {
