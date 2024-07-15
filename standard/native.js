@@ -138,5 +138,7 @@ module.exports = {
     } catch (e) {
       return [null, "Result", "Error", e.toString()];
     }
-  }
+  },
+
+  all: (promises) => Promise.all(promises),
 }
