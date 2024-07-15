@@ -1,3 +1,5 @@
+// REQUIRES NATIVE BYTECODE EXECUTION
+
 require "std:io/async"
 
 mut x = 6

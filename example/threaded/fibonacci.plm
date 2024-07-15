@@ -1,3 +1,5 @@
+// REQUIRES NATIVE BYTECODE EXECUTION
+
 require "../basic/fibonacci"
 require "../basic/helper"
 require "std:io/async"

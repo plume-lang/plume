@@ -1,3 +1,5 @@
+// REQUIRES NATIVE BYTECODE EXECUTION
+
 require "std:io/http"
 
 port = 8000
