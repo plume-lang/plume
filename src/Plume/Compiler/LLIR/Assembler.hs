@@ -11,7 +11,6 @@ import Data.Set qualified as Set
 import Data.Map qualified as Map
 import Data.List qualified as List
 import Plume.Syntax.Common qualified as Cmm
-import Plume.Syntax.Translation.Generics
 
 -- | LLIR ASSEMBLER
 -- | The LLIR assembler is a step in the compilation process where the AST is
@@ -36,6 +35,24 @@ import Plume.Syntax.Translation.Generics
 -- |
 -- |  - We need to know which functions are returning something, to know if we 
 -- |    need to put a relative jump or not.
+
+createDrops :: Map Text (Int, Bool) -> [LLIR.Segment]
+createDrops = map (\(name, (i, isGlob)) -> do
+  let fun = if isGlob then LLIR.DropGlobal else LLIR.DropLocal
+  LLIR.Instruction $ fun name i) . Map.toList
+
+withUse :: Assemble a => [a] -> IOReader (Set Text) ([LLIR.Segment], Map Text (Int, Bool))
+withUse xs = do
+  old <- readIORef variablesUses
+  writeIORef variablesUses Map.empty
+  xs' <- mapM assemble xs
+  new <- readIORef variablesUses
+  writeIORef variablesUses old
+  pure (concat xs', new)
+
+{-# NOINLINE variablesUses #-}
+variablesUses :: IORef (Map Text (Int, Bool))
+variablesUses = IO.unsafePerformIO $ newIORef Map.empty
 
 {-# NOINLINE natives #-}
 natives :: IORef (Set Text)
@@ -91,7 +108,7 @@ instance Assemble Pre.DesugaredProgram where
         freed = LLIR.free reserved body
         env   = freed <> args'
 
-    body' <- local (<> env) $ concat <$> mapM assemble body
+    (body', _) <- local (<> env) $ withUse body
 
     let localSpaceSize = Set.size env
 
@@ -139,7 +156,7 @@ instance Assemble Pre.DesugaredProgram where
     let newLibFunction = LLIR.NativeFunction nameConstantIdx funLibIdx libIdx
     modifyIORef' nativeFunctionsHandler (\m -> do
         case Map.lookup fp m of
-          Just l -> Map.insert fp (l { LLIR.nativeFunctions = Map.insert name newLibFunction (l.nativeFunctions) }) m
+          Just l -> Map.insert fp (l { LLIR.nativeFunctions = Map.insert name newLibFunction l.nativeFunctions }) m
           Nothing -> Map.insert 
             fp 
             (LLIR.MkNativeLibrary fp libIdx isStd (Map.singleton name newLibFunction)) m
@@ -175,35 +192,47 @@ instance Assemble Pre.DesugaredStatement where
     pure (expr' <> update' <> [LLIR.Instruction LLIR.Update])
   
   assemble (Pre.DSReturn expr) = do
+    m <- readIORef variablesUses
     expr' <- assemble expr
-    pure (expr' <> [LLIR.Instruction LLIR.Return])
+
+    let drops = createDrops m
+    
+    -- We need to reset the variables uses to 0
+    modifyIORef' variablesUses (Map.map (first (const 0)))
+
+    pure (expr' <> drops <> [LLIR.Instruction LLIR.Return])
 
   assemble (Pre.DSIf cond then' else') = do
     cond' <- assemble cond
-    then'' <- concatMapM assemble then'
-    else'' <- concatMapM assemble else'
+    (then'', m1) <- withUse then'
+    (else'', m2) <- withUse else'
+
+    let m1Drops = createDrops m1
+        m2Drops = createDrops m2
 
     let doesElseReturn = doesReturn else''
-        thenJumpAddr   = length then'' + if doesElseReturn then 1 else 2
+        thenJumpAddr   = length then'' + length m1Drops + if doesElseReturn then 1 else 2
         thenBranch     = LLIR.instr (LLIR.JumpElseRel thenJumpAddr)
 
-        elseJumpAddr   = if doesElseReturn then length else'' else length else'' + 1
+        elseJumpAddr   = length else'' + length m2Drops + if doesElseReturn then 0 else 1
         elseBranch     = [LLIR.Instruction (LLIR.JumpRel elseJumpAddr) | not doesElseReturn]
 
-    pure (cond' <> thenBranch <> then'' <> elseBranch <> else'')
+    pure (cond' <> thenBranch <> then'' <> m1Drops <> elseBranch <> else'' <> m2Drops)
 
   -- | A while loop is just a conditional jump at the end of the body to the
   -- | condition if condition not met
   assemble (Pre.DSWhile cond body) = do
     cond' <- assemble cond
-    body' <- concatMapM assemble body
+    (body', m) <- withUse body
 
-    let bodyJumpAddr = length body' + 1 + length cond'
+    let mDrops = createDrops m
+
+    let bodyJumpAddr = length body' + 1 + length cond' + length mDrops
         bodyJump = LLIR.instr (LLIR.JumpRel (-bodyJumpAddr))
 
-        jumpCond = LLIR.instr (LLIR.JumpElseRel (length body' + 2))
+        jumpCond = LLIR.instr (LLIR.JumpElseRel (length body' + length mDrops + 2))
 
-    pure (cond' <> jumpCond <> body' <> bodyJump)
+    pure (cond' <> jumpCond <> body' <> mDrops <> bodyJump)
 
 isLiteral :: Pre.DesugaredExpr -> Bool
 isLiteral (Pre.DELiteral _) = True
@@ -214,10 +243,15 @@ instance Assemble Pre.DesugaredExpr where
     locals <- ask
     glbs <- readIORef globals
     nats <- readIORef globals
+
     if name `Set.member` locals
-      then pure [LLIR.Instruction (LLIR.LoadLocal name)]
+      then do
+        modifyIORef' variablesUses (Map.alter (Just . maybe (1, False) (first (+1))) name)
+        pure [LLIR.Instruction (LLIR.LoadLocal name)]
     else if name `Set.member` glbs
-      then pure [LLIR.Instruction (LLIR.LoadGlobal name)]
+      then do
+        modifyIORef' variablesUses (Map.alter (Just . maybe (1, True) (first (+1))) name)
+        pure [LLIR.Instruction (LLIR.LoadGlobal name)]
     else if name `Set.member` nats
       then pure [LLIR.Instruction (LLIR.LoadNative name)]
     else pure [LLIR.Instruction (LLIR.LoadGlobal name)]
@@ -278,14 +312,20 @@ instance Assemble Pre.DesugaredExpr where
     glbs <- readIORef globals
 
     if name `Set.member` locals
-      then pure $ args' ++ [LLIR.Instruction (LLIR.CallLocal name argsLength)]
+      then do
+        modifyIORef' variablesUses (Map.alter (Just . maybe (argsLength, False) (first (+1))) name)
+        pure $ args' ++ [LLIR.Instruction (LLIR.CallLocal name argsLength)]
     else if name `Set.member` glbs
-      then pure $ args' ++ [LLIR.Instruction (LLIR.CallGlobal name argsLength)]
+      then do    
+        modifyIORef' variablesUses (Map.alter (Just . maybe (argsLength, True) (first (+1))) name)
+        pure $ args' ++ [LLIR.Instruction (LLIR.CallGlobal name argsLength)]
     else if name `Set.member` nats
       then pure $ args' 
                 ++ LLIR.instr (LLIR.LoadNative name) 
                 ++ LLIR.instr (LLIR.Call argsLength)
-    else pure $ args' ++ [LLIR.Instruction (LLIR.CallGlobal name argsLength)]
+    else do
+      modifyIORef' variablesUses (Map.alter (Just . maybe (argsLength, True) (first (+1))) name)
+      pure $ args' ++ [LLIR.Instruction (LLIR.CallGlobal name argsLength)]
 
   assemble (Pre.DELiteral lit) = do
     i <- liftIO $ fetchConstant lit
@@ -312,17 +352,20 @@ instance Assemble Pre.DesugaredExpr where
 
   assemble (Pre.DEIf cond then' else') = do
     cond' <- assemble cond
-    then'' <- concatMapM assemble then'
-    else'' <- concatMapM assemble else'
+    (then'', m1) <- withUse then'
+    (else'', m2) <- withUse else'
+
+    let m1Drops = createDrops m1
+        m2Drops = createDrops m2
 
     let doesElseReturn = doesReturn else''
-        thenJumpAddr   = length then'' + if doesElseReturn then 1 else 2
+        thenJumpAddr   = length then'' + length m1Drops + if doesElseReturn then 1 else 2
         thenBranch     = LLIR.instr (LLIR.JumpElseRel thenJumpAddr)
 
-        elseJumpAddr   = if doesElseReturn then length else'' else length else'' + 1
+        elseJumpAddr   = length else'' + length m2Drops + if doesElseReturn then 0 else 1
         elseBranch     = [LLIR.Instruction (LLIR.JumpRel elseJumpAddr) | not doesElseReturn]
 
-    pure (cond' <> thenBranch <> then'' <> elseBranch <> else'')
+    pure (cond' <> thenBranch <> then'' <> m1Drops <> elseBranch <> else'' <> m2Drops)
 
   assemble (Pre.DETypeOf _) = error "TypeOf is not implemented"
   assemble (Pre.DEIsConstructor _ _) = error "IsConstructor is not implemented"
@@ -363,9 +406,13 @@ instance Assemble Pre.DesugaredExpr where
 instance Assemble Pre.Update where
   assemble (Pre.UVariable name) = do
     locals <- ask
-    if name `Set.member` locals
-      then pure [LLIR.Instruction (LLIR.LoadLocal name)]
-    else pure [LLIR.Instruction (LLIR.LoadGlobal name)]
+
+    if name `Set.member` locals then do
+      modifyIORef' variablesUses (Map.alter (Just . maybe (1, False) (first (+1))) name)
+      pure [LLIR.Instruction (LLIR.LoadLocal name)]
+    else do
+      modifyIORef' variablesUses (Map.alter (Just . maybe (1, True) (first (+1))) name)
+      pure [LLIR.Instruction (LLIR.LoadGlobal name)]
   
   assemble (Pre.UProperty u i) = case readEither (toString i) of
     Right i' -> do

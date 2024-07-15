@@ -49,6 +49,20 @@ instance Assemble LLIR.Instruction where
         pure [BC.LoadLocal address']
       Nothing -> error $ "Local " <> name <> " not found"
   
+  assemble (LLIR.DropLocal name size) = do
+    locals <- readIORef localPool
+    case Map.lookup name locals of
+      Just address -> do
+        address' <- negIdx address
+        pure [BC.DropLocal address' size]
+      Nothing -> error $ "Local " <> name <> " not found"
+
+  assemble (LLIR.DropGlobal name size) = do
+    globals <- readIORef globalPool
+    case Map.lookup name globals of
+      Just address -> pure [BC.DropGlobal address size]
+      Nothing -> error $ "Global " <> name <> " not found"
+
   assemble (LLIR.StoreLocal name) = do
     locals <- readIORef localPool
     case Map.lookup name locals of
