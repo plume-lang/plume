@@ -1,0 +1,13 @@
+cradle:
+  cabal:
+    - path: "src"
+      component: "lib:plume"
+
+    - path: "app/Main.hs"
+      component: "plume:exe:plume"
+
+    - path: "app/CLI.hs"
+      component: "plume:exe:plume"
+
+    - path: "test"
+      component: "plume:test:plume-test"
