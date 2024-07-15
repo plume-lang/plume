@@ -5,7 +5,6 @@ module Plume.Compiler.Desugaring.Desugar where
 import Data.Map qualified as M 
 import Data.IntMap qualified as IM
 import Data.Set qualified as Set
-import Data.List qualified as List
 import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Compiler.Desugaring.Monad
 import Plume.Compiler.Desugaring.Syntax qualified as Post
@@ -140,9 +139,15 @@ shouldReturn = \case
     helper (Pre.CSReturn _) = True
     helper _ = False
 
+unsnoc :: [a] -> Maybe ([a], a)
+unsnoc [] = Nothing
+unsnoc (x : xs) = Just $ case unsnoc xs of
+  Just (ys, y) -> (x : ys, y)
+  Nothing -> ([], x)
+
 insertReturn :: [Post.DesugaredStatement] -> IsReturned -> [Post.DesugaredStatement]
 insertReturn e False = e
-insertReturn e True = case List.unsnoc e of
+insertReturn e True = case unsnoc e of
   Just (_, Post.DSReturn _) -> e
   Just (xs, Post.DSExpr x) -> xs <> [Post.DSReturn x]
   _ -> e
