@@ -73,7 +73,9 @@ main = setEncoding $ do
 
   paths <- fromEither [] <$> parse getPaths file content
   let paths' = case env of
-        Just _ | not remove_prelude -> ("std:prelude", Nothing) : paths
+        Just _ | not remove_prelude -> do
+          let preludeName = if ext_type == "js" then "prelude-js.plm" else "prelude.plm"
+          ("std:" <> preludeName, Nothing) : paths
         _ -> paths
 
   ppBuilding "Parsing file and dependencies..."
@@ -82,7 +84,7 @@ main = setEncoding $ do
   void $ checkModule (env, mod') file
 
   runConcreteToAbstract env dir paths' file `with` \ast -> do
-    let ast' = concatMap (removeUselessBlocks (False, False)) ast
+    let ast' = concatMap (removeUselessBlocks (False, True)) ast
     ppBuilding "Typechecking..."
     runSynthesize ast' `with` \tlir -> do
       ppBuilding "Compiling and optimizing..."
@@ -120,3 +122,10 @@ printBytecode bytecode =
         print instr
     )
     (zip [0 :: Int ..] bytecode)
+
+showBytecode :: [Instruction] -> Text
+showBytecode bytecode =
+  unlines
+    [ show i <> ": " <> show instr
+    | (i, instr) <- zip [0 :: Int ..] bytecode
+    ]
