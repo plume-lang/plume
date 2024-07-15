@@ -49,3 +49,5 @@ CMakeFiles
 node_modules
 
 example/**/*.js
+
+.idea
