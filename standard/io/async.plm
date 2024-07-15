@@ -1,24 +1,20 @@
-#if #JS_BACKEND {
-  type async<A> { }
+require "std:classes"
 
-  native "js" "std:native" {
-    async<A>(a: A): async<A>
-  }
+type Thread<A> {  }
 
-  declare fn wait<A>(a: async<A>): A
-} #else {
-  type Thread<A> {  }
+native "native" "std:native" {
+  create_thread<A>(callback: fn(Thread<A>): A): Thread<A>
+  join_thread<A>(thread: Thread<A>): A
+  thread_sleep(millis: int): unit
+}
 
-  native "native" "std:native" {
-    create_thread<A>(callback: fn(Thread<A>): A): Thread<A>
-    join_thread<A>(thread: Thread<A>): A
-    thread_sleep(millis: int): unit
-  }
+fn sleep(millis: int) => thread_sleep(millis)
 
-  fn sleep(millis: int) => thread_sleep(millis)
+fn wait<A>(a: Thread<A>): A => join_thread(a)
 
-  fn wait<A>(a: Thread<A>): A => join_thread(a)
+fn wait_all<A>(threads: list<Thread<A>>): list<A> =>
+  threads.map(join_thread)
 
-  fn wait_all<A>(threads: list<Thread<A>>): list<A> =>
-    threads.map(join_thread)
+extend<A> show<Thread<A>> {
+  fn show_prec(_, _) => "Thread"
 }
