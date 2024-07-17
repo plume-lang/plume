@@ -62,6 +62,7 @@ parseStringWithInterpolation = lexeme $ do
         (ELiteral (LString a), ELiteral (LString b)) -> ELiteral (LString (a <> b))
         _ -> EBinary "+" x' y'
     combineCharsIntoString x = x
+
 -- | Parse a character literal
 -- | A character literal is a single character enclosed in single quotes
 -- | Example: 'a'
