@@ -109,7 +109,7 @@ prettyExpr _ (ENativeFunction fp n gens (args :->: ret) _ _) =
       <+> ":"
       <+> ansiPretty ret
 prettyExpr _ (ENativeFunction {}) = compilerError "ENativeFunction: invalid type"
-prettyExpr _ (EInterface (Annotation name gens _) gs ms) =
+prettyExpr _ (EInterface (Annotation name gens _) gs ms _) =
   anCol Blue "interface"
     <> angles (hsep . punctuate comma $ map ansiPretty gs)
     <+> anItalic (pretty name)

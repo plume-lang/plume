@@ -87,7 +87,12 @@ data Expression t f
   | ERequire Text
   | ELocated (Expression t f) Position
   | ESwitch (Expression t f) [(Pattern t f, Expression t f)]
-  | EInterface { interfaceType :: Annotation [t], interfaceGenerics :: [PlumeGeneric], interfaceMembers :: [Annotation PlumeScheme] }
+  | EInterface { 
+      interfaceType :: Annotation [t], 
+      interfaceGenerics :: [PlumeGeneric],
+      interfaceMembers :: [Annotation PlumeScheme],
+      interfaceDeduction :: Maybe (Text, Text)
+    }
   | EReturn (Expression t f)
   | ETypeExtension [PlumeGeneric] (Annotation [t]) (Maybe Text) [ExtensionMember t f]
   | ENativeFunction Text Text [Text] t LibraryType IsStandard
@@ -141,7 +146,7 @@ instance (Eq t, Eq (f t)) => Eq (Expression t f) where
   ERequire x == ERequire y = x == y
   ESwitch x xs == ESwitch x' xs' = x == x' && xs == xs'
   EReturn x == EReturn y = x == y
-  EInterface x xs ys == EInterface x' xs' ys' = x == x' && xs == xs' && ys == ys'
+  EInterface x xs ys d == EInterface x' xs' ys' d' = x == x' && xs == xs' && ys == ys' && d == d'
   ETypeExtension xs x t ys == ETypeExtension xs' x' t' ys' = xs == xs' && x == x' && ys == ys' && t == t'
   ENativeFunction x y xs z t isStd == ENativeFunction x' y' xs' z' t' isStd' = x == x' && y == y' && xs == xs' && z == z' && t == t' && isStd == isStd'
   EVariableDeclare xs x t == EVariableDeclare xs' x' t' = xs == xs' && x == x' && t == t'
