@@ -1,4 +1,4 @@
-fn welcome<A extends to_str>(name: A) {
+fn welcome<A extends show>(name: A) {
   println("Hello, $name!")
 }
 
