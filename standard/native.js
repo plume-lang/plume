@@ -31,7 +31,13 @@ module.exports = {
   mul_str: (a, b) => a * b,
   string_length: (s) => s.length,
   eq_string: (a, b) => a === b,
-  get_index_str: (s, i) => s[i],
+  get_index_str: (s, i) => {
+    if (i < 0 || i >= s.length) {
+      return [null, "Option", "None"];
+    }
+
+    return [null, "Option", "Some", s[i]];
+  },
   str_slice: (s, start, end) => s.slice(start, end),
   show_bool: (b) => b ? "true" : "false",
 
