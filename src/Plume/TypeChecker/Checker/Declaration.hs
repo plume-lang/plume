@@ -122,7 +122,8 @@ synthDecl
       pos <- fetchPosition
       oldScs <- readIORef superclasses
       writeIORef superclasses scs
-      h' <- liftIO $ runReaderT h $ getExpr pos m'
+      checkSub <- gets substitution
+      h' <- liftIO $ runReaderT h $ getExpr pos checkSub m'
       writeIORef superclasses oldScs
 
       -- Substituting the duplicated assumptions in the expression

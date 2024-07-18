@@ -31,7 +31,6 @@ data PlumeType
   | TypeQuantified QuVar
   | TypeId Text
   | TypeApp PlumeType [PlumeType]
-  deriving (Eq)
 
 -- | Assumption is used to represent a value linked to an extension 
 -- | dictionary. 
@@ -114,10 +113,26 @@ instance Show PlumeType where
     case v of
       Link t -> "#" <> show t
       Unbound q l -> toString q <> "-" <> show l -- <> " (may be a generic type)"
-  show (TypeQuantified q) = toString q
+  show (TypeQuantified q) = "q" <> toString q
   show (TypeApp (TypeId "cons") [x, _]) = "[" <> show x <> "]"
   show (TypeApp (TypeId "nil") _) = "[]"
   show (TypeApp (TypeId "tuple") ts) = "(" <> intercalate ", " (map show ts) <> ")"
   show (args :->: ret) = "(" <> show args <> " -> " <> show ret <> ")"
-  show (TypeId t) = toString t
+  show (TypeId t) = "@" <> toString t
   show (TypeApp t ts) = show t <> "<" <> intercalate ", " (map show ts) <> ">"
+
+instance Eq PlumeType where
+  TypeId t == TypeId t' = t == t'
+  TypeVar ref == TypeVar ref' = unsafePerformIO $ (==) <$> readIORef ref <*> readIORef ref'
+  TypeQuantified q == TypeQuantified q' = q == q'
+  TypeApp t ts == TypeApp t' ts' = t == t' && ts == ts'
+  _ == _ = False
+
+instance Ord (IORef TyVar) where
+  compare ref ref' = unsafePerformIO $ do
+    v <- readIORef ref
+    v' <- readIORef ref'
+    pure $ compare v v'
+
+deriving instance Ord TyVar
+deriving instance Ord PlumeType

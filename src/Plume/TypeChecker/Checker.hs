@@ -141,7 +141,8 @@ synthesizeToplevel e@(Pre.EDeclaration _ _ body _) = do
   let t'' = Forall [] $ List.nub ps' :=>: ty
 
   pos <- fetchPosition
-  h' <- liftIO $ runReaderT h $ getExpr pos m
+  checkSub <- gets substitution
+  h' <- liftIO $ runReaderT h $ getExpr pos checkSub m
 
   unless (null as') $ do
     throw (UnresolvedTypeVariable as')
@@ -152,7 +153,7 @@ synthesizeToplevel e@(Pre.EDeclaration _ _ body _) = do
 synthesizeToplevel e = do
   (ty, ps, h) <- synthesize e
   cenv <- gets (extendEnv . environment)
-  zs <- traverse (discharge cenv) ps
+  zs <- traverse (discharge cenv) (reverse ps)
 
   let (ps', m, as, _) = mconcat zs
   (_, as') <- removeDuplicatesAssumps as
@@ -160,7 +161,8 @@ synthesizeToplevel e = do
   let t'' = Forall [] $ List.nub ps' :=>: ty
 
   pos <- fetchPosition
-  h' <- liftIO $ runReaderT h $ getExpr pos m
+  checkSub <- gets substitution
+  h' <- liftIO $ runReaderT h $ getExpr pos checkSub m
 
   unless (null as') $ do
     throw (UnresolvedTypeVariable as')

@@ -11,6 +11,17 @@ import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.TLIR qualified as Post
 import Plume.Syntax.Common.Annotation qualified as Cmm
 import Prelude hiding (gets)
+import Data.Tuple.Utils (thd3)
+import qualified Plume.TypeChecker.Monad as M
+
+findMatchingFunDep :: (MonadChecker m) => PlumeType -> m (Maybe (PlumeType, (Text, PlumeType)))
+findMatchingFunDep t1 = do
+  funDeps <- gets (funDeps . environment)
+  t1' <- liftIO $ compressPaths t1
+
+  findM (Map.toList funDeps) $ \(t2, _) -> do
+    t2' <- liftIO $ compressPaths t2
+    liftIO $ doesUnifyWith t1' t2'
 
 -- | Discharging operation is a step that decompose a qualified type into smaller
 -- | extensions. This also generates the new dictionaries if no extensions is
@@ -27,29 +38,32 @@ discharge ::
       [Post.Expression]
     )
 discharge cenv p = do
+  s <- gets substitution
   -- Checking if some extension exists for the given qualifier and getting the
   -- first to match.
-  p' <- liftIO $ compressQual p
+  p' <- liftIO $ applyQual s =<< compressQual p
   x <- forM (getQuals cenv) $ \(qvs, sch) -> do
     sub <- Map.fromList <$> mapM (\c -> (c,) <$> fresh) qvs
     (a :=>: b, _) <- instantiateQual sub sch
     b' <- liftIO $ compressQual b
+
     First <$> (fmap (a,b,) <$> matchMut' b' p') `tryOr` pure Nothing
 
   case getFirst $ mconcat x of
     Just (_ps, b, _) -> do
+      _ps' <- liftIO $ mapM (applyQual s) _ps
       -- Removing already deduced superclasses, e.g. boolean_algebra A is a
       -- superclass of equality A, so if both are presents, we can remove 
       -- boolean_algebra qualifier.
-      let ps = List.nub $ removeQVars _ps
-      _ps' <- removeSuperclassesQuals ps
+      let ps = List.nub $ removeQVars _ps'
+      _ps'' <- removeSuperclassesQuals ps
 
       -- Recursively discharging environment in order to get smaller pieces of
       -- qualifiers
       (ps', mp, as, ds) <-
         fmap mconcat
           . mapM (discharge cenv)
-          $ _ps'
+          $ _ps''
 
       -- Getting dictionary stuffs for generating calls, map, assumptions..
       let ty = getDictTypeForPred p'
@@ -57,18 +71,55 @@ discharge cenv p = do
 
       let d = Post.EVariable (Cmm.fromText (getDict b)) (Identity t)
           e = if null ds then d else Post.EApplication d ds
-      pure (ps', mp <> [(p', e)], as, pure e)
+
+      newSub <- gets substitution
+      ps'' <- liftIO $ mapM (applyQual newSub) ps'
+      p'' <- liftIO $ applyQual newSub p'
+
+      pure (ps'', mp <> [(p'', e)], as, pure e)
     Nothing -> do
-      -- If no exact extension is found, backing off and creating a new
-      -- dictionary for the extension. 
-      param <- freshName
-      let paramTy = getDictTypeForPred p'
-      pure
-        ( pure p,
-          List.singleton (p', Post.EVariable (Cmm.fromText param) (Identity paramTy)),
-          pure $ param :>: paramTy,
-          pure $ Post.EVariable (Cmm.fromText param) (Identity paramTy)
-        )
+      case p' of
+        IsIn xs'@(x':y:_) n -> do
+          matching <- findMatchingFunDep x'
+          
+          case matching of
+            Just (ty, (n', y')) | n == n' -> do
+              s1 <- unifyAndGetSub x' ty
+              s2 <- unifyAndGetSub y y'
+
+              s'' <- liftIO $ compose s1 s2
+
+              xs'' <- liftIO $ mapM (apply s'') xs'
+
+              -- print (IsIn xs'' n, s'')
+
+              M.modify $ \st -> st {substitution = s'' <> st.substitution}
+
+              discharge cenv (IsIn xs'' n)
+            _ -> dischargeCallback p' p
+        _ -> dischargeCallback p' p
+
+dischargeCallback ::
+  (MonadChecker m) =>
+  PlumeQualifier ->
+  PlumeQualifier ->
+  m
+    ( [PlumeQualifier],
+      [(PlumeQualifier, Post.Expression)],
+      [Assumption PlumeType],
+      [Post.Expression]
+    )
+dischargeCallback p' p = do
+  -- If no exact extension is found, backing off and creating a new
+  -- dictionary for the extension. 
+  param <- freshName
+  let paramTy = getDictTypeForPred p'
+  pure
+    ( pure p,
+      List.singleton (p', Post.EVariable (Cmm.fromText param) (Identity paramTy)),
+      pure $ param :>: paramTy,
+      pure $ Post.EVariable (Cmm.fromText param) (Identity paramTy)
+    )
 
 -- SOME TEXT QUALIFIER RELATED FUNCTIONS
 getDictName :: Text -> PlumeType
@@ -164,6 +215,12 @@ matchMut' (IsIn a1 b) (IsIn a2 b') | b == b' = do
   Just <$> zipWithM_ matchMut a1' a2'
 matchMut' _ _ = pure Nothing
 
+matchMut'' :: (MonadChecker m) => PlumeType -> PlumeType -> m ()
+matchMut'' t1 t2 = do
+  t1' <- liftIO $ compressPaths t1
+  t2' <- liftIO $ compressPaths t2
+  matchMut t1' t2'
+
 -- SOME QUALIFIER FUNCTIONS
 
 removeDuplicatesAssumps :: (MonadChecker m) => [Assumption PlumeType] -> m ([(Text, Text)], [Assumption PlumeType])
@@ -226,14 +283,23 @@ instantiateTyQual s (IsIn tys name) = do
 instantiateTyQual s (IsQVar name) = pure (IsQVar name, s)
 
 instantiateClass :: (MonadChecker m) => Class -> m Class
-instantiateClass (MkClass qvars quals methods) = do
+instantiateClass (MkClass qvars quals methods ded) = do
   sub <- Map.fromList <$> mapM (\c -> (c,) <$> fresh) qvars
   (quals', s) <- instantiateQual sub quals
   methods' <- mapM (instantiateWithSub s) methods
 
+  s' <- liftIO $ composeSubs (map thd3 (Map.elems methods'))
+
+  ded' <- case ded of
+    Just (x, y) -> liftIO $ Just <$> do
+      x' <- apply s' x
+      y' <- apply s' y
+      return (x', y')
+    Nothing -> pure Nothing
+
   let methods'' = fmap (\(t, ps, _) -> Forall [] (ps :=>: t)) methods'
 
-  pure (MkClass qvars quals' methods'')
+  pure (MkClass qvars quals' methods'' ded')
 
 unifiyTyQualWith :: (MonadChecker m) => PlumeQualifier -> PlumeQualifier -> m ()
 unifiyTyQualWith (IsIn ty1 name1) (IsIn ty2 name2) | name1 == name2 = 
@@ -285,7 +351,7 @@ instantiateFromName name sch = do
 isInSuperclassOf :: MonadChecker m => PlumeQualifier -> [PlumeQualifier] -> m Bool
 isInSuperclassOf p@(IsIn t n) ps = not . null <$> filterM (\case
     IsIn t' n' -> do
-      MkClass _ (quals :=>: _) _ <- findClass n'
+      MkClass _ (quals :=>: _) _ _ <- findClass n'
       if null quals then do
         _t <- liftIO $ mapM compressPaths t
         _t' <- liftIO $ mapM compressPaths t'
