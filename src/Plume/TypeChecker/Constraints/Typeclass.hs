@@ -78,23 +78,30 @@ discharge cenv p = do
 
       pure (ps'', mp <> [(p'', e)], as, pure e)
     Nothing -> do
+      -- Checking for potential matching function dependencies
       case p' of
         IsIn xs'@(x':y:_) n -> do
           matching <- findMatchingFunDep x'
           
           case matching of
             Just (ty, (n', y')) | n == n' -> do
+              -- First we resolve general extension type with the given type
               s1 <- unifyAndGetSub x' ty
+              -- Then we resolve inner type with the given type
               s2 <- unifyAndGetSub y y'
 
+              -- We compose to get the final substitution for th given type
+              -- This is used to apply the general substitution to the inner 
+              -- type.
               s'' <- liftIO $ compose s1 s2
 
               xs'' <- liftIO $ mapM (apply s'') xs'
 
-              -- print (IsIn xs'' n, s'')
-
+              -- Saving locally the new substitution
               M.modify $ \st -> st {substitution = s'' <> st.substitution}
 
+              -- Recursively discharging environment in order to get smaller pieces of
+              -- qualifiers for the new type
               discharge cenv (IsIn xs'' n)
             _ -> dischargeCallback p' p
         _ -> dischargeCallback p' p
