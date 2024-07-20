@@ -102,3 +102,10 @@ extend<A extends equality> equality<Option<A>> {
     case ? => false
   }
 }
+
+fn is_some<A>(x: Option<A>): bool => switch x {
+  case Some(_) => true
+  case None => false
+}
+
+fn is_none<A>(x: Option<A>): bool => not is_some(x)

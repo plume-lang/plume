@@ -120,3 +120,6 @@ fn (/=)<A extends product>(var: mut A, x: A): A {
 }
 
 infixr 0 ^=
+
+fn negate<A extends (default, numeric)>(x: A): A
+  => default() - x
