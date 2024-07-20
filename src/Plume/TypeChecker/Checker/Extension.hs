@@ -23,6 +23,14 @@ import Prelude hiding (gets, local)
 import Plume.Syntax.Concrete qualified as CST
 import qualified Plume.TypeChecker.Monad as M
 
+assocSchemes :: MonadChecker m => [(Text, PlumeScheme)] -> [Pre.ExtensionMember] -> m [(PlumeScheme, Pre.ExtensionMember)]
+assocSchemes _ [] = pure []
+assocSchemes env (e@(Pre.ExtDeclaration _ (Annotation name _ _) _) : xs) = do
+  let name' = name.identifier
+  case List.lookup name' env of
+    Just sch -> ((sch, e) :) <$> assocSchemes env xs
+    Nothing -> throw $ CompilerError "Scheme not found"
+
 
 firstM :: (Monad m) => (a -> m b) -> (a, c) -> m (b, c)
 firstM f (a, b) = do
@@ -122,6 +130,7 @@ synthExt
       MkClass qs' quals methods' _ -> do
         case quals of
           _  :=>: t -> do
+
             b <- liftIO $ doesQualUnifiesWith t instH
             unless b $ throw $ CompilerError "Instance does not match the class"
 
@@ -145,10 +154,6 @@ synthExt
           _ -> 
             (Nothing, Nothing)
 
-    -- when (length fdSub > 2) $ do
-    --   print fdSub
-    --   throw $ CompilerError "Too many substitutions"
-
     -- Adding functional dependencies to the state
     case (ded', dedTy') of
       (Just ded'', Just dedTy'') -> do
@@ -161,9 +166,12 @@ synthExt
       _ -> pure ()
 
     let schs = Map.map (\(Forall qs (quals :=>: ty')) -> Forall (qs <> qvars) ((quals <> gens) :=>: ty')) meths
-    -- Typechecking the instance methods
-    exprs <- zipWithM (extMemberToDeclaration infer) (Map.elems schs) methods
 
+    assocs <- assocSchemes (Map.toList schs) methods
+
+    -- Typechecking the instance methods
+    exprs <- traverse (uncurry $ extMemberToDeclaration infer) assocs
+    
     cenv <- gets (extendEnv . environment)
 
     -- Generating the required instance constraints arguments, for instance
@@ -264,7 +272,6 @@ synthExt
     let (quals, exprs') = unzip res'
     let (funTys, _) = unzip quals
 
-
     -- Creating instance dictionary
     let dict = Map.unions exprs'
     let dictFunTys = Map.unions funTys
@@ -311,9 +318,8 @@ synthExt _ _ = throw $ CompilerError "Only type extensions are supported"
 
 getExpr :: CST.Position -> M.Substitution -> [(PlumeQualifier, Post.Expression)] -> PlumeQualifier -> Post.Expression
 getExpr pos sub xs p = do
-  let p' = unsafePerformIO $ compressQual p
-  let p'' = unsafePerformIO $ applyQual sub p'
-  case List.lookup p'' xs of
+  let p' = unsafePerformIO (applyQual sub =<< compressQual p)
+  case List.lookup p' xs of
     Just x -> x
     Nothing -> unsafePerformIO $ do
       interpretError (pos, CompilerError $ "getExpr: " <> show p' <> " not found in " <> show xs)

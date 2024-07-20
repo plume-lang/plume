@@ -21,7 +21,7 @@ findMatchingFunDep t1 = do
 
   findM (Map.toList funDeps) $ \(t2, _) -> do
     t2' <- liftIO $ compressPaths t2
-    liftIO $ doesUnifyWith t1' t2'
+    liftIO $ doesUnifyWith' t1' t2'
 
 -- | Discharging operation is a step that decompose a qualified type into smaller
 -- | extensions. This also generates the new dictionaries if no extensions is
@@ -102,7 +102,9 @@ discharge cenv p = do
 
               -- Recursively discharging environment in order to get smaller pieces of
               -- qualifiers for the new type
-              discharge cenv (IsIn xs'' n)
+              if null s'' 
+                then dischargeCallback p' p
+                else discharge cenv (IsIn xs'' n)
             _ -> dischargeCallback p' p
         _ -> dischargeCallback p' p
 
