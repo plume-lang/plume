@@ -22,6 +22,9 @@ data Annotation t = Annotation {annotationName :: Identifier, annotationValue ::
 instance IsString Identifier where
   fromString x = MkIdentifier (fromString x) False
 
+instance ToString Identifier where
+  toString (MkIdentifier x _) = toString x
+
 fromText :: Text -> Identifier
 fromText x = MkIdentifier x False
 
