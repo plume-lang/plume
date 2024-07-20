@@ -5,7 +5,7 @@ module Main where
 
 import Control.Monad.Exception
 import Control.Monad.Parser
-import Data.Text.IO hiding (putStr)
+import Data.Text.IO hiding (putStr, writeFile)
 import Plume.Compiler.ClosureConversion.Conversion
 import Plume.Compiler.Desugaring.Desugar
 import Plume.Compiler.TypeErasure.EraseType
@@ -55,6 +55,13 @@ main = setEncoding $ do
   MkOptions file_input ext_type file_output remove_prelude <- parseOptions
   let output = fromMaybe file_input file_output
 
+  case ext_type of
+    "native" -> pure ()
+    "js" -> pure ()
+    _ -> do
+      ppFailure $ "Invalid backend, received: " <> fromString ext_type
+      exitFailure
+
   env <- lookupEnv "PLUME_PATH"
   mod' <- lookupEnv "PPM_PATH"
 
@@ -99,9 +106,9 @@ main = setEncoding $ do
 
             let outputPath = output -<.> "js"
             writeFileText outputPath code
-            ppSuccess ("Javacsript code written to " <> fromString outputPath)
+            ppSuccess ("Javascript code written to " <> fromString outputPath)
 
-          _ -> do
+          "native" -> do
             (bytecode, natives', constants) <- runLLIRAssembler desugared
             let nativeFuns = getNativeFunctions natives'
 
@@ -113,6 +120,8 @@ main = setEncoding $ do
             let newPath = output -<.> "bin"
             writeFileLBS newPath sbc
             ppSuccess ("Bytecode written to " <> fromString newPath)
+
+          _ -> ppFailure "Invalid backend"
 
 printBytecode :: [Instruction] -> IO ()
 printBytecode bytecode =
