@@ -62,7 +62,7 @@ desugarANF t f (Pre.CEMutUpdate name expr body) = do
           <> [Post.DSDeclaration fresh body']
 
   return (Post.DEVar fresh, stmts)
-desugarANF (isTop, _, _, _) f (Pre.CEConditionBranch e1 e2 e3) = do
+desugarANF (isTop, _, isExpr, _) f (Pre.CEConditionBranch e1 e2 e3) = do
   (e1', stmts1) <- f e1
   r1 <- f e2
   r2 <- f e3
@@ -73,7 +73,7 @@ desugarANF (isTop, _, _, _) f (Pre.CEConditionBranch e1 e2 e3) = do
   let br1 = createBr r1 shRet1
       br2 = createBr r2 shRet2
 
-  if isTop
+  if isTop || isExpr
     then do
       let br = Post.DEIf e1' br1 br2
       return (br, stmts1)
