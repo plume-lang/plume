@@ -59,8 +59,6 @@ data Instruction
   | ListLength
   | Halt
   | ReturnUnit
-  | DropGlobal Address Int
-  | DropLocal Address Int
   deriving (Show, Eq)
 
 instance LLIR.Free LLIR.Segment where
