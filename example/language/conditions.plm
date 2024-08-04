@@ -1,4 +1,6 @@
 x = 5
+require "std:io/system"
+require "std:io/async-js"
 
 if x == 5 {
   println("test")
@@ -8,3 +10,15 @@ if x == 5 {
 
 nested = if (x == 5) println("test") else println("test2")
 
+wrapped_age: Option<int> = (await input("Enter your age : ")).convert()
+
+switch wrapped_age {
+  case Some(age) {
+    if age >= 18 {
+      println("Majeur")
+    } else {
+      println("Mineur")
+    }
+  } 
+  case None => println("Pas d'âge")
+}

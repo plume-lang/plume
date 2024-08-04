@@ -2,6 +2,7 @@ fn welcome<A extends show>(name: A) {
   println("Hello, $name!")
 }
 
+println("test")
 welcome("world")
 welcome(42)
 welcome("user")
