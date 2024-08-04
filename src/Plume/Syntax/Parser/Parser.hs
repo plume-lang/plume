@@ -169,6 +169,7 @@ eIf :: P.Parser CST.Expression
 eIf = do
   void $ L.reserved "if"
   cond <- parseExpression
+  void $ P.try $ P.optional $ L.reserved "then"
   thenBlock <- eBlock
   void $ L.reserved "else"
 
