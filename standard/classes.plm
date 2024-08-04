@@ -123,3 +123,7 @@ infixr 0 ^=
 
 fn negate<A extends (default, numeric)>(x: A): A
   => default() - x
+
+interface<A, B> convertible<A, B> with B => A {
+  fn convert(x: A): Option<B>
+}

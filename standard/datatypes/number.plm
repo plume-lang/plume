@@ -10,6 +10,7 @@ native ("js", "native") "std:native" {
   int_to_float(x: int): float
   eq_int(x: int, y: int): bool
   lt_int(x: int, y: int): bool
+  str_to_int(x: str): Option<int>
 }
 
 // Native float functions
@@ -63,6 +64,10 @@ extend equality<int> {
 
 extend ordering<int> {
   fn (<) (x: int, y: int) => lt_int(x, y)
+}
+
+extend convertible<str, int> {
+  fn convert(x) => str_to_int(x)
 }
 
 // Defining math functions
