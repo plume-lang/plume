@@ -111,7 +111,6 @@ instance Show Instruction where
   show Halt = "halt"
   show ReturnUnit = "return unit"
 
-
 instance Show Segment where
   show (Function name args _ _ body) = name' <> "(" <> args' <> ")" <> ":\n" <> body'
     where args' = let args'' = map (flip decorate (Black, NoColor, Null) . toString) args

@@ -1,0 +1,23 @@
+require "mod:plume-lang/http"
+
+port = 8000
+
+start_server(port, fn(req, res) {
+  headers = req.get_headers()
+  host = headers.get("host").or_else("unknown")
+  path = req.get_url()
+  
+  println("[$path] Request received from $host")
+
+  if does_url_match(path, "/hello") {
+    res.respond(200, from_list([
+      ("Content-Type", "text/plain")
+    ]), "Hello, World!")
+  } else {
+    res.respond(404, from_list([
+      ("Content-Type", "text/plain")
+    ]), "Not Found")
+  }
+})
+
+println("Server running at http://localhost:$port/")

@@ -136,6 +136,7 @@ reservedWords =
     , "infixl"
     , "infixr"
     , "mut"
+    , "while"
     ]
 
 -- | Lexeme parser that consumes whitespace after the lexeme

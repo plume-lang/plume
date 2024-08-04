@@ -1,0 +1,8 @@
+type async<A> { }
+
+native "js" "std:native" {
+  async<A>(a: A): async<A>
+  all<A>(a: list<async<A>>): async<list<A>>
+}
+
+declare fn wait<A>(a: async<A>): A

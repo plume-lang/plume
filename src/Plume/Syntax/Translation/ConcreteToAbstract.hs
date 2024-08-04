@@ -156,9 +156,9 @@ concreteToAbstract (CST.ENativeFunction fp n gens t libTy _) = do
   -- Native function resolution is kind the same as require resolution
   -- except we do not parse everything.
   let strModName = fromString $ toString fp -<.> sharedLibExt libTy
-  let (_, path)
+  let (ty, path)
         | "std:" `T.isPrefixOf` fp = 
-            (Just "standard" :: Maybe String, T.drop 4 strModName)
+            (Just "standard" :: Maybe Text, T.drop 4 strModName)
         | "mod:" `T.isPrefixOf` fp = 
             (Just "module", T.drop 4 strModName)
         | otherwise = 
@@ -181,7 +181,7 @@ concreteToAbstract (CST.ENativeFunction fp n gens t libTy _) = do
         Nothing -> return path
     _ -> return path
 
-  transRet . Right $ AST.ENativeFunction newPath n gens t' libTy sc
+  transRet . Right $ AST.ENativeFunction newPath n gens t' libTy (sc <|> ty)
 concreteToAbstract (CST.EList es) = do
   -- Lists can be composed of spread elements, so we need to flatten
   -- the list of expressions into a single expression.
@@ -191,10 +191,10 @@ concreteToAbstract (CST.EList es) = do
 concreteToAbstract (CST.EType ann ts) = do
   ts' <- mapM transformTyCons ts
   bireturn . Single $ AST.EType ann ts'
-concreteToAbstract (CST.EInterface ann gs ms) = do
+concreteToAbstract (CST.EInterface ann gs ms d) = do
   ann' <- mapM (mapM transformType) ann
   ms' <- mapM (mapM transformSch) ms
-  bireturn . Single $ AST.EInterface ann' gs ms'
+  bireturn . Single $ AST.EInterface ann' gs ms' d
 concreteToAbstract (CST.ETypeAlias ann t) = do
   let gens = ann.annotationValue
   let name = ann.annotationName.identifier
@@ -209,6 +209,10 @@ concreteToAbstract (CST.EVariableDeclare gens n t) = do
 concreteToAbstract (CST.EAwait e) = do
   e' <- shouldBeAlone <$> concreteToAbstract e
   transRet $ AST.EApplication (AST.EVariable "wait" Nothing) . (: []) <$> e'
+concreteToAbstract (CST.EWhile e1 e2) = do
+  e1' <- shouldBeAlone <$> concreteToAbstract e1
+  e2' <- shouldBeAlone <$> concreteToAbstract e2
+  transRet $ AST.EWhile <$> e1' <*> e2'
 concreteToAbstract _ = throwError' (CompilerError "Unsupported expression")
 
 transformSch :: MonadIO m => Common.PlumeScheme -> m Common.PlumeScheme

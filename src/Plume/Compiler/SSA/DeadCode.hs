@@ -66,6 +66,7 @@ instance Free DesugaredStatement where
   free (DSMutDeclaration n e) = free e S.\\ S.singleton n
   free (DSMutUpdate n e) = free e S.\\ free n
   free (DSIf e1 e2 e3) = free e1 <> fst (freeStmtList e2) <> fst (freeStmtList e3)
+  free (DSWhile e body) = free e <> fst (freeStmtList body)
 
 type BoundVariables = Set Text
 type DeclaredFunctions = Set Text
@@ -99,6 +100,10 @@ freeStmtList xs = go xs (S.empty, S.empty)
         (freeE2, bound2) = freeStmtList e2
         (freeE3, bound3) = freeStmtList e3
      in go rest (bimap (S.union freeE) (S.union bound2) s <> (freeE2 <> freeE3, bound3))
+  go (DSWhile e body : rest) s =
+    let freeE = free e
+        (freeBo, bound) = freeStmtList body
+     in go rest (bimap (S.union freeE) (S.union bound) s <> (freeBo, bound))
   go [] s = s
 
 freeProgList :: [DesugaredProgram] -> FreeVariables
@@ -221,6 +226,10 @@ removeDeadCodeStmt s (DSIf e1 e2 e3 : rest) =
       e2' = removeDeadCodeStmt s e2
       e3' = removeDeadCodeStmt s e3
    in [DSIf e1  e2' e3'] <> rest'
+removeDeadCodeStmt s (DSWhile e body : rest) =
+  let rest' = removeDeadCodeStmt s rest
+      body' = removeDeadCodeStmt s body
+   in [DSWhile e body'] <> rest'
 removeDeadCodeStmt _ [] = []
 
 removeDeadCodeExpr :: BoundVariables -> DesugaredExpr -> Maybe DesugaredExpr

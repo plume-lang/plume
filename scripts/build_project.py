@@ -39,7 +39,7 @@ system(f"cp {executable} bin/{executable_out}")
 dir = pathlib.Path(__file__).parent.parent.resolve() / "standard"
 os.environ['PLUME_PATH'] = str(dir)
 
-system('bin/plumec example/closure.plm')
-system('node example/closure.js')
+system('bin/plumec -e js example/iterative/fibonacci.plm')
+system('node example/iterative/fibonacci.js')
 
 print("Build succeeded!")

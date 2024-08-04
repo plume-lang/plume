@@ -13,7 +13,7 @@
 #define sleep_(x) sleep(x / 1000)
 #endif
 
-#define MAX_THREADS 50
+#define MAX_THREADS (BUFSIZ * 8)
 
 struct threads {
   thread_t threads[MAX_THREADS];
@@ -31,6 +31,7 @@ struct thread_data {
   Value thread;
   Value handler;
   Module* mod;
+  int thread_id;
 };
 
 Value thread_sleep(size_t argc, Module* mod, Value* args) {
@@ -56,13 +57,16 @@ void* thread_function(void *arg) {
   struct thread_data *data = (struct thread_data *)arg;
   Value handler = data->handler;
   Module* mod = data->mod;
+  int current_thread = data->thread_id;
   
-  gc_pause(&mod->gc);
+  // gc_pause(&mod->gc);
   Value result = mod->call_threaded(mod, handler, 2, (Value[]) { data->thread });
 
-  threads.returns[threads.count] = result;
+  pthread_mutex_lock(&threads.mutex_count);
+  threads.returns[current_thread] = result;
 
-  gc_resume(&mod->gc);
+  pthread_mutex_unlock(&threads.mutex_count);
+  // gc_resume(&mod->gc);
 
   return NULL;
 }
@@ -73,26 +77,26 @@ Value create_thread(size_t argc, Module* mod, Value* args) {
   #define thread_ threads.threads[threads.count]
 
   pthread_mutex_lock(&threads.mutex_count);
-  threads.count++;
-  pthread_mutex_unlock(&threads.mutex_count);
+  int count = ++threads.count;
 
-  HeapValue* thread_val = (HeapValue*) gc_malloc(&mod->gc, sizeof(HeapValue));
+  HeapValue* thread_val = (HeapValue*) malloc(sizeof(HeapValue));
   thread_val->type = TYPE_THREAD;
   thread_val->as_any = thread_;
 
-  struct thread_data *data = gc_malloc(&mod->gc, sizeof(struct thread_data));
+  struct thread_data *data = malloc(sizeof(struct thread_data));
   data->handler = args[0];
   data->mod = mod;
   data->thread = MAKE_PTR(thread_val);
+  data->thread_id = threads.count;
 
 #if defined(_WIN32) || defined(_WIN64)
-    *thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)start_routine, arg, 0, NULL);
-    return *thread ? 0 : -1;
+  *thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)start_routine, arg, 0, NULL);
+  return *thread ? 0 : -1;
 #else
-    int res = pthread_create(&thread_, NULL, thread_function, data);
-  
+  int res = pthread_create(&thread_, NULL, thread_function, data);
+  pthread_mutex_unlock(&threads.mutex_count);
 
-    return MAKE_INTEGER(threads.count);
+  return MAKE_INTEGER(count);
 #endif
 }
 
@@ -119,7 +123,7 @@ Value join_thread(size_t argc, Module* mod, Value* args) {
 
     switch (res) {
       case ESRCH: {
-        THROW("No thread could be found corresponding to that specified by the given thread ID.");
+        THROW_FMT("No thread could be found corresponding to that specified by the given thread ID %d.", th_id);
       }
 
       case EINVAL: {
@@ -131,6 +135,8 @@ Value join_thread(size_t argc, Module* mod, Value* args) {
       }
     }
 
-    return threads.returns[th_id];
+    Value ret = threads.returns[th_id];
+
+    return ret;
 #endif
 }

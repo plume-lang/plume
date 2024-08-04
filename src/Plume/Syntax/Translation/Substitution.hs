@@ -78,7 +78,7 @@ substitute (name, expr) (AST.ETypeExtension g ann Nothing ems) =
   AST.ETypeExtension g ann Nothing (map (substituteExt (name, expr)) ems)
 substitute _ (AST.ENativeFunction fp n gens t st isStd) =
   AST.ENativeFunction fp n gens t st isStd
-substitute _ (AST.EInterface ann gs ms) = AST.EInterface ann gs ms
+substitute _ (AST.EInterface ann gs ms d) = AST.EInterface ann gs ms d
 substitute e (AST.EList es) = AST.EList (map (substitute e) es)
 substitute _ (AST.EType ann ts) = AST.EType ann ts
 substitute _ (AST.EVariableDeclare g n t) = AST.EVariableDeclare g n t
@@ -90,6 +90,8 @@ substitute (name, expr) (AST.EInstanceDict n t es) =
 substitute _ (AST.EInstanceVariable n t) = AST.EInstanceVariable n t
 substitute _ (AST.ETypeAlias ann t) = AST.ETypeAlias ann t
 substitute (name, expr) (AST.EAwait e) = AST.EAwait (substitute (name, expr) e)
+substitute (name, expr) (AST.EWhile e1 e2) =
+  AST.EWhile (substitute (name, expr) e1) (substitute (name, expr) e2)
 
 substituteExt
   :: (Text, AST.Expression)

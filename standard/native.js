@@ -31,7 +31,13 @@ module.exports = {
   mul_str: (a, b) => a * b,
   string_length: (s) => s.length,
   eq_string: (a, b) => a === b,
-  get_index_str: (s, i) => s[i],
+  get_index_str: (s, i) => {
+    if (i < 0 || i >= s.length) {
+      return [null, "Option", "None"];
+    }
+
+    return [null, "Option", "Some", s[i]];
+  },
   str_slice: (s, start, end) => s.slice(start, end),
   show_bool: (b) => b ? "true" : "false",
 
@@ -138,5 +144,26 @@ module.exports = {
     } catch (e) {
       return [null, "Result", "Error", e.toString()];
     }
+  },
+
+  all: (promises) => Promise.all(promises),
+  add_big: (x, y) => x + y,
+  sub_big: (x, y) => x - y,
+  mul_big: (x, y) => x * y,
+  div_big: (x, y) => x / y,
+  mod_big: (x, y) => x % y,
+  int_to_big: (x) => new BigInt(x),
+  big_to_str: (x) => x.toString(),
+  eq_big: (x, y) => x === y,
+  lt_big: (x, y) => x < y,
+  create_big: (x) => new BigInt(x),
+
+  str_to_int: (x) => {
+    const res = parseInt(x);
+    if (isNaN(res)) {
+      return [null, 'Option', 'None'];
+    }
+
+    return [null, 'Option', 'Some', res];
   }
 }

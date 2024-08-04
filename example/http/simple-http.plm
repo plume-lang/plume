@@ -1,0 +1,11 @@
+// REQUIRES NATIVE BYTECODE EXECUTION
+
+require "std:io/http"
+
+port = 8000
+
+create_server(
+  port, Some("Server running on port $port"), 
+  fn(res, body: str) =>
+    res.respond("Hello, world!", 200)
+)

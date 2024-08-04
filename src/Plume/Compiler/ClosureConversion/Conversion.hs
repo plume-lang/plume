@@ -275,6 +275,10 @@ closeStatement (Pre.USMutDeclaration name e) = do
 closeStatement (Pre.USMutUpdate name e) = do
   (stmts, e') <- closeExpression e
   pure (stmts, Post.CSMutUpdate (Post.UVariable name) e')
+closeStatement (Pre.USWhile e s) = do
+  (p1, e') <- closeExpression e
+  (p2, s') <- closeStatement s
+  pure (p1 <> p2, Post.CSWhile e' s')
 
 makeReturn :: Post.ClosedExpr -> [Post.ClosedStatement]
 makeReturn (Post.CEBlock es) = es

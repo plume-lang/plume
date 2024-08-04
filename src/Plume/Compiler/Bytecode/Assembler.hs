@@ -48,7 +48,7 @@ instance Assemble LLIR.Instruction where
         address' <- negIdx address
         pure [BC.LoadLocal address']
       Nothing -> error $ "Local " <> name <> " not found"
-  
+
   assemble (LLIR.StoreLocal name) = do
     locals <- readIORef localPool
     case Map.lookup name locals of

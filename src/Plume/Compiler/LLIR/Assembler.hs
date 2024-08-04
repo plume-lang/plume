@@ -109,10 +109,12 @@ instance Assemble Pre.DesugaredProgram where
 
   assemble (Pre.DPDeclaration name expr) = do
     expr' <- assemble expr
+    modifyIORef globals (Set.insert name)
     pure (expr' <> LLIR.storeGlobal name)
   
   assemble (Pre.DPMutDeclaration name expr) = do
     expr' <- assemble expr
+    modifyIORef globals (Set.insert name)
     pure (expr' <> [LLIR.Instruction LLIR.MakeMutable] <>  LLIR.storeGlobal name)
 
   assemble (Pre.DPMutUpdate update expr) = do
@@ -137,7 +139,7 @@ instance Assemble Pre.DesugaredProgram where
     let newLibFunction = LLIR.NativeFunction nameConstantIdx funLibIdx libIdx
     modifyIORef' nativeFunctionsHandler (\m -> do
         case Map.lookup fp m of
-          Just l -> Map.insert fp (l { LLIR.nativeFunctions = Map.insert name newLibFunction (l.nativeFunctions) }) m
+          Just l -> Map.insert fp (l { LLIR.nativeFunctions = Map.insert name newLibFunction l.nativeFunctions }) m
           Nothing -> Map.insert 
             fp 
             (LLIR.MkNativeLibrary fp libIdx isStd (Map.singleton name newLibFunction)) m
@@ -189,6 +191,19 @@ instance Assemble Pre.DesugaredStatement where
         elseBranch     = [LLIR.Instruction (LLIR.JumpRel elseJumpAddr) | not doesElseReturn]
 
     pure (cond' <> thenBranch <> then'' <> elseBranch <> else'')
+
+  -- | A while loop is just a conditional jump at the end of the body to the
+  -- | condition if condition not met
+  assemble (Pre.DSWhile cond body) = do
+    cond' <- assemble cond
+    body' <- concatMapM assemble body
+
+    let bodyJumpAddr = length body' + 1 + length cond'
+        bodyJump = LLIR.instr (LLIR.JumpRel (-bodyJumpAddr))
+
+        jumpCond = LLIR.instr (LLIR.JumpElseRel (length body' + 2))
+
+    pure (cond' <> jumpCond <> body' <> bodyJump)
 
 isLiteral :: Pre.DesugaredExpr -> Bool
 isLiteral (Pre.DELiteral _) = True
@@ -340,6 +355,10 @@ instance Assemble Pre.DesugaredExpr where
   assemble (Pre.DEUnMut e) = do
     e' <- assemble e
     pure (e' <> [LLIR.Instruction LLIR.UnMut])
+
+  assemble (Pre.DEDeclaration name e) = do
+    e' <- assemble e
+    pure (e' <> LLIR.storeGlobal name)
 
 instance Assemble Pre.Update where
   assemble (Pre.UVariable name) = do

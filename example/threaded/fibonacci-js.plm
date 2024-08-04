@@ -1,0 +1,9 @@
+require "std:io/async-js"
+
+require "../basic/fibonacci"
+require "../basic/helper"
+
+xs = range(0, 31).map(async fn(n) {
+  f = fib(n)
+  println("fib($n) = $f")
+})

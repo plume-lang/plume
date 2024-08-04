@@ -5,8 +5,6 @@ module Plume.Compiler.Desugaring.Desugar where
 import Data.Map qualified as M 
 import Data.IntMap qualified as IM
 import Data.Set qualified as Set
-import Data.List qualified as List
-import Data.Tuple.Utils
 import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Compiler.Desugaring.Monad
 import Plume.Compiler.Desugaring.Syntax qualified as Post
@@ -33,7 +31,7 @@ import Plume.Compiler.Desugaring.Modules.Switch
 -- |    sequence of if-else expressions.
 
 desugarExpr
-  :: (IsToplevel, IsReturned, IsExpression)
+  :: (IsToplevel, IsReturned, IsExpression, ShouldBeANF)
   -> Desugar Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
 desugarExpr isTop = \case
   Pre.CESpecial -> return' Post.DESpecial
@@ -81,7 +79,7 @@ desugarExpr isTop = \case
   d@(Pre.CEMutUpdate {}) -> desugarANF isTop (desugarExpr isTop) d
   s@Pre.CESwitch {} -> desugarSwitch isTop (desugarExpr, desugarStatement isTop) s
   Pre.CEBlock xs -> do
-    res <- concat <$> mapM (desugarStatement (fst3 isTop, False, False)) xs
+    res <- concat <$> mapM (desugarStatement (fst4 isTop, False, False, fth4 isTop)) xs
     return (Post.DEVar "nil", createBlock res)
   Pre.CEAnd x y -> do
     (x', stmts1) <- desugarExpr isTop x
@@ -99,32 +97,36 @@ desugarExpr isTop = \case
     return (Post.DESlice x' i, stmts)
     
 desugarStatement
-  :: (IsToplevel, IsReturned, IsExpression)
+  :: (IsToplevel, IsReturned, IsExpression, ShouldBeANF)
   -> Desugar Pre.ClosedStatement [ANFResult (Maybe Post.DesugaredStatement)]
-desugarStatement isTop = \case
+desugarStatement isTop@(_, _, _, sba) = \case
   Pre.CSExpr x -> do
     (x', stmts) <- desugarExpr isTop x
     case x' of
       Post.DEVar "nil" -> return [(Nothing, stmts)]
       _ -> return [(Just $ Post.DSExpr x', stmts)]
   Pre.CSReturn x -> do
-    (x', stmts) <- desugarExpr (False, True, True) x
+    (x', stmts) <- desugarExpr (False, True, True, sba) x
     return [(Just $ Post.DSReturn x', stmts)]
   Pre.CSDeclaration n e -> do
-    (e', stmts) <- desugarExpr (False, False, True) e
+    (e', stmts) <- desugarExpr (False, False, True, sba) e
     return [(Just $ Post.DSDeclaration n e', stmts)]
   Pre.CSConditionBranch x y z -> do
-    (x', stmts1) <- desugarExpr (False, snd3 isTop, False) x
+    (x', stmts1) <- desugarExpr (False, snd4 isTop, False, sba) x
     ys <- desugarStatement isTop y
     zs <- desugarStatement isTop z
     return
       [(Just $ Post.DSIf x' (createBlock ys) (createBlock zs), stmts1)]
   Pre.CSMutDeclaration n e -> do
-    (e', stmts) <- desugarExpr (False, False, True) e
+    (e', stmts) <- desugarExpr (False, False, True, sba) e
     return [(Just $ Post.DSMutDeclaration n e', stmts)]
   Pre.CSMutUpdate n e -> do
-    (e', stmts) <- desugarExpr (False, False, True) e
+    (e', stmts) <- desugarExpr (False, False, True, sba) e
     return [(Just $ Post.DSMutUpdate n e', stmts)]
+  Pre.CSWhile x y -> do
+    (x', stmts1) <- desugarExpr (False, False, False, False) x
+    ys <- desugarStatement isTop y
+    return [(Just $ Post.DSWhile x' (createBlock ys), stmts1)]
 
 shouldReturn :: Pre.ClosedStatement -> Bool
 shouldReturn = \case
@@ -137,9 +139,15 @@ shouldReturn = \case
     helper (Pre.CSReturn _) = True
     helper _ = False
 
+unsnoc :: [a] -> Maybe ([a], a)
+unsnoc [] = Nothing
+unsnoc (x : xs) = Just $ case unsnoc xs of
+  Just (ys, y) -> (x : ys, y)
+  Nothing -> ([], x)
+
 insertReturn :: [Post.DesugaredStatement] -> IsReturned -> [Post.DesugaredStatement]
 insertReturn e False = e
-insertReturn e True = case List.unsnoc e of
+insertReturn e True = case unsnoc e of
   Just (_, Post.DSReturn _) -> e
   Just (xs, Post.DSExpr x) -> xs <> [Post.DSReturn x]
   _ -> e
@@ -147,25 +155,25 @@ insertReturn e True = case List.unsnoc e of
 desugarProgram :: Pre.ClosedProgram -> IO [Post.DesugaredProgram]
 desugarProgram = \case
   Pre.CPFunction x xs y isAsync -> do
-    ys <- desugarStatement (False, shouldReturn y, False) y
+    ys <- desugarStatement (False, shouldReturn y, False, True) y
     let bl = createBlock ys
     let bl' = insertReturn bl (shouldReturn y)
 
     return [Post.DPFunction x xs bl' isAsync]
   Pre.CPStatement x -> do
-    x' <- desugarStatement (True, False, False) x
+    x' <- desugarStatement (True, False, False, True) x
     return $ createBlockProg' x'
   Pre.CPNativeFunction fp x y st -> do
     modifyIORef' nativeFunctions $ Set.insert x
     return [Post.DPNativeFunction fp x y st]
   Pre.CPDeclaration n e -> do
-    (e', stmts) <- desugarExpr (True, False, True) e
+    (e', stmts) <- desugarExpr (True, False, True, True) e
     return (createBlockProg stmts ++ [Post.DPDeclaration n e'])
   Pre.CPMutDeclaration n e -> do
-    (e', stmts) <- desugarExpr (True, False, True) e
+    (e', stmts) <- desugarExpr (True, False, True, True) e
     return (createBlockProg stmts ++ [Post.DPMutDeclaration n e'])
   Pre.CPMutUpdate n e -> do
-    (e', stmts) <- desugarExpr (True, False, True) e
+    (e', stmts) <- desugarExpr (True, False, True, True) e
     return (createBlockProg stmts ++ [Post.DPMutUpdate n e'])
   Pre.CPDeclare n -> return [Post.DPDeclare n]
 

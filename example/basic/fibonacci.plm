@@ -1,14 +1,11 @@
 require "helper"
 
-fn fib_with_tco(n: int, a: int, b: int): int {
-  if n == 0 {
-    return a
-  } else {
-    return fib_with_tco(n - 1, b, a + b)
+fn fib(n: int) =>
+  switch n {
+    case 0 => 0
+    case 1 => 1
+    case ? => fib(n - 1) + fib(n - 2)
   }
-}
-
-fn fib(n: int) => fib_with_tco(n, 0, 1)
 
 xs = range(0, 31).map(fn (n) => (n, fib(n)))
 

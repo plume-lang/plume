@@ -10,8 +10,8 @@ native ("native", "js") "std:native" {
   ffi_slice_list<A>(x: [A], start: int, end: int): [A]
 }
 
-extend indexable<list> {
-  fn get_index<A>(self: list<A>, i): Option<A> => ffi_get_index(self, i)
+extend<A> indexable<list<A>, A> {
+  fn get_index(self: list<A>, i): Option<A> => ffi_get_index(self, i)
 }
 
 extend traversable<list> {

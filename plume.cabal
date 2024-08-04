@@ -79,6 +79,7 @@ library
     Plume.TypeChecker.Checker.Interface
     Plume.TypeChecker.Checker.Monad
     Plume.TypeChecker.Checker.Native
+    Plume.TypeChecker.Checker.While
     Plume.TypeChecker.Checker.Switch
     Plume.TypeChecker.Constraints.Definition
     Plume.TypeChecker.Constraints.Solver
@@ -104,7 +105,7 @@ library
 
   ghc-options:        -Wall -Wno-orphans
   build-depends:
-    , base                         ^>=4.19.0.0
+    , base
     , binary
     , containers
     , diagnose
@@ -134,7 +135,7 @@ executable plume
   ghc-options:        -Wall -O2
   other-modules:      CLI
   build-depends:
-    , base                  ^>=4.19.0.0
+    , base
     , directory
     , filepath
     , optparse-applicative
@@ -156,5 +157,5 @@ test-suite plume-test
   default-language: GHC2021
   ghc-options:      -Wall
   build-depends:
-    , base   ^>=4.19.0.0
+    , base
     , plume

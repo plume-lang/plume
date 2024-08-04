@@ -197,7 +197,7 @@ checkForUndefined m (HLIR.EType ann tcs) = do
 checkForUndefined m (HLIR.ETypeAlias ann _) = do
   let m' = m { M.types = Set.insert ann.annotationName.identifier (M.types m) }
   pure m'
-checkForUndefined m (HLIR.EInterface ann _ annots) = do
+checkForUndefined m (HLIR.EInterface ann _ annots _) = do
   let defs = Set.fromList $ map interpretAnnot annots
   let m' = m { 
     M.classes = Set.insert ann.annotationName.identifier (M.classes m),
@@ -267,6 +267,9 @@ checkForUndefined m (HLIR.ETypeExtension _ ann _ exts) = do
 checkForUndefined m (HLIR.ENativeFunction _ name _ _ _ _) = do
   pure m { M.variables = Set.insert (name, False) (M.variables m) }
 checkForUndefined m (HLIR.EAwait e) = checkForUndefined m e
+checkForUndefined m (HLIR.EWhile e1 e2) = do
+  m' <- checkForUndefined m e1
+  checkForUndefined m' e2
 checkForUndefined _ _ = error "Unsupported expression"
 
 toExpr :: HLIR.ExtensionMember -> HLIR.Expression

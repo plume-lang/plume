@@ -1,16 +1,18 @@
 add_rules("mode.release")
 add_requires("libcurl", { system = false })
-add_requires("llhttp", { system = false })
+
+if has_config("local-repo") then
+	add_repositories("local-repo " .. get_config("local-repo"))
+end
+
+add_requires("plume-vm")
 
 target("plume-natives")
   set_kind("shared")
   add_packages("libcurl")
-  add_packages("llhttp")
-
+  add_packages("plume-vm")
   add_files("c-ffi/**.c")
   add_includedirs("../runtime/include")
-  -- add_files("ffi/ffi.export.txt")
-  -- add_rules("utils.symbols.export_list")
   set_targetdir(".")
   set_basename("native")
   set_prefixname("")

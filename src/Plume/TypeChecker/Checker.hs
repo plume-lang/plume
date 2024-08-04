@@ -11,6 +11,7 @@ import Plume.TypeChecker.Checker.Closure
 import Plume.TypeChecker.Checker.Condition
 import Plume.TypeChecker.Checker.Datatype
 import Plume.TypeChecker.Checker.Declaration
+import Plume.TypeChecker.Checker.While
 import Plume.TypeChecker.Checker.Extension
 import Plume.TypeChecker.Checker.Interface (synthInterface)
 import Plume.TypeChecker.Checker.Native
@@ -88,6 +89,7 @@ synthesize (Pre.EVariableDeclare gens name ty) = do
 synthesize app@(Pre.EApplication {}) = synthApp synthesize app
 synthesize clos@(Pre.EClosure {}) = synthClosure synthesize clos
 synthesize decl@(Pre.EDeclaration {}) = synthDecl False synthesize decl
+synthesize whil@(Pre.EWhile {}) = synthWhile synthesize whil
 synthesize cond@(Pre.EConditionBranch {}) = synthCond synthesize cond
 synthesize ext@(Pre.ETypeExtension {}) = synthExt synthesize ext
 synthesize ty@(Pre.EType {}) = synthDataType ty
@@ -139,7 +141,8 @@ synthesizeToplevel e@(Pre.EDeclaration _ _ body _) = do
   let t'' = Forall [] $ List.nub ps' :=>: ty
 
   pos <- fetchPosition
-  h' <- liftIO $ runReaderT h $ getExpr pos m
+  checkSub <- gets substitution
+  h' <- liftIO $ runReaderT h $ getExpr pos checkSub m
 
   unless (null as') $ do
     throw (UnresolvedTypeVariable as')
@@ -150,7 +153,7 @@ synthesizeToplevel e@(Pre.EDeclaration _ _ body _) = do
 synthesizeToplevel e = do
   (ty, ps, h) <- synthesize e
   cenv <- gets (extendEnv . environment)
-  zs <- traverse (discharge cenv) ps
+  zs <- traverse (discharge cenv) (reverse ps)
 
   let (ps', m, as, _) = mconcat zs
   (_, as') <- removeDuplicatesAssumps as
@@ -158,7 +161,8 @@ synthesizeToplevel e = do
   let t'' = Forall [] $ List.nub ps' :=>: ty
 
   pos <- fetchPosition
-  h' <- liftIO $ runReaderT h $ getExpr pos m
+  checkSub <- gets substitution
+  h' <- liftIO $ runReaderT h $ getExpr pos checkSub m
 
   unless (null as') $ do
     throw (UnresolvedTypeVariable as')

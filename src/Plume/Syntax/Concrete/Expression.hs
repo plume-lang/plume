@@ -15,6 +15,9 @@ import Plume.Syntax.Common.Pattern
 import Plume.Syntax.Common.Type
 import Text.Megaparsec.Pos
 import Prelude hiding (intercalate)
+import GHC.Show qualified as S
+import Data.String qualified as S
+import qualified Data.List as S
 
 type IsStandard = Maybe Text
 
@@ -87,7 +90,12 @@ data Expression t f
   | ERequire Text
   | ELocated (Expression t f) Position
   | ESwitch (Expression t f) [(Pattern t f, Expression t f)]
-  | EInterface { interfaceType :: Annotation [t], interfaceGenerics :: [PlumeGeneric], interfaceMembers :: [Annotation PlumeScheme] }
+  | EInterface { 
+      interfaceType :: Annotation [t], 
+      interfaceGenerics :: [PlumeGeneric],
+      interfaceMembers :: [Annotation PlumeScheme],
+      interfaceDeduction :: Maybe (Text, Text)
+    }
   | EReturn (Expression t f)
   | ETypeExtension [PlumeGeneric] (Annotation [t]) (Maybe Text) [ExtensionMember t f]
   | ENativeFunction Text Text [Text] t LibraryType IsStandard
@@ -97,6 +105,7 @@ data Expression t f
   | EInstanceVariable Identifier (f t)
   | EInstanceAccess (Expression t f) Int
   | EInstanceDict Text (f t) [Expression t f]
+  | EWhile (Expression t f) (Expression t f)
 
 -- | A type constructor is a type that is used to construct a type.
 -- | It may be either a type-constructor function or a type-constructor
@@ -106,7 +115,6 @@ data Expression t f
 data TypeConstructor t
   = TConstructor Text [t]
   | TVariable Text
-  deriving (Show)
 
 -- | An extension member is a member that is used to extend a type.
 -- | It is currently only a declaration that may be a function.
@@ -115,9 +123,6 @@ data ExtensionMember t f
       [PlumeGeneric]
       (Annotation (f t))
       (Expression t f)
-
-deriving instance (Show t, Show (f t)) => Show (ExtensionMember t f)
-deriving instance (Show t, Show (f t)) => Show (Expression t f)
 
 -- | Shorthand for a located expression
 -- | x :>: p is equivalent to ELocated x p
@@ -140,7 +145,7 @@ instance (Eq t, Eq (f t)) => Eq (Expression t f) where
   ERequire x == ERequire y = x == y
   ESwitch x xs == ESwitch x' xs' = x == x' && xs == xs'
   EReturn x == EReturn y = x == y
-  EInterface x xs ys == EInterface x' xs' ys' = x == x' && xs == xs' && ys == ys'
+  EInterface x xs ys d == EInterface x' xs' ys' d' = x == x' && xs == xs' && ys == ys' && d == d'
   ETypeExtension xs x t ys == ETypeExtension xs' x' t' ys' = xs == xs' && x == x' && ys == ys' && t == t'
   ENativeFunction x y xs z t isStd == ENativeFunction x' y' xs' z' t' isStd' = x == x' && y == y' && xs == xs' && z == z' && t == t' && isStd == isStd'
   EVariableDeclare xs x t == EVariableDeclare xs' x' t' = xs == xs' && x == x' && t == t'
@@ -156,3 +161,36 @@ instance (Eq t) => Eq (TypeConstructor t) where
 
 instance (Eq t, Eq (f t)) => Eq (ExtensionMember t f) where
   ExtDeclaration xs x y == ExtDeclaration xs' x' y' = xs == xs' && x == x' && y == y'
+
+instance Show t => Show (TypeConstructor t) where
+  show (TConstructor x xs) = toString x <> " " <> show xs
+  show (TVariable x) = toString x
+
+instance (Show t, Show (f t)) => Show (Expression t f) where
+  show (EVariable x t) = toString x
+  show (ELiteral x) = show x
+  show (EList xs) = "[" <> S.intercalate ", " (map show xs) <> "]"
+  show (EApplication f xs) = show f <> "(" <> S.intercalate ", " (map show xs) <> ")"
+  show (EType _ xs) = "type " <> S.intercalate " | " (map show xs)
+  show (EDeclaration xs t x y) = "let " <> show xs <> " = " <> show t <> " in " <> show x <> maybe "" ((" else " <>) . show) y
+  show (EMutUpdate t x y) = "mut " <> show t <> " = " <> show x <> maybe "" ((" else " <>) . show) y
+  show (EConditionBranch x y z) = "if " <> show x <> " then " <> show y <> " else " <> show z
+  show (EClosure xs t x isA) = "closure " <> show xs <> " " <> show t <> " " <> show x <> " " <> show isA
+  show (EBlock xs) = "{ " <> S.intercalate ";\n" (map show xs) <> "\n}"
+  show (ERequire x) = "require " <> toString x
+  show (ESwitch x xs) = "switch " <> show x <> " { " <> S.intercalate "; " (map (\(p, e) -> show p <> " -> " <> show e) xs) <> " }"
+  show (EInterface x xs ys d) = "interface " <> show x <> " " <> show xs <> " " <> show ys <> " " <> maybe "" (\(x, y) -> "deduct " <> toString x <> " " <> toString y) d
+  show (EReturn x) = "return " <> show x
+  show (ETypeExtension xs x t ys) = "extend " <> show xs <> " " <> show x <> " " <> maybe "" ((" as " <>) . toString) t <> " " <> show ys
+  show (ENativeFunction x y xs z t isStd) = "native " <> toString x <> " " <> toString y <> " " <> show xs
+  show (ETypeAlias x t) = "type " <> show x <> " = " <> show t
+  show (EVariableDeclare xs x t) = "declare " <> show xs <> " " <> toString x <> " " <> show t
+  show (EAwait x) = "await " <> show x
+  show (EInstanceVariable x t) = "instance " <> toString x <> " " <> show t
+  show (EInstanceAccess x i) = show x <> "." <> show i
+  show (EInstanceDict x t xs) = "dict " <> toString x <> " " <> show t <> " " <> show xs
+  show (EWhile x y) = "while " <> show x <> " " <> show y
+  show (ELocated x _) = show x
+
+instance (Show t, Show (f t)) => Show (ExtensionMember t f) where
+  show (ExtDeclaration xs x y) = "declare " <> show xs <> " " <> show x <> " " <> show y

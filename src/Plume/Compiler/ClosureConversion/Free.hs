@@ -73,6 +73,7 @@ instance Free ClosedStatement where
   free (CSConditionBranch e1 e2 e3) = free e1 <> free e2 <> free e3
   free (CSMutDeclaration x e) = free e S.\\ S.singleton x
   free (CSMutUpdate x e) = (free e S.\\ free x) <> free x
+  free (CSWhile e s) = free e <> free s
 
 instance Free ClosedProgram where
   free (CPFunction n args e _) = free e S.\\ (S.fromList args <> S.singleton n)
@@ -148,6 +149,7 @@ instance Substitutable ClosedStatement ClosedExpr where
     | name == n = CSMutUpdate (convertToUpdate r) (substitute e e')
     | otherwise = CSMutUpdate (UVariable name) (substitute e e')
   substitute e (CSMutUpdate x e') = CSMutUpdate x (substitute e e')
+  substitute e (CSWhile e' s) = CSWhile (substitute e e') (substitute e s)
 
 instance Substitutable ClosedProgram ClosedExpr where
   substitute e (CPStatement s) = CPStatement (substitute e s)

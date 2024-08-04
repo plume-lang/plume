@@ -38,13 +38,12 @@ Value fetch(size_t argc, Module* mod, Value* args) {
   const char* url_str = GET_STRING(url);
 
   struct MemoryStruct mem;
-  mem.gc = gc;
-  mem.memory = gc_malloc(&mod->gc, 1);
+  mem.memory = malloc(1);
   mem.size = 0;
 
   CURL* curl = curl_easy_init();
   if (!curl)
-    return make_err(mod->gc, MAKE_STRING(mod->gc, "Failed to initialize curl"));
+    return make_err(mod->gc, MAKE_STRING("Failed to initialize curl"));
 
   curl_easy_setopt(curl, CURLOPT_URL, url_str);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
@@ -54,13 +53,13 @@ Value fetch(size_t argc, Module* mod, Value* args) {
   if (res != CURLE_OK) {
     char* err = (char*)curl_easy_strerror(res);
     curl_easy_cleanup(curl);
-    return make_err(mod->gc, MAKE_STRING(mod->gc, err));
+    return make_err(mod->gc, MAKE_STRING(err));
   }
 
-  char* result = gc_strdup(&mod->gc, mem.memory);
+  char* result = strdup(mem.memory);
 
   curl_easy_cleanup(curl);
-  return make_ok(mod->gc, MAKE_STRING(mod->gc, result));
+  return make_ok(mod->gc, MAKE_STRING(result));
 }
 
 Value call_callback(size_t argc, Module* mod, Value* args) {
@@ -73,7 +72,7 @@ Value call_callback(size_t argc, Module* mod, Value* args) {
     MAKE_INTEGER(10)
   });
 
-  return MAKE_STRING(mod->gc, "test");
+  return MAKE_STRING("test");
 }
 
 #ifdef _WIN32
@@ -187,9 +186,9 @@ Value create_server(size_t argc, Module* mod, Value* args) {
     }
 #endif
 
-    gc_pause(&mod->gc);
+    // gc_pause(&mod->gc);
     handle_client(client_socket, mod, handler);
-    gc_resume(&mod->gc);
+    // gc_resume(&mod->gc);
 
 #ifdef _WIN32
     closesocket(client_socket);
@@ -205,12 +204,12 @@ Value create_server(size_t argc, Module* mod, Value* args) {
   close(server_socket);
 #endif
 
-  gc_run(&mod->gc);
+  // gc_run(&mod->gc);
   return 0;
 }
 
 void handle_client(int client_socket, Module *mod, Value handler) {
-  char *buffer = (char *)gc_malloc(&mod->gc, BUFFER_SIZE);
+  char *buffer = (char *)malloc(BUFFER_SIZE);
   int bytes_read = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
 
   if (bytes_read < 0) {
@@ -220,16 +219,16 @@ void handle_client(int client_socket, Module *mod, Value handler) {
 
   buffer[bytes_read] = '\0';
   
-  HeapValue* response_obj = gc_malloc(&mod->gc, sizeof(HeapValue));
+  HeapValue* response_obj = malloc(sizeof(HeapValue));
   response_obj->type = TYPE_API;
   response_obj->as_any = &client_socket;
 
   Value res = MAKE_PTR(response_obj);
-  Value buf = MAKE_STRING(mod->gc, buffer);
+  Value buf = MAKE_STRING(buffer);
   Value ret = mod->call_function(mod, handler, 3, (Value[]) { res, buf });
 
-  gc_free(&mod->gc, buffer);
-  gc_free(&mod->gc, response_obj);
+  free(buffer);
+  free(response_obj);
 }
 
 Value respond(size_t argc, Module* mod, Value* args) {
@@ -244,7 +243,7 @@ Value respond(size_t argc, Module* mod, Value* args) {
   const char* content = GET_STRING(args[1]);
   int status = GET_INT(args[2]);
 
-  char* response = gc_malloc(&mod->gc, strlen(content) + 100);
+  char* response = malloc(strlen(content) + 100);
   sprintf(response,
           "HTTP/1.1 %d OK\r\n"
           "Content-Type: text/plain\r\n"
@@ -254,7 +253,7 @@ Value respond(size_t argc, Module* mod, Value* args) {
           status, strlen(content), content);
 
   send(client_socket, response, strlen(response), 0);
-  gc_free(&mod->gc, response);
+  free(response);
 
   return make_unit(mod->gc);
 }
@@ -277,7 +276,7 @@ Value respond_with(size_t argc, Module* mod, Value* args) {
   int status_int = GET_INT(status);
   const char* headers_str = GET_STRING(headers);
 
-  char* response = gc_malloc(&mod->gc, strlen(content_str) + 100);
+  char* response = malloc(strlen(content_str) + 100);
   sprintf(response,
           "HTTP/1.1 %d OK\r\n"
           "%s\r\n"
@@ -287,7 +286,7 @@ Value respond_with(size_t argc, Module* mod, Value* args) {
           status_int, headers_str, strlen(content_str), content_str);
 
   send(client_socket, response, strlen(response), 0);
-  gc_free(&mod->gc, response);
+  free(response);
 
   return make_unit(mod->gc);
 }

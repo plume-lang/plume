@@ -5,6 +5,7 @@ import Plume.Compiler.Desugaring.Syntax qualified as Pre
 import Plume.Compiler.ClosureConversion.Syntax qualified as Pre
 import Plume.Syntax.Common.Literal qualified as Cmm
 import Data.IntMap qualified as IntMap
+import qualified Data.Text as Text
 
 class Assemble a b where
   assemble :: a -> b
@@ -13,8 +14,8 @@ instance Assemble Pre.DesugaredProgram Post.Program where
   assemble (Pre.DPDeclaration name expr) = Post.Program [Post.JSVariableDeclaration name (assemble expr)]
   assemble (Pre.DPFunction name args body isAsync) = Post.Program [fun name args (assemble body)]
     where fun = if isAsync then Post.JSAsyncFunction else Post.JSFunction
-  assemble (Pre.DPMutDeclaration name expr) = Post.Program [Post.JSVariableDeclaration name (assemble expr)]
-  assemble (Pre.DPMutUpdate name expr) = Post.Program [Post.JSUpdate (assemble name) (assemble expr)]
+  assemble (Pre.DPMutDeclaration name expr) = Post.Program [Post.JSVariableDeclaration name (Post.JSObject [("value", assemble expr)])]
+  assemble (Pre.DPMutUpdate name expr) = Post.Program [Post.JSUpdate (Post.JSFieldUpdate "value" (assemble name)) (assemble expr)]
   assemble (Pre.DPStatement st) = Post.Program [assemble st]
   assemble e@(Pre.DPNativeFunction {}) = Post.Program (assembleNative e)
   assemble (Pre.DPDeclare {}) = mempty
@@ -24,6 +25,11 @@ createStandardPath name = Post.JSBinary "+" path (Post.JSLiteral (Cmm.LString ("
   where 
     path = Post.JSMember (Post.JSMember (Post.JSIdentifier "process") "env") "PLUME_PATH"
 
+createModulePath :: Text -> Post.Expression
+createModulePath name = Post.JSBinary "+" path (Post.JSLiteral (Cmm.LString ((if Text.isPrefixOf "modules" name then "/" else "/modules/") <> name)))
+  where 
+    path = Post.JSMember (Post.JSMember (Post.JSIdentifier "process") "env") "PPM_PATH"
+
 assembleNative :: Pre.DesugaredProgram -> [Post.Statement]
 assembleNative (Pre.DPNativeFunction lib name _ isStd) = do
   [Post.JSVariableDeclaration name nameCall]
@@ -31,6 +37,8 @@ assembleNative (Pre.DPNativeFunction lib name _ isStd) = do
     requireCall = Post.JSCall (Post.JSIdentifier "require") [
         if isStd == Just "standard" then 
           createStandardPath lib 
+        else if isStd == Just "module" then
+          createModulePath lib
         else Post.JSLiteral (Cmm.LString ("./" <> lib))
       ]
     nameCall = Post.JSMember requireCall name
@@ -38,11 +46,12 @@ assembleNative _ = []
 
 instance Assemble Pre.DesugaredStatement Post.Statement where
   assemble (Pre.DSDeclaration name expr) = Post.JSVariableDeclaration name (assemble expr)
-  assemble (Pre.DSMutDeclaration name expr) = Post.JSVariableDeclaration name (assemble expr)
-  assemble (Pre.DSMutUpdate name expr) = Post.JSUpdate (assemble name) (assemble expr)
+  assemble (Pre.DSMutDeclaration name expr) = Post.JSVariableDeclaration name (Post.JSObject [("value", assemble expr)])
+  assemble (Pre.DSMutUpdate name expr) = Post.JSUpdate (Post.JSFieldUpdate "value" (assemble name)) (assemble expr)
   assemble (Pre.DSReturn e) = Post.JSReturn (assemble e)
   assemble (Pre.DSExpr e) = Post.JSExpression (assemble e)
   assemble (Pre.DSIf e1 e2 e3) = Post.JSIfStatement (assemble e1) (assemble e2) (Just $ assemble e3)
+  assemble (Pre.DSWhile e1 e2) = Post.JSWhile (assemble e1) (assemble e2)
 
 doesContainReturn :: [Pre.DesugaredStatement] -> Bool
 doesContainReturn = any isReturn
@@ -125,3 +134,4 @@ containsAsyncS (Post.JSFunction _ _ body) = any containsAsyncS body
 containsAsyncS (Post.JSReturn e) = containsAsync e
 containsAsyncS (Post.JSUpdate _ e) = containsAsync e
 containsAsyncS (Post.JSAsyncFunction _ _ body) = any containsAsyncS body
+containsAsyncS (Post.JSWhile e body) = containsAsync e || any containsAsyncS body

@@ -15,8 +15,6 @@ native "native" "std:native" {
   respond_with(res: Response, body: str, status: int, headers: str): unit
 }
 
-native "js" "std:native" fetch(url: str): async<Result<str, str>>
-
 extend show<Response> {
   fn show_prec(_, _) => "Response"
 }

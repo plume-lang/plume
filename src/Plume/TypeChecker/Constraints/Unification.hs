@@ -5,6 +5,8 @@ import Plume.TypeChecker.Constraints.Definition
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.TLIR qualified as Typed
 import Plume.Syntax.Common.Annotation qualified as Cmm
+import qualified Data.Map as Map
+import Data.Foldable (foldrM)
 
 doesUnifyWith :: PlumeType -> PlumeType -> IO Bool
 doesUnifyWith t t' = do
@@ -16,8 +18,72 @@ doesQualUnifiesWith :: PlumeQualifier -> PlumeQualifier -> IO Bool
 doesQualUnifiesWith (IsIn t n) (IsIn t' n') | n == n' = do
   t1 <- mapM compressPaths t
   t2 <- mapM compressPaths t'
-  and <$> zipWithM doesUnifyWithH t1 t2
+  and <$> zipWithM doesUnifyWithH' t1 t2
 doesQualUnifiesWith _ _ = pure False
+
+unifyAndGetSub :: MonadChecker m => PlumeType -> PlumeType -> m Substitution
+unifyAndGetSub t t' = do
+  t1 <- liftIO $ compressPaths t
+  t2 <- liftIO $ compressPaths t'
+  unifyAndGetSubH t1 t2
+
+composeSubs :: [Substitution] -> IO Substitution
+composeSubs = foldrM compose Map.empty
+
+compose :: Substitution -> Substitution -> IO Substitution
+compose s1 s2 = do
+  -- Map.map (apply s1) s2 `Map.union` s1
+  s1' <- mapM (apply s1) s2
+  pure $ s1' `Map.union` s1
+
+applyQual :: Substitution -> PlumeQualifier -> IO PlumeQualifier
+applyQual s (IsIn t n) = IsIn <$> mapM (apply s) t <*> pure n
+applyQual _ q = pure q
+
+apply :: Substitution -> PlumeType -> IO PlumeType
+apply _ (TypeId n) = pure $ TypeId n
+apply s (TypeApp t ts) = TypeApp <$> apply s t <*> mapM (apply s) ts
+apply s (TypeVar u) = do
+  v <- readIORef u
+  case v of
+    Link t -> apply s t
+    Unbound t _ -> case Map.lookup t s of
+      Just t' -> apply s t'
+      Nothing -> pure $ TypeVar u
+apply s (TypeQuantified q) = case Map.lookup q s of
+  Just t -> apply s t
+  Nothing -> pure $ TypeQuantified q
+
+unifyAndGetSubH :: MonadChecker m => PlumeType -> PlumeType -> m Substitution
+unifyAndGetSubH t1 t2 | t1 == t2 = pure mempty
+unifyAndGetSubH (TypeVar tv) t = do
+  tv' <- readIORef tv
+  case tv' of
+    Link t' -> unifyAndGetSub t' t
+    Unbound qv _ -> pure (Map.singleton qv t)
+unifyAndGetSubH t (TypeVar tv) = do
+  tv' <- readIORef tv
+  case tv' of
+    Link t' -> unifyAndGetSub t t'
+    Unbound qv _ -> pure (Map.singleton qv t)
+unifyAndGetSubH (TypeApp t1 t1') (TypeApp t2 t2') | length t1' == length t2' = do
+  s1 <- unifyAndGetSub t1 t2
+  s2 <- foldrM (\(t1'', t2'') s -> do
+    s' <- unifyAndGetSub t1'' t2''
+    liftIO $ compose s' s
+    ) mempty (zip t1' t2')
+  pure (s1 <> s2)
+unifyAndGetSubH (TypeQuantified q1) t = do
+  b <- liftIO $ doesOccurQ q1 t
+  if b
+    then pure mempty
+    else pure (Map.singleton q1 t)
+unifyAndGetSubH t (TypeQuantified q2) = do
+  b <- liftIO $ doesOccurQ q2 t
+  if b
+    then pure mempty
+    else pure (Map.singleton q2 t)
+unifyAndGetSubH _ _ = error "Unification failed"
 
 doesUnifyWithScheme :: PlumeType -> PlumeScheme -> IO Bool
 doesUnifyWithScheme t (Forall _ (_ :=>: t')) = do
@@ -39,12 +105,39 @@ doesUnifyWithH t (TypeVar tv) = do
   case tv' of
     Link t' -> doesUnifyWith t t'
     Unbound _ _ -> pure True
-doesUnifyWithH (TypeApp t1 t1') (TypeApp t2 t2') =
+doesUnifyWithH (TypeApp t1 t1') (TypeApp t2 t2') | length t1' == length t2' =
   and <$> zipWithM doesUnifyWith (t1:t1') (t2:t2')
 doesUnifyWithH (TypeQuantified q1) (TypeQuantified q2) = pure (q1 == q2)
 doesUnifyWithH (TypeQuantified q1) t = not <$> doesOccurQ q1 t
 doesUnifyWithH t (TypeQuantified q2) = not <$> doesOccurQ q2 t
 doesUnifyWithH _ _ = pure False
+
+doesUnifyWith' :: PlumeType -> PlumeType -> IO Bool
+doesUnifyWith' t1 t2 = do
+  t1' <- compressPaths t1
+  t2' <- compressPaths t2
+  doesUnifyWithH' t1' t2'
+
+doesUnifyWithH' :: PlumeType -> PlumeType -> IO Bool
+doesUnifyWithH' t1 t2 | t1 == t2 = pure True
+doesUnifyWithH' (TypeId "variable") (TypeId "list") = pure True
+doesUnifyWithH' (TypeId "list") (TypeId "variable") = pure True
+doesUnifyWithH' (TypeVar tv) t = do
+  tv' <- readIORef tv
+  case tv' of
+    Link t' -> doesUnifyWith' t' t
+    Unbound _ _ -> pure True
+doesUnifyWithH' t (TypeVar tv) = do
+  tv' <- readIORef tv
+  case tv' of
+    Link t' -> doesUnifyWith' t t'
+    Unbound _ _ -> pure True
+doesUnifyWithH' (TypeApp t1 t1') (TypeApp t2 t2') | length t1' == length t2' =
+  and <$> zipWithM doesUnifyWith' (t1:t1') (t2:t2')
+doesUnifyWithH' (TypeQuantified _) (TypeQuantified _) = pure True
+doesUnifyWithH' (TypeQuantified q1) t = not <$> doesOccurQ q1 t
+doesUnifyWithH' t (TypeQuantified q2) = not <$> doesOccurQ q2 t
+doesUnifyWithH' _ _ = pure False
 
 doesOccurQ :: QuVar -> PlumeType -> IO Bool
 doesOccurQ q (TypeVar tv) = do
@@ -107,7 +200,7 @@ mgu t t' = do
         Unbound _ _ -> liftIO $ do
           doesOccur tv2 t1
           writeIORef tv2 (Link t1)
-      (TypeApp t1a t1b, TypeApp t2a t2b) -> do
+      (TypeApp t1a t1b, TypeApp t2a t2b) | length t1b == length t2b -> do
         mgu t1a t2a
         zipWithM_ mgu t1b t2b
       (TypeId n, TypeId n') | n == n' -> pure ()

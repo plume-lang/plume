@@ -7,7 +7,7 @@ import Plume.Compiler.Desugaring.Syntax qualified as Post
 import Control.Monad.Exception (compilerError)
 
 desugarANF
-  :: (IsToplevel, IsReturned, IsExpression)
+  :: (IsToplevel, IsReturned, IsExpression, ShouldBeANF)
   -> DesugarModule Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
 desugarANF _ f (Pre.CEApplication x xs) = do
   (x', stmts1) <- f x
@@ -23,7 +23,7 @@ desugarANF _ f (Pre.CEApplication x xs) = do
       let stmts' = stmts1 <> [Post.DSDeclaration fresh x'] <> concat stmts2
 
       return (Post.DEApplication fresh xs', stmts')
-desugarANF t f (Pre.CEDeclaration name expr body) = do
+desugarANF t@(_, _, _, sba) f (Pre.CEDeclaration name expr body) = do
   (expr', stmt1) <- f expr
   (body', stmts2) <- desugarANF t f body
 
@@ -33,9 +33,9 @@ desugarANF t f (Pre.CEDeclaration name expr body) = do
         stmt1
           <> [Post.DSDeclaration name expr']
           <> stmts2
-          <> [Post.DSDeclaration fresh body']
+          <> [Post.DSDeclaration fresh body' | sba]
 
-  return (Post.DEVar fresh, stmts)
+  return (if sba then Post.DEVar fresh else body', stmts)
 desugarANF t f (Pre.CEMutDeclaration name expr body) = do
   (expr', stmt1) <- f expr
   (body', stmts2) <- desugarANF t f body
@@ -62,7 +62,7 @@ desugarANF t f (Pre.CEMutUpdate name expr body) = do
           <> [Post.DSDeclaration fresh body']
 
   return (Post.DEVar fresh, stmts)
-desugarANF (isTop, _, _) f (Pre.CEConditionBranch e1 e2 e3) = do
+desugarANF (isTop, _, _, _) f (Pre.CEConditionBranch e1 e2 e3) = do
   (e1', stmts1) <- f e1
   r1 <- f e2
   r2 <- f e3

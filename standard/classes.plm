@@ -39,6 +39,7 @@ interface<A> numeric<A> {
   fn (-)(a: A, b: A): A
 }
 
+infix 3 ^
 interface<A> product<A> {
   fn (*)(a: A, b: A): A
   fn (/)(a: A, b: A): A
@@ -66,8 +67,8 @@ interface<T> foldable<T> {
   fn foldl<A, B>(self: T<A>, f: fn(B, A): B, init: B): B
 }
 
-interface<T> indexable<T> {
-  fn get_index<A>(self: T<A>, i: int): Option<A>
+interface<T, I> indexable<T, I> with T => I {
+  fn get_index(self: T, i: int): Option<I>
 }
 
 interface<A> default<A> {
@@ -93,3 +94,36 @@ fn (>>)<M extends monadic, A, B>(x: M<A>, y: M<B>): M<B> =>
 infixl 1 <<
 fn (<<)<M extends monadic, A, B>(x: M<A>, y: M<B>): M<A> => 
   x.bind(fn (a) => y.bind(fn(_) => pure(a)))
+
+infixr 0 +=
+fn (+=)<A extends numeric>(var: mut A, x: A): A {
+  var = *var + x
+  return *var
+}
+
+infixr 0 -=
+fn (-=)<A extends numeric>(var: mut A, x: A): A {
+  var = *var - x
+  return *var
+}
+
+infixr 0 *=
+fn (*=)<A extends product>(var: mut A, x: A): A {
+  var = *var * x
+  return *var
+}
+
+infixr 0 /=
+fn (/=)<A extends product>(var: mut A, x: A): A {
+  var = *var / x
+  return *var
+}
+
+infixr 0 ^=
+
+fn negate<A extends (default, numeric)>(x: A): A
+  => default() - x
+
+interface<A, B> convertible<A, B> with B => A {
+  fn convert(x: A): Option<B>
+}

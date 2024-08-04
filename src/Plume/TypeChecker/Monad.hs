@@ -5,7 +5,6 @@ module Plume.TypeChecker.Monad
     MonadChecker,
     Checker,
     Placeholder,
-    Substitution,
     fetchPositionIO,
     modify,
     get,
@@ -88,7 +87,7 @@ local f action = do
   put (f old)
   a <- action
   new <- get
-  modify $ \s -> s { isAsynchronous = isAsynchronous new}
+  modify $ const old { isAsynchronous = isAsynchronous new }
   pure a
 
 -- | Throwing an error onto the error stack if a position is
@@ -288,8 +287,6 @@ fetchPositionIO = do
         Nothing -> liftIO $ compilerError "No position found in checker state"
         Just p -> pure p
     Just p -> pure p
-
-type Substitution = Map Text PlumeType
 
 instantiate :: (MonadChecker m) => PlumeScheme -> m (PlumeType, [PlumeQualifier])
 instantiate t = do

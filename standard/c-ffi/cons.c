@@ -4,13 +4,13 @@
 #include <value.h>
 
 Value make_some(GarbageCollector gc, Value v) {
-  Value* values = gc_malloc(&gc, sizeof(Value) * 4);
+  Value* values = malloc(sizeof(Value) * 4);
   values[0] = MAKE_SPECIAL();
-  values[1] = MAKE_STRING(gc, "Option");
-  values[2] = MAKE_STRING(gc, "Some");
+  values[1] = MAKE_STRING("Option");
+  values[2] = MAKE_STRING("Some");
   values[3] = v;
 
-  return MAKE_LIST(gc, values, 4);
+  return MAKE_LIST(values, 4);
 }
 
 bool is_some(Value v) {
@@ -28,21 +28,21 @@ Value get_some(Value v) {
 }
 
 Value make_unit(GarbageCollector gc) {
-  Value* values = gc_malloc(&gc, sizeof(Value) * 3);
+  Value* values = malloc(sizeof(Value) * 3);
   values[0] = MAKE_SPECIAL();
-  values[1] = MAKE_STRING(gc, "unit");
-  values[2] = MAKE_STRING(gc, "unit");
+  values[1] = MAKE_STRING("unit");
+  values[2] = MAKE_STRING("unit");
 
-  return MAKE_LIST(gc, values, 3);
+  return MAKE_LIST(values, 3);
 }
 
 Value make_none(GarbageCollector gc) {
-  Value* values = gc_malloc(&gc, sizeof(Value) * 3);
+  Value* values = malloc(sizeof(Value) * 3);
   values[0] = MAKE_SPECIAL();
-  values[1] = MAKE_STRING(gc, "Option");
-  values[2] = MAKE_STRING(gc, "None");
+  values[1] = MAKE_STRING("Option");
+  values[2] = MAKE_STRING("None");
 
-  return MAKE_LIST(gc, values, 3);
+  return MAKE_LIST(values, 3);
 }
 
 Value MAKE_CHAR(GarbageCollector gc, char c) {
@@ -50,27 +50,27 @@ Value MAKE_CHAR(GarbageCollector gc, char c) {
   str[0] = c;
   str[1] = '\0';
 
-  return MAKE_STRING(gc, str);
+  return MAKE_STRING(str);
 }
 
 Value make_ok(GarbageCollector gc, Value v) {
-  Value* values = gc_malloc(&gc, sizeof(Value) * 4);
+  Value* values = malloc(sizeof(Value) * 4);
   values[0] = MAKE_SPECIAL();
-  values[1] = MAKE_STRING(gc, "Result");
-  values[2] = MAKE_STRING(gc, "Ok");
+  values[1] = MAKE_STRING("Result");
+  values[2] = MAKE_STRING("Ok");
   values[3] = v;
 
-  return MAKE_LIST(gc, values, 4);
+  return MAKE_LIST(values, 4);
 }
 
 Value make_err(GarbageCollector gc, Value v) {
-  Value* values = gc_malloc(&gc, sizeof(Value) * 4);
+  Value* values = malloc(sizeof(Value) * 4);
   values[0] = MAKE_SPECIAL();
-  values[1] = MAKE_STRING(gc, "Result");
-  values[2] = MAKE_STRING(gc, "Error");
+  values[1] = MAKE_STRING("Result");
+  values[2] = MAKE_STRING("Error");
   values[3] = v;
 
-  return MAKE_LIST(gc, values, 4);
+  return MAKE_LIST(values, 4);
 }
 
 void print_helper(Value v) {

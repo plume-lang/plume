@@ -1,0 +1,7 @@
+mut i = 0
+
+while *i < 100000 {
+  println("test = $i")
+
+  i += 1
+}

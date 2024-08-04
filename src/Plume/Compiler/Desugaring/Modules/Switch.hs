@@ -25,14 +25,27 @@ type DesugarSwitch =
 type IsToplevel = Bool
 type IsReturned = Bool
 type IsExpression = Bool
-type Information = (IsToplevel, IsReturned, IsExpression)
+type ShouldBeANF = Bool
+type Information = (IsToplevel, IsReturned, IsExpression, ShouldBeANF)
+
+fst4 :: (a, b, c, d) -> a
+fst4 (a, _, _, _) = a
+
+snd4 :: (a, b, c, d) -> b
+snd4 (_, b, _, _) = b
+
+thd4 :: (a, b, c, d) -> c
+thd4 (_, _, c, _) = c
+
+fth4 :: (a, b, c, d) -> d
+fth4 (_, _, _, d) = d
 
 {-# NOINLINE switchCounter #-}
 switchCounter :: IORef Int
 switchCounter = unsafePerformIO $ newIORef 0
 
-desugarSwitch :: (IsToplevel, IsReturned, IsExpression) -> DesugarSwitch
-desugarSwitch info@(_, shouldReturn, isExpr) (fExpr, fStmt) (Pre.CESwitch x cases) = do
+desugarSwitch :: (IsToplevel, IsReturned, IsExpression, ShouldBeANF) -> DesugarSwitch
+desugarSwitch info@(_, shouldReturn, isExpr, _) (fExpr, fStmt) (Pre.CESwitch x cases) = do
   let freedPat = foldMap (free . fst) cases
   (decl, declVar) <- case x of
     Pre.CEVar n | n `S.notMember` freedPat -> return ([], x)

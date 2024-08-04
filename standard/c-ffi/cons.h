@@ -2,6 +2,7 @@
 #define CONS_H
 
 #include <value.h>
+#include <stdbool.h>
 
 Value make_some(GarbageCollector gc, Value v);
 Value make_none(GarbageCollector gc);

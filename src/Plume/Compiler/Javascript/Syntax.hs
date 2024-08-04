@@ -12,6 +12,7 @@ type Field = Text
 
 data Statement
   = JSIfStatement Expression [Statement] (Maybe [Statement])
+  | JSWhile Expression [Statement]
   | JSVariableDeclaration Name Expression
   | JSExpression Expression
   | JSFunction Name [Name] [Statement]
@@ -60,6 +61,7 @@ instance Show Statement where
   show (JSReturn e) = "return " <> show e <> ";"
   show (JSUpdate u e) = show u <> " = " <> show e <> ";"
   show (JSAsyncFunction n args body) = "async function " <> varify (toString n) <> "(" <> intercalate ", " (fmap (varify . toString) args) <> ") {\n" <> intercalate "\n" (fmap show body) <> "\n}"
+  show (JSWhile e body) = "while (" <> show e <> ") {\n" <> intercalate "\n" (fmap show body) <> "\n}"
 
 instance Show Update where
   show (JSFieldUpdate f u) = show u <> "." <> toString f
