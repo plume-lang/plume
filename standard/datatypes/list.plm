@@ -113,3 +113,32 @@ fn nub<A extends equality>(x: [A]): [A] => switch x {
   case [] => []
   case [y, ..ys] => nub(ys.filter(fn (z) => z != y)).list_concat([y])
 }
+
+fn partition<A extends equality>(xs: list<A>, f: fn(A): bool): (list<A>, list<A>) {
+  left = filter(xs, f)
+  right = filter(xs, fn(x) => not f(x))
+
+  return (left, right)
+}
+
+fn sort<A extends (equality, ordering)>(xs: list<A>): list<A> => switch xs {
+  case [y, ..ys] {
+    lesser = filter(ys, fn(x) => x < y)
+    greater = filter(ys, fn(x) => x >= y)
+
+    return sort(lesser) + [y] + sort(greater)
+  }
+
+  case [] => []
+}
+
+fn sort_on<A extends (equality, ordering)>(xs: list<A>, f: fn(A, A): bool): list<A> => switch xs {
+  case [y, ..ys] {
+    lesser = ys.filter(fn(x) => f(x, y))
+    greater = ys.filter(fn(x) => not f(x, y))
+
+    return sort(lesser) + [y] + sort(greater)
+  }
+
+  case [] => []
+}
