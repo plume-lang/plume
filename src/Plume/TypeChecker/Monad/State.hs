@@ -6,6 +6,8 @@ import Plume.Syntax.Concrete
 import Plume.TypeChecker.Monad.Type
 import Plume.TypeChecker.TLIR qualified as Typed
 
+type Substitution = Map Text PlumeType
+
 -- | Type checker state
 -- | The type checker state holds the current state of the type checker
 -- | It stores the environment, the return type, the positions, and the natives
@@ -16,6 +18,7 @@ data CheckState = MkCheckState
   , positions :: [Position]
   , natives :: Map Text (PlumeScheme, Position)
   , isAsynchronous :: Bool
+  , substitution :: Substitution
   }
   deriving (Eq)
 
@@ -31,6 +34,7 @@ data Environment = MkEnvironment
   , genericsEnv :: Map Text PlumeType
   , extendEnv :: ExtendEnv
   , classEnv :: ClassEnv
+  , funDeps :: Map PlumeType (Text, PlumeType)
   }
   deriving (Eq)
 
@@ -44,7 +48,11 @@ newtype ClassEnv = MkClassEnv (Map Text Class)
 -- | The class representation is used to store the class (resp. interface).
 -- | A class is composed of generic variables, a qualified qualifier (i.e. the
 -- | superclasses qualifying the class), and a map of methods.
-data Class = MkClass [QuVar] (Qualified PlumeQualifier) (Map Text PlumeScheme)
+data Class = MkClass 
+    [QuVar] 
+    (Qualified PlumeQualifier) 
+    (Map Text PlumeScheme)
+    (Maybe (PlumeType, PlumeType))
   deriving (Eq, Show)
 
 -- | Extension environment
@@ -74,11 +82,19 @@ instance Functor (Instance val) where
 emptyState :: CheckState
 emptyState =
   MkCheckState
-    { environment = MkEnvironment mempty mempty mempty (MkExtendEnv mempty) (MkClassEnv mempty)
+    { environment = 
+      MkEnvironment 
+        mempty 
+        mempty 
+        mempty 
+        (MkExtendEnv mempty) 
+        (MkClassEnv mempty)
+        mempty
     , returnType = Nothing
     , positions = []
     , natives = mempty
     , isAsynchronous = False
+    , substitution = mempty
     }
 
 -- | classMapIndex is used to keep updated the index of the method in its

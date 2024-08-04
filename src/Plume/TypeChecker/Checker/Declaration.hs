@@ -122,7 +122,8 @@ synthDecl
       pos <- fetchPosition
       oldScs <- readIORef superclasses
       writeIORef superclasses scs
-      h' <- liftIO $ runReaderT h $ getExpr pos m'
+      checkSub <- gets substitution
+      h' <- liftIO $ runReaderT h $ getExpr pos checkSub m'
       writeIORef superclasses oldScs
 
       -- Substituting the duplicated assumptions in the expression
@@ -160,8 +161,6 @@ synthDecl
     let psb = maybe [] snd3 b
 
     let closTy' = Identity closTy
-
-    -- print (name, isMut', isMut)
 
     pure (retTy, psb <> remainingPs, declFun (Annotation name closTy' isMut') <$> clos <*> body')
 synthDecl _ _ _ = throw $ CompilerError "Only declarations are supported"

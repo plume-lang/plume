@@ -26,6 +26,10 @@ extend show<str> {
   }
 }
 
+extend indexable<str, char> {
+  fn get_index(self: str, i): Option<char> => get_index_str(self, i)
+}
+
 // Inserting a `sep`arator between each element of the list
 // and concatenating the result into a single string.
 fn join_str(c: [str], sep: str) =>

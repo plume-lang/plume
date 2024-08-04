@@ -40,8 +40,6 @@ data Instruction
   | ListLength
   | Halt
   | ReturnUnit
-  | DropLocal Text Int
-  | DropGlobal Text Int
   deriving (Eq)
 
 data Segment
@@ -112,8 +110,6 @@ instance Show Instruction where
   show ListLength = "list length"
   show Halt = "halt"
   show ReturnUnit = "return unit"
-  show (DropLocal name i) = "drop " <> decorate (toString name) (NoColor, NoColor, Bold) <> " by " <> show i
-  show (DropGlobal name i) = "drop " <> decorate (toString name) (Red, NoColor, Bold) <> " by " <> show i
 
 instance Show Segment where
   show (Function name args _ _ body) = name' <> "(" <> args' <> ")" <> ":\n" <> body'

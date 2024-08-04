@@ -10,11 +10,17 @@ import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
 
 synthInterface :: Infer -> Infer
-synthInterface _ (Pre.EInterface (Annotation name tys _) generics methods) = do
+synthInterface _ (Pre.EInterface (Annotation name tys _) generics methods deduction) = do
   gens' :: [PlumeQualifier] <- concatMapM convert generics
   tys' <- mapM convert tys
   let qvars = getQVars gens'
   let gens = removeQVars gens'
+
+  deduction' :: Maybe (QuVar, QuVar) <- case deduction of
+    Just (ded, ty) -> Just <$> ((,) <$> convert ded <*> convert ty)
+    Nothing -> pure Nothing
+
+  let deduction'' = fmap (bimap TypeQuantified TypeQuantified) deduction'
 
   let inst = IsIn tys' name.identifier
   methods' <- mapM convertMethod methods
@@ -25,7 +31,8 @@ synthInterface _ (Pre.EInterface (Annotation name tys _) generics methods) = do
   let pred' = gens :=>: inst
 
   let methodsBis = map (\(n, Forall qv t) -> (n, Forall (qv <> qvars) t)) methods'
-  let cls = MkClass qvars pred' (Map.fromList methodsBis)
+
+  let cls = MkClass qvars pred' (Map.fromList methodsBis) deduction''
 
   addClass name.identifier cls
 

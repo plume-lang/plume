@@ -133,10 +133,6 @@ encodeInstruction (MulConst i) =
   encodeInstr 40 >> encodeInteger i >> replicateNull 2
 encodeInstruction ReturnUnit =
   encodeInstr 41 >> replicateNull 3
-encodeInstruction (DropLocal i j) =
-  encodeInstr 42 >> encodeInteger i >> encodeInteger j >> encodeNull
-encodeInstruction (DropGlobal i j) =
-  encodeInstr 43 >> encodeInteger i >> encodeInteger j >> encodeNull
 
 encodeText :: Text -> Put
 encodeText w = do

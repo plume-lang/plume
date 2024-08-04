@@ -67,8 +67,8 @@ interface<T> foldable<T> {
   fn foldl<A, B>(self: T<A>, f: fn(B, A): B, init: B): B
 }
 
-interface<T> indexable<T> {
-  fn get_index<A>(self: T<A>, i: int): Option<A>
+interface<T, I> indexable<T, I> with T => I {
+  fn get_index(self: T, i: int): Option<I>
 }
 
 interface<A> default<A> {
@@ -120,3 +120,10 @@ fn (/=)<A extends product>(var: mut A, x: A): A {
 }
 
 infixr 0 ^=
+
+fn negate<A extends (default, numeric)>(x: A): A
+  => default() - x
+
+interface<A, B> convertible<A, B> with B => A {
+  fn convert(x: A): Option<B>
+}

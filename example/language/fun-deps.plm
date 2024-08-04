@@ -1,0 +1,33 @@
+// Functional dependencies help to normalize a relation between two types in
+// an extension. 
+// For instance, the following code would not work if we tried:
+
+interface<Container, Elem> Indexable<Container, Elem> {
+  fn get_index(container: Container, index: int): Option<Elem>
+}
+
+println("Hello, world!"[0])
+
+// because the type of "Hello, world!" is str, and there is no way to infer
+// the type of the element of a str from the type of the str itself. In certain
+// cases, this could be possible but the compiler deterministically refuses to
+// do so.
+
+// Functional dependencies allow us to specify that the type of the element of a
+// container can be inferred from the container itself. For instance, we could
+// write:
+
+interface<Container, Elem> Indexable<Container, Elem> with Container {
+  fn get_index(container: Container, index: int): Option<Elem>
+}
+
+println("Hello, world!"[0])
+
+// This would work because the compiler can infer that the element of a str is
+// char. This is because the compiler knows that the only type that implements
+// Indexable<str, char> is str itself.
+
+// The syntax for functional dependencies is "with <Type>" where <Type> is the
+// type that the compiler can infer from the other types in the extension. The
+// type must be a type parameter of the interface, and it must be a type
+// parameter that is not used in the function signature of the interface.

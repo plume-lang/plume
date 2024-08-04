@@ -669,8 +669,18 @@ tInterface = do
   void $ L.reserved "interface"
   gens <- P.option [] $ L.angles $ Typ.parseGeneric `P.sepBy` L.comma
   annot <- Cmm.Annotation . Cmm.fromText <$> L.identifier <*> L.angles (Typ.tType `P.sepBy` L.comma) <*> pure False
+  
+  deduction <- P.optional $ do
+    void $ L.reserved "with"
+    x <- L.identifier
+    void $ L.symbol "=>"
+    y <- L.identifier
+
+    return (x, y)
+
   members <- L.braces (P.many iFun)
-  return [CST.EInterface annot gens members]
+
+  return [CST.EInterface annot gens members deduction]
   where 
     iFun = do
       void $ L.reserved "fn"

@@ -5,7 +5,6 @@ module Plume.TypeChecker.Monad
     MonadChecker,
     Checker,
     Placeholder,
-    Substitution,
     fetchPositionIO,
     modify,
     get,
@@ -288,8 +287,6 @@ fetchPositionIO = do
         Nothing -> liftIO $ compilerError "No position found in checker state"
         Just p -> pure p
     Just p -> pure p
-
-type Substitution = Map Text PlumeType
 
 instantiate :: (MonadChecker m) => PlumeScheme -> m (PlumeType, [PlumeQualifier])
 instantiate t = do

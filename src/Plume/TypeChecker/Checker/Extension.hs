@@ -21,6 +21,15 @@ import Plume.TypeChecker.Monad.Type qualified as Post
 import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (gets, local)
 import Plume.Syntax.Concrete qualified as CST
+import qualified Plume.TypeChecker.Monad as M
+
+assocSchemes :: MonadChecker m => [(Text, PlumeScheme)] -> [Pre.ExtensionMember] -> m [(PlumeScheme, Pre.ExtensionMember)]
+assocSchemes _ [] = pure []
+assocSchemes env (e@(Pre.ExtDeclaration _ (Annotation name _ _) _) : xs) = do
+  let name' = name.identifier
+  case List.lookup name' env of
+    Just sch -> ((sch, e) :) <$> assocSchemes env xs
+    Nothing -> throw $ CompilerError "Scheme not found"
 
 
 firstM :: (Monad m) => (a -> m b) -> (a, c) -> m (b, c)
@@ -62,7 +71,7 @@ getAllElements x = [x]
 
 isQualNotDefined :: PlumeQualifier -> [PlumeQualifier] -> Bool
 isQualNotDefined _ [] = True
-isQualNotDefined (IsIn t1 n1) ((IsIn t2 n2) : xs) 
+isQualNotDefined (IsIn t1 n1) ((IsIn t2 n2) : xs)
   | n1 == n2 && t1 == t2 = False
   | otherwise = isQualNotDefined (IsIn t1 n1) xs
 isQualNotDefined t (_ : xs) = isQualNotDefined t xs
@@ -107,7 +116,7 @@ synthExt
     ty <- mapM convert tcTy
     let instH = IsIn ty tcName.identifier
     let pred' = gens :=>: instH
-    
+
     -- Checking if the instance is already defined
     possibleInst <- isInstanceAlreadyDefined instH
     when (isJust possibleInst) $ case possibleInst of
@@ -115,12 +124,14 @@ synthExt
       _ -> throw $ CompilerError "Instance already defined"
 
     -- Pre-generating an instance dictionary only based on types
-    cls@(MkClass _ _ meths) <- findClass tcName.identifier
-    case cls of
-      MkClass qs' quals methods' -> do
-        case quals of 
+    cls@(MkClass _ _ meths ded) <- findClass tcName.identifier
+
+    fdSub <- case cls of
+      MkClass qs' quals methods' _ -> do
+        case quals of
           _  :=>: t -> do
-            b <- liftIO $ doesQualUnifiesWith t instH 
+
+            b <- liftIO $ doesQualUnifiesWith t instH
             unless b $ throw $ CompilerError "Instance does not match the class"
 
         let finalMethods = fmap (\(Forall qs (quals' :=>: ty')) -> Forall (qs <> qs') $ (gens <> quals') :=>: ty') methods'
@@ -129,12 +140,38 @@ synthExt
 
         let preInst = MkInstance qvars quals' mempty finalMethods
 
+        let qs'' = TypeQuantified <$> qs'
+        sub <- liftIO . composeSubs =<< zipWithM unifyAndGetSub qs'' ty
+
         addClassInstance (instH, void preInst)
 
-    let schs = Map.map (\(Forall qs (quals :=>: ty')) -> Forall (qs <> qvars) ((quals <> gens) :=>: ty')) meths
-    -- Typechecking the instance methods
-    exprs <- zipWithM (extMemberToDeclaration infer) (Map.elems schs) methods
+        pure sub
 
+    -- Getting deduction type correspondance
+    let (ded', dedTy') = case ded of
+          Just (TypeQuantified ded'', TypeQuantified dedTy'') -> 
+            (Map.lookup ded'' fdSub, Map.lookup dedTy'' fdSub)
+          _ -> 
+            (Nothing, Nothing)
+
+    -- Adding functional dependencies to the state
+    case (ded', dedTy') of
+      (Just ded'', Just dedTy'') -> do
+
+        M.modify $ \s -> s {
+          environment = s.environment {
+            funDeps = Map.insert ded'' (tcName.identifier, dedTy'') s.environment.funDeps
+          }
+        }
+      _ -> pure ()
+
+    let schs = Map.map (\(Forall qs (quals :=>: ty')) -> Forall (qs <> qvars) ((quals <> gens) :=>: ty')) meths
+
+    assocs <- assocSchemes (Map.toList schs) methods
+
+    -- Typechecking the instance methods
+    exprs <- traverse (uncurry $ extMemberToDeclaration infer) assocs
+    
     cenv <- gets (extendEnv . environment)
 
     -- Generating the required instance constraints arguments, for instance
@@ -201,19 +238,22 @@ synthExt
       -- Getting the duplicates assumptions in order to remove and resolve
       -- duplicatas.
       let finalExprs'' = map (\(i, Identity t') -> (i.identifier, t')) finalExprs'
-      sub' <- unify finalExprs''
-      let sub'' = Map.toList sub' <> sub <> remainingSub
+      sub3 <- unify finalExprs''
+      let sub4 = Map.toList sub3 <> sub <> remainingSub
 
       -- Running the expression reader because we're toplevel or there are 
       -- used-given generics.
       pos <- fetchPosition
       oldScs <- readIORef superclasses
       writeIORef superclasses scs
-      h' <- liftIO $ runReaderT h $ getExpr pos finalM
+
+      checkSub <- gets substitution
+
+      h' <- liftIO $ runReaderT h $ getExpr pos checkSub finalM
       writeIORef superclasses oldScs
 
       -- Substituting the duplicated assumptions in the expression
-      let h'' = List.foldl substituteVar h' sub''
+      let h'' = List.foldl substituteVar h' sub4
 
       -- Checking if there are some remaining assumptions in the scope.
       unlessM (allIsSuperclass as''' scs) $ throw (UnresolvedTypeVariable as''')
@@ -232,7 +272,6 @@ synthExt
     let (quals, exprs') = unzip res'
     let (funTys, _) = unzip quals
 
-
     -- Creating instance dictionary
     let dict = Map.unions exprs'
     let dictFunTys = Map.unions funTys
@@ -240,17 +279,17 @@ synthExt
     -- Checking for missing methods in the extension (resp. instance)
     let meths' = Map.keys dict
     let areThereMissingMethods = Set.fromList meths' `Set.isSubsetOf` Map.keysSet meths
-    let missingMeths = 
-          if areThereMissingMethods 
-            then Set.fromList meths' Set.\\ Map.keysSet meths 
+    let missingMeths =
+          if areThereMissingMethods
+            then Set.fromList meths' Set.\\ Map.keysSet meths
             else Set.empty
-    
-    unless (Set.null missingMeths) $ 
+
+    unless (Set.null missingMeths) $
       throw $ MissingExtensionMethods tcName.identifier (Set.toList missingMeths)
-    
+
     let unknown = filter (`Map.notMember` meths) meths'
-  
-    unless (null unknown) $ 
+
+    unless (null unknown) $
       throw $ UnknownExtensionMethods tcName.identifier unknown
 
     -- Creating the new instance to insert it in the extend environment
@@ -277,9 +316,9 @@ synthExt
     pure (TUnit, [], pure (Post.EDeclaration [] (Annotation (Cmm.fromText name) (Identity funTy) False) dictE Nothing))
 synthExt _ _ = throw $ CompilerError "Only type extensions are supported"
 
-getExpr :: CST.Position -> [(PlumeQualifier, Post.Expression)] -> PlumeQualifier -> Post.Expression
-getExpr pos xs p = do
-  let p' = unsafePerformIO $ compressQual p
+getExpr :: CST.Position -> M.Substitution -> [(PlumeQualifier, Post.Expression)] -> PlumeQualifier -> Post.Expression
+getExpr pos sub xs p = do
+  let p' = unsafePerformIO (applyQual sub =<< compressQual p)
   case List.lookup p' xs of
     Just x -> x
     Nothing -> unsafePerformIO $ do

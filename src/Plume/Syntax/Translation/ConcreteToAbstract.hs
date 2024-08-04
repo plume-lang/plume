@@ -191,10 +191,10 @@ concreteToAbstract (CST.EList es) = do
 concreteToAbstract (CST.EType ann ts) = do
   ts' <- mapM transformTyCons ts
   bireturn . Single $ AST.EType ann ts'
-concreteToAbstract (CST.EInterface ann gs ms) = do
+concreteToAbstract (CST.EInterface ann gs ms d) = do
   ann' <- mapM (mapM transformType) ann
   ms' <- mapM (mapM transformSch) ms
-  bireturn . Single $ AST.EInterface ann' gs ms'
+  bireturn . Single $ AST.EInterface ann' gs ms' d
 concreteToAbstract (CST.ETypeAlias ann t) = do
   let gens = ann.annotationValue
   let name = ann.annotationName.identifier

@@ -197,7 +197,7 @@ checkForUndefined m (HLIR.EType ann tcs) = do
 checkForUndefined m (HLIR.ETypeAlias ann _) = do
   let m' = m { M.types = Set.insert ann.annotationName.identifier (M.types m) }
   pure m'
-checkForUndefined m (HLIR.EInterface ann _ annots) = do
+checkForUndefined m (HLIR.EInterface ann _ annots _) = do
   let defs = Set.fromList $ map interpretAnnot annots
   let m' = m { 
     M.classes = Set.insert ann.annotationName.identifier (M.classes m),
