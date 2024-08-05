@@ -109,11 +109,3 @@ fn is_some<A>(x: Option<A>): bool => switch x {
 }
 
 fn is_none<A>(x: Option<A>): bool => not is_some(x)
-
-fn nub_maybe<A extends equality>(xs: list<Option<A>>): list<A> => switch xs {
-  case [y, ..ys] => switch y {
-    case Some(v) => [v] + nub_maybe(ys)
-    case None => nub_maybe(ys)
-  }
-  case ? => []
-}

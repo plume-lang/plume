@@ -109,6 +109,9 @@ extend<A> default<list<A>> {
   fn default() => []
 }
 
+fn reverse<A extends equality>(xs: list<A>): list<A> =>
+  xs.foldl(fn (acc, z) => [z] + acc, [])
+
 fn nub<A extends equality>(x: [A]): [A] => switch x {
   case [] => []
   case [y, ..ys] => nub(ys.filter(fn (z) => z != y)).list_concat([y])
@@ -142,3 +145,52 @@ fn sort_on<A extends (equality, ordering)>(xs: list<A>, f: fn(A, A): bool): list
 
   case [] => []
 }
+
+fn nub_maybe<A extends equality>(xs: list<Option<A>>): list<A> => switch xs {
+  case [y, ..ys] => switch y {
+    case Some(v) => [v].list_concat(nub_maybe(ys))
+    case None => nub_maybe(ys)
+  }
+  case ? => []
+}
+
+fn first<A>(xs: list<A>): Option<A> => switch xs {
+  case [y, ..ys] => Some(y)
+  case [] => None
+}
+
+fn tail<A>(xs: list<A>): list<A> => switch xs {
+  case [?, ..ys] => ys
+  case [] => []
+}
+
+fn last<A>(xs: list<A>): Option<A> =>
+  xs.foldl(fn(acc, z) => Some(z), None)
+
+fn init<A>(xs: list<A>): list<A> => switch xs {
+  case [y, ..ys] => list_concat([y], init(ys))
+  case [?] => []
+  case [] => []
+}
+
+fn drop<A>(xs: list<A>, count: int): list<A> =>
+  switch count <= 0 {
+    case true => xs
+    case false => switch xs {
+      case [] => []
+      case [?, ..ys] => ys.drop(count - 1)
+    }
+  }
+
+fn take<A>(xs: list<A>, count: int): list<A> =>
+  switch (xs, count) {
+    case ([], ?) => []
+    case ([x, ..xs], 1) => [x]
+    case ([y, ..ys], ?) => [y].list_concat(take(ys, count - 1))
+  }
+
+fn any<A>(f: fn(A): bool, xs: list<A>): bool =>
+  switch xs {
+    case [] => false
+    case [y, ..ys] => f(y) or any(f, ys)
+  }
