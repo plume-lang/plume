@@ -194,3 +194,9 @@ fn any<A>(f: fn(A): bool, xs: list<A>): bool =>
     case [] => false
     case [y, ..ys] => f(y) or any(f, ys)
   }
+  
+fn all<A>(f: fn(A): bool, xs: list<A>): bool =>
+  switch xs {
+    case [] => false
+    case [y, ..ys] => f(y) and all(f, ys)
+  }

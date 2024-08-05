@@ -13,14 +13,6 @@ extend show<char> {
   }
 }
 
-extend to_str<char> {
-  fn to_str(self) => char_to_string(self)
-}
-
 extend equality<char> {
   fn (==) (c: char, d: char) => eq_char(c, d)
-}
-
-extend to_str<[char]> {
-  fn to_str(c: [char]): str => c.map(char_to_string).join_str("")
 }

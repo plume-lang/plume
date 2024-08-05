@@ -17,19 +17,6 @@ interface<A> boolean_algebra<A> {
   fn not(b: A): A
 }
 
-interface<A> to_str<A> {
-  fn to_str(a: A): str
-}
-
-interface<A> from_str<A> {
-  fn from_str(s: str): A
-}
-
-interface<A> coercible<A> {
-  fn from<B>(b: B): A
-  fn to<B>(a: A): B
-}
-
 interface<A> equality<A> {
   fn (==)(a: A, b: A): bool
 }

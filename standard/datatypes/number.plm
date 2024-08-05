@@ -54,10 +54,6 @@ extend show<int> {
 
 fn (%) (c: int, d: int) => mod_int(c, d)
 
-extend to_str<int> {
-  fn to_str(c: int) => to_string(c)
-}
-
 extend equality<int> {
   fn (==) (x: int, y: int) => eq_int(x, y)
 }
@@ -102,10 +98,6 @@ extend ordering<float> {
 
 extend show<float> {
   fn show_prec(c: float, _) => to_string(c)
-}
-
-extend to_str<float> {
-  fn to_str(c: float) => to_string(c)
 }
 
 macro e = 2.718282
