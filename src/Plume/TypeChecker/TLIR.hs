@@ -47,7 +47,7 @@ pattern EUnMut e = EApplication (EVariable "#deref" (Identity TUnit)) [e]
 containsReturn :: Expression -> Bool
 containsReturn (EBlock es) = any containsReturn es
 containsReturn (EReturn _) = True
-containsReturn (EConditionBranch _ t f) = containsReturn t || containsReturn f
+containsReturn (EConditionBranch _ t f) = containsReturn t || maybe False containsReturn f
 containsReturn (ESwitch _ cases) = any (containsReturn . snd) cases
 containsReturn _ = False
 

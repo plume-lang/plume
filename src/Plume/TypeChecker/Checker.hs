@@ -54,14 +54,20 @@ synthesize (Pre.EUnMut e) = do
   ty `unifiesWith` TMut tv
   pure (tv, ps, Post.EUnMut <$> r)
 synthesize (Pre.EBlock exprs) = local id $ do
-  (tys, pss, exprs') <- localPosition $ unzip3 <$> synthesizeStmts exprs
+  (tys, pss, exprs') <- localPosition $ unzip3 <$> mapM synthesizeStmt exprs
 
   retTy <- gets returnType
   let retTy' = fromMaybe TUnit retTy
 
+  let tys' = catMaybes tys
+
+  gotRetTy <- case tys' of
+    [] -> fresh
+    (t:ys) -> forM_ ys (unifiesWith t) $> t
+
   -- void $ maybeM (viaNonEmpty last tys) (`unifiesWith` retTy')
 
-  return (retTy', concat pss, liftBlock (Post.EBlock <$> sequence exprs') tys retTy')
+  return (gotRetTy, concat pss, liftBlock (Post.EBlock <$> sequence exprs') tys' retTy')
 synthesize (Pre.EReturn expr) = do
   (ty, ps, expr') <- synthesize expr
   returnTy <- gets returnType
@@ -83,7 +89,6 @@ synthesize (Pre.EVariableDeclare gens name ty) = do
 
   insertEnv @"typeEnv" name (Forall qvars (quals :=>: ty'))
 
-
   pure (ty', [], pure (Post.EVariableDeclare gens name (Identity ty')))
 -- \| Calling synthesis modules
 synthesize app@(Pre.EApplication {}) = synthApp synthesize app
@@ -98,30 +103,16 @@ synthesize int@(Pre.EInterface {}) = synthInterface synthesize int
 synthesize nat@(Pre.ENativeFunction {}) = synthNative nat
 synthesize _ = throw (CompilerError "Unsupported expression")
 
-synthesizeStmts :: (MonadChecker m) => [Pre.Expression] -> m [(PlumeType, [PlumeQualifier], Placeholder Post.Expression)]
-synthesizeStmts ((Pre.ELocated e pos) : es) = do
-  withPosition pos $ synthesizeStmts (e : es)
-synthesizeStmts (e@(Pre.EReturn _) : _) = do
-  (ty, ps, h) <- synthesizeStmt e
-  return [(ty, ps, Post.EReturn <$> h)]
-synthesizeStmts (e : es) = do
-  (ty, ps, h) <- synthesizeStmt e
-  (tys, pss, hs) <- unzip3 <$> synthesizeStmts es
-  return $ (ty, ps, h) : zip3 tys pss hs
-synthesizeStmts [] = pure []
-
-synthesizeStmt :: (MonadChecker m) => Pre.Expression -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression)
-synthesizeStmt sw@(Pre.ESwitch {}) = synthSwitch synthesize sw
-synthesizeStmt cond@(Pre.EConditionBranch {}) = synthCond synthesize cond
+synthesizeStmt :: (MonadChecker m) => Pre.Expression -> m (Maybe PlumeType, [PlumeQualifier], Placeholder Post.Expression)
 synthesizeStmt (Pre.ELocated e pos) = withPosition pos $ synthesizeStmt e
 synthesizeStmt (Pre.EReturn e) = do
   (ty, ps, expr') <- synthesize e
   returnTy <- gets returnType
   forM_ returnTy $ unifiesWith ty
-  pure (ty, ps, Post.EReturn <$> expr')
+  pure (Just ty, ps, Post.EReturn <$> expr')
 synthesizeStmt e = do
   (_, ps, h) <- synthesize e
-  return (TUnit, ps, h)
+  return (Nothing, ps, h)
 
 isClosure :: Pre.Expression -> Bool
 isClosure (Pre.ELocated e _) = isClosure e
