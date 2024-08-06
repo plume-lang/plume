@@ -216,7 +216,7 @@ checkForUndefined m (HLIR.EApplication f xs) = do
 checkForUndefined m (HLIR.EConditionBranch e1 e2 e3) = do
   m' <- checkForUndefined m e1
   m'' <- checkForUndefined m' e2
-  checkForUndefined m'' e3
+  maybe (pure m'') (checkForUndefined m'') e3
 checkForUndefined m (HLIR.EList es) = foldlM checkForUndefined m es
 checkForUndefined m (HLIR.ESwitch e cases) = do
   m' <- checkForUndefined m e

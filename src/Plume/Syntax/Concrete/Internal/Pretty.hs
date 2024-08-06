@@ -65,12 +65,17 @@ prettyExpr _ (EDeclaration generics a e1' e2') =
       <+> case e2' of
         Nothing -> ""
         Just e2'' -> anCol Blue "\nin" <+> prettyExpr 0 e2''
-prettyExpr _ (EConditionBranch e1' e2' e3') =
+prettyExpr _ (EConditionBranch e1' e2' (Just e3')) =
   anCol Blue "if"
     <+> prettyExpr 0 e1'
     <+> anCol Blue "then "
     <> prettyExpr 0 e2'
     <> anCol Blue "\nelse " <> prettyExpr 0 e3'
+prettyExpr _ (EConditionBranch e1' e2' _) =
+  anCol Blue "if"
+    <+> prettyExpr 0 e1'
+    <+> anCol Blue "then "
+    <> prettyExpr 0 e2'
 prettyExpr _ (EClosure as t e _) =
   ppArgs as t
     <+> "=>\n"

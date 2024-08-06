@@ -84,7 +84,7 @@ data Expression t f
   | EType (Annotation [Text]) [TypeConstructor t]
   | EDeclaration [PlumeGeneric] (Annotation (f t)) (Expression t f) (Maybe (Expression t f))
   | EMutUpdate (Annotation (f t)) (Expression t f) (Maybe (Expression t f))
-  | EConditionBranch (Expression t f) (Expression t f) (Expression t f)
+  | EConditionBranch (Expression t f) (Expression t f) (Maybe (Expression t f))
   | EClosure [Annotation (f t)] (f t) (Expression t f) IsAsync
   | EBlock [Expression t f]
   | ERequire Text

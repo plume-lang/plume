@@ -171,9 +171,9 @@ eIf = do
   cond <- parseExpression
   void $ P.try $ P.optional $ L.reserved "then"
   thenBlock <- eBlock
-  void $ L.reserved "else"
+  elseBlock <- optional $ void (L.reserved "else") *> eBlock
 
-  CST.EConditionBranch cond thenBlock <$> eBlock
+  pure $ CST.EConditionBranch cond thenBlock elseBlock
 
 eIfThenMacro :: P.Parser CST.Expression
 eIfThenMacro = do

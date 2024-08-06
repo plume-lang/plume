@@ -85,8 +85,10 @@ concreteToAbstract (CST.EConditionBranch e1 e2 e3) = do
   -- are, and then combine them into a single expression by wrapping them
   -- into a block.
   e2' <- fmap interpretSpreadable <$> concreteToAbstract e2
-  e3' <-
-    fmap interpretSpreadable <$> concreteToAbstract e3
+  e3' <- sequence <$> case e3 of
+    Just e3' -> 
+      Just . fmap interpretSpreadable <$> concreteToAbstract e3'
+    Nothing -> pure Nothing
   transRet $ AST.EConditionBranch <$> e1' <*> e2' <*> e3'
 concreteToAbstract (CST.EClosure anns t e isA) = do
   anns' <- mapM (\(Common.Annotation name ty mut) -> do

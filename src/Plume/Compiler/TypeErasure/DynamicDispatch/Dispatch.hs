@@ -11,13 +11,13 @@ type Extension = (ExtensionName, ExtensionVariable)
 createIfSequence :: [TypedExpression] -> TypedExpression
 createIfSequence [] = EEqualsType (ELiteral (LBool True)) "True"
 createIfSequence [EConditionBranch _ body _] = EReturn body
-createIfSequence (EConditionBranch cond body _ : xs) = EConditionBranch cond (EReturn body) (createIfSequence xs)
+createIfSequence (EConditionBranch cond body _ : xs) = EConditionBranch cond (EReturn body) (Just $ createIfSequence xs)
 createIfSequence _ = compilerError "Invalid if sequence"
 
 createIf
   :: (TypedExpression, TypedExpression)
   -> TypedExpression
-createIf (cond, body) = EConditionBranch cond body (EReturn (ELiteral (LBool False)))
+createIf (cond, body) = EConditionBranch cond body (Just $ EReturn (ELiteral (LBool False)))
 
 createConditionAnd :: [TypedExpression] -> TypedExpression
 createConditionAnd [] = EEqualsType (ELiteral (LBool True)) "True"

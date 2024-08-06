@@ -141,10 +141,15 @@ eraseStatement (Pre.EDeclaration _ (Annotation n _ _) e Nothing) = Post.USDeclar
 eraseStatement (Pre.EMutUpdate (Annotation n _ _) e1 Nothing) =
   Post.USMutUpdate n.identifier <$> eraseExpr e1
 eraseStatement (Pre.EConditionBranch e1 e2 e3) = do
+  e3' <- case e3 of
+    Just e3' -> eraseStatement e3'
+    Nothing -> pure $ Post.USExpr (Post.UEBlock [])
+
+
   Post.USConditionBranch 
     <$> eraseExpr e1
     <*> eraseStatement e2
-    <*> eraseStatement e3
+    <*> pure e3'
 eraseStatement (Pre.EWhile c b) = do
   c' <- eraseExpr c
   b' <- eraseStatement b
@@ -173,11 +178,15 @@ eraseExpr (Pre.EList es) = Post.UEList <$> mapM eraseExpr es
 eraseExpr (Pre.EDeclaration _ (Annotation n _ _) e1 e2) = case e2 of
   Just e2' -> Post.UEDeclaration n.identifier <$> eraseExpr e1 <*> eraseExpr e2'
   Nothing -> compilerError "Declaration without a body"
-eraseExpr (Pre.EConditionBranch e1 e2 e3) = 
+eraseExpr (Pre.EConditionBranch e1 e2 e3) = do
+  e3' <- case e3 of
+    Just e3' -> eraseExpr e3'
+    Nothing -> pure $ Post.UEBlock []
+
   Post.UEConditionBranch
     <$> eraseExpr e1
     <*> eraseExpr e2
-    <*> eraseExpr e3
+    <*> pure e3'
 eraseExpr (Pre.ESwitch e cases) = do
   e' <- eraseExpr e
   cases' <- mapM (bimapM erasePattern eraseExpr) cases
