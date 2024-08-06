@@ -99,7 +99,7 @@ desugarExpr isTop = \case
 desugarStatement
   :: (IsToplevel, IsReturned, IsExpression, ShouldBeANF)
   -> Desugar Pre.ClosedStatement [ANFResult (Maybe Post.DesugaredStatement)]
-desugarStatement isTop@(_, _, _, sba) = \case
+desugarStatement isTop@(_, isReturned, _, sba) = \case
   Pre.CSExpr x -> do
     (x', stmts) <- desugarExpr isTop x
     case x' of
@@ -112,9 +112,9 @@ desugarStatement isTop@(_, _, _, sba) = \case
     (e', stmts) <- desugarExpr (False, False, True, sba) e
     return [(Just $ Post.DSDeclaration n e', stmts)]
   Pre.CSConditionBranch x y z -> do
-    (x', stmts1) <- desugarExpr (False, snd4 isTop, False, sba) x
-    ys <- desugarStatement isTop y
-    zs <- desugarStatement isTop z
+    (x', stmts1) <- desugarExpr (False, isReturned, False, sba) x
+    ys <- desugarStatement isTop (createModifier isReturned y)
+    zs <- desugarStatement isTop (createModifier isReturned z)
     return
       [(Just $ Post.DSIf x' (createBlock ys) (createBlock zs), stmts1)]
   Pre.CSMutDeclaration n e -> do
@@ -128,11 +128,17 @@ desugarStatement isTop@(_, _, _, sba) = \case
     ys <- desugarStatement isTop y
     return [(Just $ Post.DSWhile x' (createBlock ys), stmts1)]
 
+createModifier :: IsReturned -> Pre.ClosedStatement -> Pre.ClosedStatement 
+createModifier True (Pre.CSExpr x) = Pre.CSReturn x
+createModifier _ x = x
+
 shouldReturn :: Pre.ClosedStatement -> Bool
 shouldReturn = \case
   Pre.CSReturn _ -> False
   Pre.CSExpr (Pre.CEBlock es) -> maybe False helper (viaNonEmpty last es)
   Pre.CSExpr _ -> True
+  Pre.CSConditionBranch _ x y -> shouldReturn x || shouldReturn y
+  Pre.CSWhile _ x -> shouldReturn x
   _ -> False
 
   where

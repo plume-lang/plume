@@ -145,7 +145,6 @@ eraseStatement (Pre.EConditionBranch e1 e2 e3) = do
     Just e3' -> eraseStatement e3'
     Nothing -> pure $ Post.USExpr (Post.UEBlock [])
 
-
   Post.USConditionBranch 
     <$> eraseExpr e1
     <*> eraseStatement e2
