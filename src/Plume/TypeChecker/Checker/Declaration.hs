@@ -4,7 +4,6 @@ module Plume.TypeChecker.Checker.Declaration where
 
 import Data.List qualified as List
 import Data.Map qualified as Map
-import Data.Tuple.Utils (fst3, snd3, thd3)
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Type (getGenericName)
@@ -18,6 +17,7 @@ import Plume.TypeChecker.Monad.Free (substituteVar)
 import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (gets, local)
+import Plume.Compiler.Desugaring.Modules.Switch (fst4, snd4, thd4, fth4)
 
 synthDecl :: Bool -> Infer -> Infer
 synthDecl
@@ -60,15 +60,18 @@ synthDecl
     insertEnv @"typeEnv" name.identifier scheme
 
     enterLevel
-    (exprTy, ps, h) <- case convertedGenerics of
+    (exprTy, ps, h, isAsync) <- case convertedGenerics of
       -- If the variable is not generic, we can just infer the expression
       [] -> local id $ infer expr
       -- If the variable is generic but not mutable, we can infer
-      _ | not isMut -> infer expr
+      _ | not isMut -> local id $ infer expr
       _ -> throw $ CompilerError "Generic mutable variables are not supported"
 
     let ty' = mut exprTy
-    convertedTy' `unifiesWith` ty'
+    
+    convertedTy'' <- if isAsync then addAsync convertedTy' else pure convertedTy'
+    
+    convertedTy'' `unifiesWith` ty'
 
     -- If there are no user-quantified variables and if the declaration is not
     -- toplevel, then just return the inferred expression as it was inferred.
@@ -156,13 +159,14 @@ synthDecl
 
     -- Infer the body of the declaration
     b <- maybeM body (local id . infer)
-    let retTy = maybe TUnit fst3 b
-    let body' = mapM thd3 b
-    let psb = maybe [] snd3 b
+    let retTy = maybe TUnit fst4 b
+    let body' = mapM thd4 b
+    let psb = maybe [] snd4 b
+    let isAsync' = maybe False fth4 b
 
     let closTy' = Identity closTy
 
-    pure (retTy, psb <> remainingPs, declFun (Annotation name closTy' isMut') <$> clos <*> body')
+    pure (retTy, psb <> remainingPs, declFun (Annotation name closTy' isMut') <$> clos <*> body', isAsync')
 synthDecl _ _ _ = throw $ CompilerError "Only declarations are supported"
 
 -- removeGeneralizedQuals :: [PlumeQualifier] -> [QuVar] -> IO [PlumeQualifier]
@@ -215,3 +219,13 @@ isElemOf q (q':qs) = doesMatchQual q q' >>= \case
   True -> pure True
   False -> isElemOf q qs
 isElemOf _ _ = pure False
+
+addAsync :: MonadIO m => PlumeType -> m PlumeType
+addAsync (TAsync t) = pure (TAsync t)
+addAsync (TypeVar tvr) = do
+  tv <- readIORef tvr
+  case tv of
+    Link t -> addAsync t
+    Unbound _ _ -> pure (TypeVar tvr)
+addAsync (args :->: ret) = (args :->:) <$> addAsync ret
+addAsync t = pure $ TAsync t

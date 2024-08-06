@@ -27,5 +27,6 @@ synthNative (Pre.ENativeFunction fp name generics ty st isStd) = do
     ( TUnit
     , []
     , pure $ Post.ENativeFunction fp name gens convertedTy st isStd
+    , False
     )
 synthNative _ = throw $ CompilerError "Only native functions are supported"

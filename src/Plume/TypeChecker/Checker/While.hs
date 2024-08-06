@@ -9,8 +9,8 @@ import Prelude hiding (local)
 synthWhile :: Infer -> Infer
 synthWhile infer (Pre.EWhile cond bl) = local id $ do
   -- Type checking the condition, the true branch and the false branch
-  (condTy, ps1, cond') <- infer cond
-  (tTy, ps2, t') <- local id $ infer bl
+  (condTy, ps1, cond', async1) <- infer cond
+  (tTy, ps2, t', async2) <- local id $ infer bl
 
   -- Unifying the condition type with a boolean type
   condTy `unifiesWith` TBool
@@ -18,5 +18,5 @@ synthWhile infer (Pre.EWhile cond bl) = local id $ do
   -- Unifying the true branch type with the false branch type
   -- if the false branch is present and return the type of the
   -- condition branch
-  pure (tTy, ps1 ++ ps2, Post.EWhile <$> cond' <*> t')
+  pure (tTy, ps1 ++ ps2, Post.EWhile <$> cond' <*> t', async1 || async2)
 synthWhile _ _ = throw $ CompilerError "Only condition branches are supported"

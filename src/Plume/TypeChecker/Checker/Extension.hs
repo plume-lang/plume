@@ -313,7 +313,7 @@ synthExt
 
     mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) generics
 
-    pure (TUnit, [], pure (Post.EDeclaration [] (Annotation (Cmm.fromText name) (Identity funTy) False) dictE Nothing))
+    pure (TUnit, [], pure (Post.EDeclaration [] (Annotation (Cmm.fromText name) (Identity funTy) False) dictE Nothing), False)
 synthExt _ _ = throw $ CompilerError "Only type extensions are supported"
 
 getExpr :: CST.Position -> M.Substitution -> [(PlumeQualifier, Post.Expression)] -> PlumeQualifier -> Post.Expression
@@ -351,7 +351,7 @@ extMemberToDeclaration infer sch (Pre.ExtDeclaration gens (Annotation name ty _)
   instantiate sch >>= \case
     (ty'', _) -> ty' `unifiesWith` ty''
 
-  (bTy, ps', b) <- local id $ infer c
+  (bTy, ps', b, isAsync) <- local id $ infer c
   ty' `unifiesWith` bTy
 
   mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) gens

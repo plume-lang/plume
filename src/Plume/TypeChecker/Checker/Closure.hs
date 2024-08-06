@@ -17,14 +17,13 @@ synthClosure infer (Pre.EClosure args ret body async) = local id $ do
   -- Creating a new environment with the arguments as type schemes
   let argSchemes = createEnvFromAnnotations convertedArgs
 
-
   old <- gets isAsynchronous
   oldRet <- gets returnType
   modify (\s -> s {isAsynchronous = False})
 
   -- Type checking the body of the closure with the new environment
   -- and the return type of the closure
-  (isAsync, (retTy, ps, body')) <-
+  (isAsync, (retTy, ps, body', isAsync')) <-
     local (\s -> s {returnType = Just convertedRet}) $ do
       insertEnvWith @"typeEnv" (<>) argSchemes
       res <- infer body
@@ -34,7 +33,8 @@ synthClosure infer (Pre.EClosure args ret body async) = local id $ do
 
   modify (\s -> s {isAsynchronous = old})
 
-  let retTy' = if isAsync then createAsyncType retTy else retTy
+  let b = async || isAsync || isAsync'
+  let retTy' = if b then createAsyncType retTy else retTy
 
   -- Unifying specified return type with the inferred return type
   convertedRet `unifiesWith` retTy
@@ -43,11 +43,11 @@ synthClosure infer (Pre.EClosure args ret body async) = local id $ do
   let closureTy = map (.annotationValue) convertedArgs :->: retTy'
 
   let convertedArgs' = map (fmap Identity) convertedArgs
-  let retTy'' = Identity retTy'
+  let retTy'' = Identity retTy
   
   modify (\s -> s {returnType = oldRet})
 
-  pure (closureTy, ps, Post.EClosure convertedArgs' retTy'' <$> body' <*> pure (isAsync || async))
+  pure (closureTy, ps, Post.EClosure convertedArgs' retTy'' <$> body' <*> pure b, b)
 synthClosure _ _ = throw $ CompilerError "Only closures are supported"
 
 -- | Function that create a new environment from a list of converted
@@ -57,5 +57,5 @@ createEnvFromAnnotations xs =
   Map.fromList $ map (\(Annotation n ty _) -> (n.identifier, Forall [] ([] :=>: ty))) xs
 
 createAsyncType :: PlumeType -> PlumeType 
-createAsyncType (TypeApp (TypeId "async") [t]) = TypeApp (TypeId "async") [t]
-createAsyncType t = TypeApp (TypeId "async") [t]
+createAsyncType (TAsync t) = TAsync t
+createAsyncType t = TAsync t

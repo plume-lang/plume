@@ -54,7 +54,7 @@ synthInterface _ (Pre.EInterface (Annotation name tys _) generics methods deduct
           methods'
 
   mapM_ (deleteEnv @"genericsEnv" . Pre.getGenericName) generics
-  return (TUnit, [], pure $ Post.ESpreadable genFuns)
+  return (TUnit, [], pure $ Post.ESpreadable genFuns, False)
 synthInterface _ _ = throw $ CompilerError "Only interfaces are supported"
 
 convertMethod :: (MonadChecker m) => Annotation Pre.PlumeScheme -> m (Text, PlumeScheme)

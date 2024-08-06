@@ -9,14 +9,15 @@ import Plume.TypeChecker.TLIR qualified as Post
 import Plume.TypeChecker.Constraints.Solver (unifiesWith)
 import Plume.TypeChecker.Checker.Datatype (datatypes, tA)
 import Plume.TypeChecker.Constraints.Unification (doesUnifyWith)
-import Data.List (nub)
+import Data.List (nub, unzip4)
 import System.IO.Pretty (printWarningFromString)
 import Prelude hiding (local, gets)
+import Data.Tuple.Utils (fst3)
 
 synthSwitch :: Infer -> Infer
 synthSwitch infer (Pre.ESwitch scrutinee cases) = local id $ do
   -- Infer the scrutinee and the cases
-  (t, ps1, scrutinee') <- infer scrutinee
+  (t, ps1, scrutinee', b1) <- infer scrutinee
   (tys, ps2, cases') <- mapAndUnzip3M (synthCase infer t) cases
   let (ts', expr) = unzip tys  
   
@@ -30,10 +31,12 @@ synthSwitch infer (Pre.ESwitch scrutinee cases) = local id $ do
   -- Unify the return type with the type of the case expressions
   forM_ xs' $ unifiesWith exprTy
 
+  let isAsync = any (\(_, _, b) -> b) cases'
+
   patternSp <- case cases' of
     [] -> throw EmptyMatch
-    [(pat, _)] -> project pat
-    _ -> foldCustom (\a b -> UnionSpace [a, b]) <$> mapM (project . fst) cases'
+    [(pat, _, _)] -> project pat
+    _ -> foldCustom (\a b -> UnionSpace [a, b]) <$> mapM (project . fst3) cases'
   uncovered <- simplify =<< (TypeSpace t `subtractSpaceWith` patternSp)
   
   if uncovered == EmptySpace then pure ()
@@ -46,15 +49,15 @@ synthSwitch infer (Pre.ESwitch scrutinee cases) = local id $ do
   -- TODO: Implement a check for redundancy that would work
   -- checkRedudancy t (map fst cases')
 
-  let cases'' = sequencePat cases'
+  let cases'' = map fst $ sequencePat cases'
 
-  pure (exprTy, concat (ps1 : ps2), Post.ESwitch <$> scrutinee' <*> sequence cases'')
+  pure (exprTy, concat (ps1 : ps2), Post.ESwitch <$> scrutinee' <*> sequence cases'', isAsync || b1)
 synthSwitch _ _ = throw $ CompilerError "Only switches are supported"
 
 sequencePat 
-  :: [(Post.Pattern, Placeholder Post.Expression)]
-  -> [Placeholder (Post.Pattern, Post.Expression)]
-sequencePat = map sequence
+  :: [(Post.Pattern, Placeholder Post.Expression, Bool)]
+  -> [(Placeholder (Post.Pattern, Post.Expression), Bool)]
+sequencePat = map (\(p, e, b) -> (sequence (p, e), b))
 
 allPatsExcept :: [Post.Pattern] -> Post.Pattern -> [Post.Pattern]
 allPatsExcept xs x = filter (/= x) xs
@@ -114,7 +117,7 @@ synthCase
   => Infer
   -> PlumeType
   -> (Pre.Pattern, Pre.Expression)
-  -> m ((PlumeType, PlumeType), [PlumeQualifier], (Post.Pattern, Placeholder Post.Expression))
+  -> m ((PlumeType, PlumeType), [PlumeQualifier], (Post.Pattern, Placeholder Post.Expression, Bool))
 synthCase infer scrutTy (pat, expr) = local id $ do
   -- Synthesize the pattern and infer the expression
   (patTy, patExpr, patEnv) <- synthPattern pat
@@ -122,8 +125,8 @@ synthCase infer scrutTy (pat, expr) = local id $ do
   -- Pattern type should unify with the scrutinee type
   scrutTy `unifiesWith` patTy
 
-  (exprTy, ps, expr') <- local id $ localEnv patEnv (infer expr)
-  pure ((patTy, exprTy), ps, (patExpr, expr'))
+  (exprTy, ps, expr', b) <- local id $ localEnv patEnv (infer expr)
+  pure ((patTy, exprTy), ps, (patExpr, expr', b))
 
 -- | Locally perform an action without changing the environment globally
 localEnv :: Map Text PlumeScheme -> Checker a -> Checker a
@@ -204,6 +207,11 @@ mapAndUnzip3M :: (Monad m) => (a -> m (b, c, d)) -> [a] -> m ([b], [c], [d])
 mapAndUnzip3M f xs = do
   (bs, cs, ds) <- unzip3 <$> mapM f xs
   pure (bs, cs, ds)
+
+mapAndUnzip4M :: (Monad m) => (a -> m (b, c, d, e)) -> [a] -> m ([b], [c], [d], [e])
+mapAndUnzip4M f xs = do
+  (bs, cs, ds, es) <- unzip4 <$> mapM f xs
+  pure (bs, cs, ds, es)
 
 data Space
   = EmptySpace

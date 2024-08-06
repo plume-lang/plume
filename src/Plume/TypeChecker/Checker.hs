@@ -23,8 +23,9 @@ import Plume.TypeChecker.Monad
 import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (gets, local, modify)
+import Data.List (unzip4)
 
-synthesize :: (MonadChecker m) => Pre.Expression -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression)
+synthesize :: (MonadChecker m) => Pre.Expression -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression, Bool)
 
 -- | Some basic and primitive expressions
 synthesize (Pre.ELocated expr pos) = withPosition pos $ synthesize expr
@@ -43,18 +44,18 @@ synthesize (Pre.EVariable name _) = do
       searchEnv @"datatypeEnv" name.identifier >>= \case
         Just sch -> do
           (ty, qs) <- instantiate sch
-          pure (ty, qs, pure (Post.EVariable name (Identity ty)))
+          pure (ty, qs, pure (Post.EVariable name (Identity ty)), False)
         Nothing -> throw (UnboundVariable name.identifier)
 synthesize (Pre.ELiteral lit) = do
   let (ty, lit') = typeOfLiteral lit
-  pure (ty, [], pure (Post.ELiteral lit'))
+  pure (ty, [], pure (Post.ELiteral lit'), False)
 synthesize (Pre.EUnMut e) = do
   tv <- fresh
-  (ty, ps, r) <- synthesize e
+  (ty, ps, r, isAsync) <- synthesize e
   ty `unifiesWith` TMut tv
-  pure (tv, ps, Post.EUnMut <$> r)
+  pure (tv, ps, Post.EUnMut <$> r, isAsync)
 synthesize (Pre.EBlock exprs) = local id $ do
-  (tys, pss, exprs') <- localPosition $ unzip3 <$> mapM synthesizeStmt exprs
+  (tys, pss, exprs', isAsync) <- localPosition $ unzip4 <$> mapM synthesizeStmt exprs
 
   retTy <- gets returnType
   let retTy' = fromMaybe TUnit retTy
@@ -67,20 +68,20 @@ synthesize (Pre.EBlock exprs) = local id $ do
 
   -- void $ maybeM (viaNonEmpty last tys) (`unifiesWith` retTy')
 
-  return (gotRetTy, concat pss, liftBlock (Post.EBlock <$> sequence exprs') tys' retTy')
+  return (gotRetTy, concat pss, liftBlock (Post.EBlock <$> sequence exprs') tys' retTy', or isAsync)
 synthesize (Pre.EReturn expr) = do
-  (ty, ps, expr') <- synthesize expr
+  (ty, ps, expr', isAsync) <- synthesize expr
   returnTy <- gets returnType
   forM_ returnTy $ unifiesWith ty
-  pure (ty, ps, Post.EReturn <$> expr')
+  pure (ty, ps, Post.EReturn <$> expr', isAsync)
 synthesize (Pre.EList xs) = do
   tv <- fresh
-  (tys, pss, xs') <-
-    mapAndUnzip3M
+  (tys, pss, xs', isAsync) <-
+    mapAndUnzip4M
       (local id . localPosition . synthesize)
       xs
   forM_ tys $ unifiesWith tv
-  pure (TList tv, concat pss, Post.EList <$> sequence xs')
+  pure (TList tv, concat pss, Post.EList <$> sequence xs', or isAsync)
 synthesize (Pre.EVariableDeclare gens name ty) = do
   gens' <- concatMapM convert gens
   let qvars = getQVars gens'
@@ -89,7 +90,7 @@ synthesize (Pre.EVariableDeclare gens name ty) = do
 
   insertEnv @"typeEnv" name (Forall qvars (quals :=>: ty'))
 
-  pure (ty', [], pure (Post.EVariableDeclare gens name (Identity ty')))
+  pure (ty', [], pure (Post.EVariableDeclare gens name (Identity ty')), False)
 -- \| Calling synthesis modules
 synthesize app@(Pre.EApplication {}) = synthApp synthesize app
 synthesize clos@(Pre.EClosure {}) = synthClosure synthesize clos
@@ -103,16 +104,16 @@ synthesize int@(Pre.EInterface {}) = synthInterface synthesize int
 synthesize nat@(Pre.ENativeFunction {}) = synthNative nat
 synthesize _ = throw (CompilerError "Unsupported expression")
 
-synthesizeStmt :: (MonadChecker m) => Pre.Expression -> m (Maybe PlumeType, [PlumeQualifier], Placeholder Post.Expression)
+synthesizeStmt :: (MonadChecker m) => Pre.Expression -> m (Maybe PlumeType, [PlumeQualifier], Placeholder Post.Expression, Bool)
 synthesizeStmt (Pre.ELocated e pos) = withPosition pos $ synthesizeStmt e
 synthesizeStmt (Pre.EReturn e) = do
-  (ty, ps, expr') <- synthesize e
+  (ty, ps, expr', isAsync) <- synthesize e
   returnTy <- gets returnType
   forM_ returnTy $ unifiesWith ty
-  pure (Just ty, ps, Post.EReturn <$> expr')
+  pure (Just ty, ps, Post.EReturn <$> expr', isAsync)
 synthesizeStmt e = do
-  (_, ps, h) <- synthesize e
-  return (Nothing, ps, h)
+  (_, ps, h, isAsync) <- synthesize e
+  return (Nothing, ps, h, isAsync)
 
 isClosure :: Pre.Expression -> Bool
 isClosure (Pre.ELocated e _) = isClosure e
@@ -122,7 +123,7 @@ isClosure _ = False
 synthesizeToplevel :: (MonadChecker m) => Pre.Expression -> m (PlumeScheme, [Post.Expression])
 synthesizeToplevel (Pre.ELocated e pos) = withPosition pos $ synthesizeToplevel e
 synthesizeToplevel e@(Pre.EDeclaration _ _ body _) = do
-  (ty, ps, h) <- synthDecl (isClosure body) synthesize e
+  (ty, ps, h, _) <- synthDecl (isClosure body) synthesize e
   cenv <- gets (extendEnv . environment)
   zs <- traverse (discharge cenv) ps
 
@@ -142,7 +143,7 @@ synthesizeToplevel e@(Pre.EDeclaration _ _ body _) = do
     Post.ESpreadable es -> pure (t'', es)
     _ -> pure (t'', [h'])
 synthesizeToplevel e = do
-  (ty, ps, h) <- synthesize e
+  (ty, ps, h, _) <- synthesize e
   cenv <- gets (extendEnv . environment)
   zs <- traverse (discharge cenv) (reverse ps)
 

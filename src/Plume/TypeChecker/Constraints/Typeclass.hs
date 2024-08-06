@@ -351,11 +351,11 @@ findMatchingClass (IsIn t1 n1) qs = flip filterM qs $ \case
   _ -> pure False
 findMatchingClass _ _ = pure []
 
-instantiateFromName :: (MonadChecker m) => Text -> PlumeScheme -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression)
+instantiateFromName :: (MonadChecker m) => Text -> PlumeScheme -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression, Bool)
 instantiateFromName name sch = do
   (ty, qs) <- instantiate sch
   let r = liftPlaceholders name ty qs
-  pure (ty, qs, r)
+  pure (ty, qs, r, False)
 
 isInSuperclassOf :: MonadChecker m => PlumeQualifier -> [PlumeQualifier] -> m Bool
 isInSuperclassOf p@(IsIn t n) ps = not . null <$> filterM (\case

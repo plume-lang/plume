@@ -62,7 +62,7 @@ synthDataType (Pre.EType (Annotation name _generics _) cons) = do
 
   let ann = Annotation name generics' False
 
-  return (TUnit, [], pure $ Post.EType ann cons')
+  return (TUnit, [], pure $ Post.EType ann cons', False)
 synthDataType _ = throw $ CompilerError "Only data types are supported"
 
 -- | Used to generate the type constructors of a data type
