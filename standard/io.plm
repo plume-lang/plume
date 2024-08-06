@@ -1,3 +1,0 @@
-require "io/file"
-pub require "io/output"
-require "io/system"
