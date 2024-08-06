@@ -351,7 +351,7 @@ extMemberToDeclaration infer sch (Pre.ExtDeclaration gens (Annotation name ty _)
   instantiate sch >>= \case
     (ty'', _) -> ty' `unifiesWith` ty''
 
-  (bTy, ps', b, isAsync) <- local id $ infer c
+  (bTy, ps', b, _) <- local id $ infer c
   ty' `unifiesWith` bTy
 
   mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) gens

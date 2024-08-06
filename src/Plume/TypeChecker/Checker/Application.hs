@@ -2,7 +2,7 @@ module Plume.TypeChecker.Checker.Application where
 
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.TypeChecker.Checker.Monad
-import Plume.TypeChecker.Checker.Switch (mapAndUnzip3M, mapAndUnzip4M)
+import Plume.TypeChecker.Checker.Switch (mapAndUnzip4M)
 import Plume.TypeChecker.Constraints.Solver (unifiesWith)
 import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (local, modify)
@@ -10,13 +10,13 @@ import Prelude hiding (local, modify)
 synthApp :: Infer -> Infer
 synthApp infer (Pre.EApplication f xs) = local id $ do
   -- Type checking the function and its arguments
-  (t, ps, f'', isAsync) <- infer f
+  (t, ps, f'', _) <- infer f
 
   let orderedArgs = case t of
         args :->: _ -> checkVariableArg args xs
         _ -> xs
 
-  (ts, pss, xs', isAsync') <- mapAndUnzip4M infer orderedArgs
+  (ts, pss, xs', _) <- mapAndUnzip4M infer orderedArgs
 
   -- Generating a new fresh type variable for the return type and
   -- unifying the function type given from `f` with the built type from
