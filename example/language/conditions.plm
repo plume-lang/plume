@@ -10,7 +10,7 @@ if x == 5 {
 
 nested = if (x == 5) println("test") else println("test2")
 
-wrapped_age: Option<int> = (await input("Enter your age : ")).convert()
+wrapped_age: Option<int> = input("Enter your age : ").convert()
 
 switch wrapped_age {
   case Some(age) {
@@ -22,3 +22,10 @@ switch wrapped_age {
   } 
   case None => println("Pas d'âge")
 }
+
+fn test() =>
+  if true
+    then 5
+    else 0
+
+println(test())
