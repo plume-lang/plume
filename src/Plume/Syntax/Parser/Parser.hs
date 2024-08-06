@@ -152,7 +152,7 @@ eBlock =
 -- |    declaration conflicts)
 eVariable :: P.Parser CST.Expression
 eVariable = CST.EVariable . Cmm.fromText <$> L.lexeme (L.nonLexedID <* isNotDecl) <*> pure Nothing
-  where 
+  where
     isNotDecl :: P.Parser ()
     isNotDecl = P.notFollowedBy (L.lexeme $ P.oneOf (":=" :: String))
 
@@ -179,7 +179,7 @@ eIfThenMacro :: P.Parser CST.Expression
 eIfThenMacro = do
   void $ L.reserved "#if"
   cond <- parseExpression
-  
+
   CST.EMacroIf cond <$> eBlockMacro
   where eBlockMacro = CST.EBlock . concat <$> L.braces (P.many parseToplevel)
 
@@ -189,7 +189,7 @@ eIfThenElseMacro = do
   cond <- parseExpression
   thenBlock <- eBlockMacro
   void $ L.reserved "#else"
-  
+
   CST.EMacroIfElse cond thenBlock <$> eBlockMacro
   where eBlockMacro = CST.EBlock . concat <$> L.braces (P.many parseToplevel)
 
@@ -326,7 +326,7 @@ eClosureAsync = do
           let threadBody = CST.EApplication (CST.EVariable "create_thread" Nothing) [CST.EClosure [] Nothing body False]
 
           CST.EClosure args retTy threadBody False
-        
+
         | otherwise = CST.EClosure args retTy body True
 
   return cl
@@ -348,12 +348,12 @@ eClosureAsyncCase = do
 
   let switch = CST.ESwitch (CST.EVariable fnCaseArg Nothing) [(pat, body)]
 
-  let cl 
+  let cl
         | extTy == "native" = do
           let threadBody = CST.EApplication (CST.EVariable "create_thread" Nothing) [CST.EClosure [] Nothing switch False]
 
           CST.EClosure [fnCaseArg Cmm.:@: Nothing] retTy threadBody False
-        
+
         | otherwise = CST.EClosure [fnCaseArg Cmm.:@: Nothing] retTy switch True
 
   return cl
@@ -425,7 +425,7 @@ parseExpression = eLocated $ do
           , listIdx
           , recSelection
           ]
-  
+
   -- | Parses a mutable property access
   -- | A mutable property access is a shortcut to access a property of an
   -- | mutable expression without the need of dereferencing it.
@@ -547,9 +547,6 @@ sAsyncFunction :: P.Parser CST.Expression
 sAsyncFunction = do
   extTy <- readIORef P.extensionType
 
-  when (extTy /= "native") $ 
-    fail "Async functions are only allowed in native context."
-
   void $ L.reserved "async"
   void $ L.reserved "fn"
   name <- L.identifier <|> L.parens L.operator
@@ -558,9 +555,11 @@ sAsyncFunction = do
   retTy <- P.optional $ L.symbol ":" *> Typ.tType
   body <- L.symbol "=>" *> parseExpression <|> eBlock
 
-  let threadBody = CST.EApplication (CST.EVariable "create_thread" Nothing) [CST.EClosure [] Nothing body False]
+  let threadBody
+        | extTy == "native" =  CST.EApplication (CST.EVariable "create_thread" Nothing) [CST.EClosure [] Nothing body False]
+        | otherwise = body
 
-  let cl = CST.EClosure args retTy threadBody False
+  let cl = CST.EClosure args retTy threadBody (extTy == "js")
 
   return $
     CST.EDeclaration
@@ -573,7 +572,7 @@ sWhile :: P.Parser CST.Expression
 sWhile = do
   void $ L.reserved "while"
   cond <- parseExpression
-  
+
   CST.EWhile cond <$> eBlock
 
 -- | Parses a statement
@@ -670,7 +669,7 @@ tInterface = do
   void $ L.reserved "interface"
   gens <- P.option [] $ L.angles $ Typ.parseGeneric `P.sepBy` L.comma
   annot <- Cmm.Annotation . Cmm.fromText <$> L.identifier <*> L.angles (Typ.tType `P.sepBy` L.comma) <*> pure False
-  
+
   deduction <- P.optional $ do
     void $ L.reserved "with"
     x <- L.identifier
@@ -682,7 +681,7 @@ tInterface = do
   members <- L.braces (P.many iFun)
 
   return [CST.EInterface annot gens members deduction]
-  where 
+  where
     iFun = do
       void $ L.reserved "fn"
       name <- Cmm.fromText <$> (L.identifier <|> L.parens L.operator)
@@ -719,7 +718,7 @@ tNative = do
 
   path <- Lit.stringLiteral
   xs <- P.choice [nativeGroup path, nativeOne path]
-  
+
   if extTy `elem` libTy
     then return (map (\p -> p extTy Nothing) xs)
     else return []
@@ -781,7 +780,7 @@ tExtension :: P.Parser [CST.Expression]
 tExtension = do
   void $ L.reserved "extend"
   gens <- P.option [] $ L.angles (Typ.parseGeneric `P.sepBy` L.comma)
-  
+
   tc <- Cmm.Annotation . Cmm.fromText <$> L.identifier <*> L.angles (Typ.tType `P.sepBy1` L.comma) <*> pure False
 
   members <- L.braces (P.many eExtensionMember)
@@ -800,10 +799,10 @@ tType = do
   void $ L.reserved "type"
   name <- L.identifier
   gens <- P.option [] $ L.angles (L.identifier `P.sepBy` L.comma)
-  
+
   cons <- typeConstructors name gens <|> typeAlias name gens
   return [cons]
-  
+
   where
     typeConstructors :: Text -> [Text] -> P.Parser CST.Expression
     typeConstructors name gens = do
