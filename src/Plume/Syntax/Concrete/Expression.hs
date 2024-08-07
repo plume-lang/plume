@@ -16,7 +16,6 @@ import Plume.Syntax.Common.Type
 import Text.Megaparsec.Pos
 import Prelude hiding (intercalate)
 import GHC.Show qualified as S
-import Data.String qualified as S
 import qualified Data.List as S
 
 type IsStandard = Maybe Text
@@ -167,7 +166,7 @@ instance Show t => Show (TypeConstructor t) where
   show (TVariable x) = toString x
 
 instance (Show t, Show (f t)) => Show (Expression t f) where
-  show (EVariable x t) = toString x
+  show (EVariable x _) = toString x
   show (ELiteral x) = show x
   show (EList xs) = "[" <> S.intercalate ", " (map show xs) <> "]"
   show (EApplication f xs) = show f <> "(" <> S.intercalate ", " (map show xs) <> ")"
@@ -179,10 +178,10 @@ instance (Show t, Show (f t)) => Show (Expression t f) where
   show (EBlock xs) = "{ " <> S.intercalate ";\n" (map show xs) <> "\n}"
   show (ERequire x) = "require " <> toString x
   show (ESwitch x xs) = "switch " <> show x <> " { " <> S.intercalate "; " (map (\(p, e) -> show p <> " -> " <> show e) xs) <> " }"
-  show (EInterface x xs ys d) = "interface " <> show x <> " " <> show xs <> " " <> show ys <> " " <> maybe "" (\(x, y) -> "deduct " <> toString x <> " " <> toString y) d
+  show (EInterface x xs ys d) = "interface " <> show x <> " " <> show xs <> " " <> show ys <> " " <> maybe "" (\(x', y) -> "deduct " <> toString x' <> " " <> toString y) d
   show (EReturn x) = "return " <> show x
   show (ETypeExtension xs x t ys) = "extend " <> show xs <> " " <> show x <> " " <> maybe "" ((" as " <>) . toString) t <> " " <> show ys
-  show (ENativeFunction x y xs z t isStd) = "native " <> toString x <> " " <> toString y <> " " <> show xs
+  show (ENativeFunction x y xs _ _ _) = "native " <> toString x <> " " <> toString y <> " " <> show xs
   show (ETypeAlias x t) = "type " <> show x <> " = " <> show t
   show (EVariableDeclare xs x t) = "declare " <> show xs <> " " <> toString x <> " " <> show t
   show (EAwait x) = "await " <> show x
