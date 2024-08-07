@@ -46,6 +46,7 @@ switchCounter = unsafePerformIO $ newIORef 0
 
 desugarSwitch :: (IsToplevel, IsReturned, IsExpression, ShouldBeANF) -> DesugarSwitch
 desugarSwitch info@(isTop, shouldReturn, isExpr, _) (fExpr, fStmt) (Pre.CESwitch x cases) = do
+  print (info, x)
   let freedPat = foldMap (free . fst) cases
   (decl, declVar) <- case x of
     Pre.CEVar n | n `S.notMember` freedPat -> return ([], x)
@@ -84,7 +85,7 @@ desugarSwitch info@(isTop, shouldReturn, isExpr, _) (fExpr, fStmt) (Pre.CESwitch
 
   t <- concat <$> sequenceMapM fStmt decl
   let finalDecl = L.foldl (\acc (x', stmts'') -> acc <> stmts'' <> maybeToList x') [] t
-
+  -- print (isExpr, x)
   if isExpr || isTop
     then do
       let ifs'' = createIfsExpr res

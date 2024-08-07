@@ -33,7 +33,7 @@ import Plume.Compiler.Desugaring.Modules.Switch
 desugarExpr
   :: (IsToplevel, IsReturned, IsExpression, ShouldBeANF)
   -> Desugar Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
-desugarExpr isTop = \case
+desugarExpr isTop@(isT, isR, _, sba) = \case
   Pre.CESpecial -> return' Post.DESpecial
   Pre.CEVar x -> return' $ Post.DEVar x
   Pre.CEApplication (Pre.CEVar ">") [x, Pre.CELiteral (LInt i)] -> do
@@ -42,7 +42,7 @@ desugarExpr isTop = \case
   Pre.CEApplication (Pre.CEVar "@list_length") [x] -> do
     (x', stmts) <- desugarExpr isTop x
     return (Post.DEListLength x', stmts)
-  x@(Pre.CEApplication _ _) -> desugarANF isTop (desugarExpr isTop) x
+  x@(Pre.CEApplication _ _) -> desugarANF (isT, isR, True, sba) (desugarExpr (isT, isR, True, sba)) x
   Pre.CELiteral x -> return' $ Post.DELiteral x
   Pre.CEList xs -> do
     (xs', stmts) <- mapAndUnzipM (desugarExpr isTop) xs

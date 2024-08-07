@@ -9,10 +9,10 @@ import Control.Monad.Exception (compilerError)
 desugarANF
   :: (IsToplevel, IsReturned, IsExpression, ShouldBeANF)
   -> DesugarModule Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
-desugarANF _ f (Pre.CEApplication x xs) = do
+desugarANF info f (Pre.CEApplication x xs) = do
+  print (xs, info)
   (x', stmts1) <- f x
   (xs', stmts2) <- mapAndUnzipM f xs
-
   case x' of
     Post.DEVar name -> do
       let stmts' = stmts1 <> concat stmts2
@@ -23,9 +23,9 @@ desugarANF _ f (Pre.CEApplication x xs) = do
       let stmts' = stmts1 <> [Post.DSDeclaration fresh x'] <> concat stmts2
 
       return (Post.DEApplication fresh xs', stmts')
-desugarANF t@(_, _, _, sba) f (Pre.CEDeclaration name expr body) = do
+desugarANF (_, _, _, sba) f (Pre.CEDeclaration name expr body) = do
   (expr', stmt1) <- f expr
-  (body', stmts2) <- desugarANF t f body
+  (body', stmts2) <- f body
 
   fresh <- freshName
 
