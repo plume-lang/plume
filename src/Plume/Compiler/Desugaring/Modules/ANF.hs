@@ -35,9 +35,9 @@ desugarANF (_, _, _, sba) f (Pre.CEDeclaration name expr body) = do
           <> [Post.DSDeclaration fresh body' | sba]
 
   return (if sba then Post.DEVar fresh else body', stmts)
-desugarANF t f (Pre.CEMutDeclaration name expr body) = do
+desugarANF _ f (Pre.CEMutDeclaration name expr body) = do
   (expr', stmt1) <- f expr
-  (body', stmts2) <- desugarANF t f body
+  (body', stmts2) <- f body
 
   fresh <- freshName
 
@@ -48,9 +48,9 @@ desugarANF t f (Pre.CEMutDeclaration name expr body) = do
           <> [Post.DSDeclaration fresh body']
 
   return (Post.DEVar fresh, stmts)
-desugarANF t f (Pre.CEMutUpdate name expr body) = do
+desugarANF _ f (Pre.CEMutUpdate name expr body) = do
   (expr', stmt1) <- f expr
-  (body', stmts2) <- desugarANF t f body
+  (body', stmts2) <- f body
 
   fresh <- freshName
 
