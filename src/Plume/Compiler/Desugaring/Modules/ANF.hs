@@ -9,8 +9,7 @@ import Control.Monad.Exception (compilerError)
 desugarANF
   :: (IsToplevel, IsReturned, IsExpression, ShouldBeANF)
   -> DesugarModule Pre.ClosedExpr (ANFResult Post.DesugaredExpr)
-desugarANF info f (Pre.CEApplication x xs) = do
-  print (xs, info)
+desugarANF _ f (Pre.CEApplication x xs) = do
   (x', stmts1) <- f x
   (xs', stmts2) <- mapAndUnzipM f xs
   case x' of
