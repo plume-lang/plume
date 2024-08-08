@@ -783,8 +783,10 @@ tExtension = do
 
   tc <- Cmm.Annotation . Cmm.fromText <$> L.identifier <*> L.angles (Typ.tType `P.sepBy1` L.comma) <*> pure False
 
+  Cmm.LInt priority <- P.option (Cmm.LInt 0) $ L.parens (L.reserved "priority" *> Lit.parseInteger)
+
   members <- L.braces (P.many eExtensionMember)
-  return [CST.ETypeExtension gens tc Nothing members]
+  return [CST.ETypeExtension gens tc Nothing members priority]
 
 -- | Parses a type declaration
 -- | A type declaration is a statement that is used to declare a new

@@ -41,12 +41,15 @@ discharge cenv p = do
   s <- gets substitution
   -- Checking if some extension exists for the given qualifier and getting the
   -- first to match.
+
+  let cenv' = sortBy (\c1 c2 -> compare (thd3 c2) (thd3 c1)) (getQuals cenv)
+
   p' <- liftIO $ applyQual s =<< compressQual p
-  x <- forM (getQuals cenv) $ \(qvs, sch) -> do
+  x <- forM cenv' $ \(qvs, sch, _) -> do
     sub <- Map.fromList <$> mapM (\c -> (c,) <$> fresh) qvs
     (a :=>: b, _) <- instantiateQual sub sch
     b' <- liftIO $ compressQual b
-
+    
     First <$> (fmap (a,b,) <$> matchMut' b' p') `tryOr` pure Nothing
 
   case getFirst $ mconcat x of
@@ -148,8 +151,8 @@ getDict (IsQVar t) = t
 createInstNames :: [PlumeType] -> Text
 createInstNames = List.foldl' (\acc x -> acc <> "_" <> createInstName x) ""
 
-getQuals :: ExtendEnv -> [([QuVar], Qualified PlumeQualifier)]
-getQuals (MkExtendEnv env) = map (\(a, MkInstance qs quals _ _) -> (qs, a <$ quals)) env
+getQuals :: ExtendEnv -> [([QuVar], Qualified PlumeQualifier, Integer)]
+getQuals (MkExtendEnv env) = map (\(a, MkInstance qs quals _ _ priority) -> (qs, a <$ quals, priority)) env
 
 unqualType :: Qualified PlumeType -> PlumeType
 unqualType (_ :=>: zs) = zs

@@ -59,9 +59,13 @@ parseStringWithInterpolation = lexeme $ do
       let y' = combineCharsIntoString y
 
       case (x', y') of
-        (ELiteral (LString a), ELiteral (LString b)) -> ELiteral (LString (a <> b))
+        (ELiteral (LString a), ELiteral (LString b)) -> stringToList (a <> b)
         _ -> EBinary "+" x' y'
+    combineCharsIntoString (ELiteral (LString s)) = stringToList s
     combineCharsIntoString x = x
+
+stringToList :: Text -> Expression
+stringToList xs = EList (map (ELiteral . LChar) (T.unpack xs))
 
 -- | Parse a character literal
 -- | A character literal is a single character enclosed in single quotes

@@ -141,11 +141,11 @@ concreteToAbstract (CST.EReturn e) = do
   -- them into a block.
   e' <- fmap interpretSpreadable <$> concreteToAbstract e
   transRet $ AST.EReturn <$> e'
-concreteToAbstract (CST.ETypeExtension g ann var ems) = do
+concreteToAbstract (CST.ETypeExtension g ann var ems p) = do
   ann' <- mapM (mapM transformType) ann
   ems' <-
     fmap flat . sequence <$> mapM concreteToAbstractExtensionMember ems
-  transRet $ AST.ETypeExtension g ann' var <$> ems'
+  transRet $ AST.ETypeExtension g ann' var <$> ems' <*> pure p
 concreteToAbstract (CST.ENativeFunction fp n gens t libTy _) = do
   sc <- readIORef mode
 

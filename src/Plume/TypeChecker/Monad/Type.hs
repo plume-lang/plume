@@ -78,7 +78,7 @@ pattern TList t = TypeApp (TypeId "list") [t]
 pattern TInt, TBool, TString, TChar, TFloat, TUnit :: PlumeType
 pattern TInt = TypeId "int"
 pattern TBool = TypeId "bool"
-pattern TString = TypeId "str"
+pattern TString = TList TChar
 pattern TChar = TypeId "char"
 pattern TFloat = TypeId "float"
 pattern TUnit = TypeId "unit"
