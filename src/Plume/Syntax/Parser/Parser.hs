@@ -447,7 +447,7 @@ parseExpression = eLocated $ do
   -- |  - expr[idx]   <=> expr.get_index(idx) 
   -- | where `expr` is an expression that returns a list, `slice` is a slice
   -- | expression and `idx` is an expression that returns an integer.
-  listIdx = Slc.transformSlice <$> L.brackets parseExpression
+  listIdx = Slc.transformSlice <$> L.brackets (Slc.parseSlice parseTerm)
 
   -- | Parses a record selection
   -- | A record selection is a postfix operator that is used to access a field
