@@ -69,13 +69,13 @@ newtype ExtendEnv = MkExtendEnv [(PlumeQualifier, Instance Typed.Expression ())]
 -- | (where the key is the method name and the value is the method expression),
 -- | and a map of types (where the key is the type name and the value is 
 -- | the type).
-data Instance val a = MkInstance [QuVar] (Qualified a) (Map Text val) (Map Text PlumeScheme) Integer
+data Instance val a = MkInstance [QuVar] (Qualified a) (Map Text val) (Map Text PlumeScheme)
   deriving (Eq, Show)
 
 -- | Instancing the Functor typeclass for the Instance type, in order to
 -- | be able to apply `void` function to the Instance type.
 instance Functor (Instance val) where
-  fmap f (MkInstance qs q m t p) = MkInstance qs (fmap f q) m t p
+  fmap f (MkInstance qs q m t) = MkInstance qs (fmap f q) m t
 
 -- | Empty state
 -- | The empty state is the initial state of the type checker

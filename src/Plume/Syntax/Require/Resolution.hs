@@ -257,7 +257,7 @@ checkForUndefined m (HLIR.EMutUpdate n e1 e2) = do
       maybe (pure m') (checkForUndefined m') e2
     else throwError ("Variable " <> toString n' <> " is not defined", pos)
 checkForUndefined m (HLIR.ERequire _) = pure m
-checkForUndefined m (HLIR.ETypeExtension _ ann _ exts _) = do
+checkForUndefined m (HLIR.ETypeExtension _ ann _ exts) = do
   let (var, _) = interpretAnnot ann
 
   unless (isClassDefined 0 var m) $ do

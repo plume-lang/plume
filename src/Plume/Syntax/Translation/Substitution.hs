@@ -70,12 +70,12 @@ substitute (name, expr) (AST.ESwitch e ps) =
     | name `S.notMember` ftv p = (p, substitute (name, expr) e')
     | otherwise = (p, e')
 substitute (name, expr) (AST.EReturn e) = AST.EReturn (substitute (name, expr) e)
-substitute (name, expr) (AST.ETypeExtension g ann (Just var) ems p)
+substitute (name, expr) (AST.ETypeExtension g ann (Just var) ems)
   | name /= var =
-      AST.ETypeExtension g ann (Just var) (map (substituteExt (name, expr)) ems) p
-  | otherwise = AST.ETypeExtension g ann (Just var) ems p
-substitute (name, expr) (AST.ETypeExtension g ann Nothing ems p) =
-  AST.ETypeExtension g ann Nothing (map (substituteExt (name, expr)) ems) p
+      AST.ETypeExtension g ann (Just var) (map (substituteExt (name, expr)) ems)
+  | otherwise = AST.ETypeExtension g ann (Just var) ems
+substitute (name, expr) (AST.ETypeExtension g ann Nothing ems) =
+  AST.ETypeExtension g ann Nothing (map (substituteExt (name, expr)) ems)
 substitute _ (AST.ENativeFunction fp n gens t st isStd) =
   AST.ENativeFunction fp n gens t st isStd
 substitute _ (AST.EInterface ann gs ms d) = AST.EInterface ann gs ms d

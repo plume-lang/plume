@@ -75,9 +75,9 @@ removeUselessBlocks isInner (AST.ELocated e p) = do
   e' <- removeUselessBlocks isInner e
   [AST.ELocated e' p]
 removeUselessBlocks _ (AST.EType ann ts) = [AST.EType ann ts]
-removeUselessBlocks isInner (AST.ETypeExtension gens ann var mems p) = do
+removeUselessBlocks isInner (AST.ETypeExtension gens ann var mems) = do
   let mems' = map (removeUselessBlocksExt isInner) mems
-  [AST.ETypeExtension gens ann var mems' p]
+  [AST.ETypeExtension gens ann var mems']
 removeUselessBlocks _ e = [e]
 
 removeUselessBlocksExt :: (Bool, Bool) -> AST.ExtensionMember -> AST.ExtensionMember

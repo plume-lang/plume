@@ -79,7 +79,7 @@ pattern TCon s ts = TApp (TId s) ts
 pattern TInt, TBool, TString, TChar, TFloat, TUnit :: PlumeType
 pattern TInt = TId "int"
 pattern TBool = TId "bool"
-pattern TString = TCon "list" [TChar]
+pattern TString = TId "str"
 pattern TChar = TId "char"
 pattern TFloat = TId "float"
 pattern TUnit = TId "unit"

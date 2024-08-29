@@ -98,7 +98,7 @@ prettyExpr _ (ESwitch e ps) =
  where
   prettyCase (p, e') = anCol Blue "case" <+> prettyPat p <+> "=>" <+> prettyExpr 0 e'
 prettyExpr _ (EReturn e) = anCol Blue "return" <+> prettyExpr 0 e
-prettyExpr _ (ETypeExtension gens a var es _) =
+prettyExpr _ (ETypeExtension gens a var es) =
   anCol Blue "extends"
     <> angles (hsep . punctuate comma $ map ansiPretty gens)
       <+> pretty a.annotationName <> angles (hsep . punctuate comma $ map ansiPretty a.annotationValue)

@@ -87,7 +87,7 @@ getMapNames ((IsIn _ _, Post.EVariable n _) : xs) = n.identifier : getMapNames x
 getMapNames (_ : xs) = getMapNames xs
 getMapNames [] = []
 
-isInstanceAlreadyDefined :: MonadChecker m => PlumeQualifier -> m (Maybe ([PlumeType], Integer))
+isInstanceAlreadyDefined :: MonadChecker m => PlumeQualifier -> m (Maybe [PlumeType])
 isInstanceAlreadyDefined p = do
   p' <- liftIO $ compressQual p
   MkExtendEnv instances <- gets (extendEnv . environment)
@@ -98,13 +98,13 @@ isInstanceAlreadyDefined p = do
       doesMatchQual p''' p'
 
   case found of
-    Just (IsIn ty _, MkInstance _ _ _ _ priority) -> return (Just (ty, priority))
+    Just (IsIn ty _, _) -> return (Just ty)
     _ -> return Nothing
 
 synthExt :: Infer -> Infer
 synthExt
   infer
-  (Pre.ETypeExtension generics (Annotation tcName tcTy _) _ methods priority) = do
+  (Pre.ETypeExtension generics (Annotation tcName tcTy _) _ methods) = do
     -- Dealing with pre-types and building the qualified qualifiers
     -- for the typeclass instance (used to indicate the instance form and its
     -- superclasses)
@@ -120,8 +120,8 @@ synthExt
     -- Checking if the instance is already defined
     possibleInst <- isInstanceAlreadyDefined instH
     when (isJust possibleInst) $ case possibleInst of
-      Just (ty', p) | p == priority -> throw $ AlreadyDefinedInstance tcName.identifier ty'
-      _ -> pure ()
+      Just ty' -> throw $ AlreadyDefinedInstance tcName.identifier ty'
+      _ -> throw $ CompilerError "Instance already defined"
 
     -- Pre-generating an instance dictionary only based on types
     cls@(MkClass _ _ meths ded) <- findClass tcName.identifier
@@ -138,7 +138,7 @@ synthExt
 
         let quals' = case quals of xs :=>: t -> (xs <> gens) :=>: t
 
-        let preInst = MkInstance qvars quals' mempty finalMethods priority
+        let preInst = MkInstance qvars quals' mempty finalMethods
 
         let qs'' = TypeQuantified <$> qs'
         sub <- liftIO . composeSubs =<< zipWithM unifyAndGetSub qs'' ty
@@ -293,7 +293,7 @@ synthExt
       throw $ UnknownExtensionMethods tcName.identifier unknown
 
     -- Creating the new instance to insert it in the extend environment
-    let inst = MkInstance qvars pred' dict dictFunTys priority
+    let inst = MkInstance qvars pred' dict dictFunTys
     let cls'' = (instH, void inst)
     addClassInstance cls''
 

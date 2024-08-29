@@ -70,8 +70,6 @@ data PostfixOperator
   = PostfixSlice
   deriving (Show, Eq)
 
-type Priority = Integer
-
 -- | A concrete expression is an expression that is used to represent
 -- | a program. It is a more concrete representation of a program than
 -- | an abstract syntax tree. It is used to represent the program in a
@@ -98,7 +96,7 @@ data Expression t f
       interfaceDeduction :: Maybe (Text, Text)
     }
   | EReturn (Expression t f)
-  | ETypeExtension [PlumeGeneric] (Annotation [t]) (Maybe Text) [ExtensionMember t f] Priority
+  | ETypeExtension [PlumeGeneric] (Annotation [t]) (Maybe Text) [ExtensionMember t f]
   | ENativeFunction Text Text [Text] t LibraryType IsStandard
   | ETypeAlias (Annotation [Text]) t
   | EVariableDeclare [PlumeGeneric] Text (f t)
@@ -147,7 +145,7 @@ instance (Eq t, Eq (f t)) => Eq (Expression t f) where
   ESwitch x xs == ESwitch x' xs' = x == x' && xs == xs'
   EReturn x == EReturn y = x == y
   EInterface x xs ys d == EInterface x' xs' ys' d' = x == x' && xs == xs' && ys == ys' && d == d'
-  ETypeExtension xs x t ys p == ETypeExtension xs' x' t' ys' p' = xs == xs' && x == x' && ys == ys' && t == t' && p == p'
+  ETypeExtension xs x t ys == ETypeExtension xs' x' t' ys' = xs == xs' && x == x' && ys == ys' && t == t'
   ENativeFunction x y xs z t isStd == ENativeFunction x' y' xs' z' t' isStd' = x == x' && y == y' && xs == xs' && z == z' && t == t' && isStd == isStd'
   EVariableDeclare xs x t == EVariableDeclare xs' x' t' = xs == xs' && x == x' && t == t'
   ELocated x _ == ELocated y _ = x == y
@@ -182,7 +180,7 @@ instance (Show t, Show (f t)) => Show (Expression t f) where
   show (ESwitch x xs) = "switch " <> show x <> " { " <> S.intercalate "; " (map (\(p, e) -> show p <> " -> " <> show e) xs) <> " }"
   show (EInterface x xs ys d) = "interface " <> show x <> " " <> show xs <> " " <> show ys <> " " <> maybe "" (\(x', y) -> "deduct " <> toString x' <> " " <> toString y) d
   show (EReturn x) = "return " <> show x
-  show (ETypeExtension xs x t ys _) = "extend " <> show xs <> " " <> show x <> " " <> maybe "" ((" as " <>) . toString) t <> " " <> show ys
+  show (ETypeExtension xs x t ys) = "extend " <> show xs <> " " <> show x <> " " <> maybe "" ((" as " <>) . toString) t <> " " <> show ys
   show (ENativeFunction x y xs _ _ _) = "native " <> toString x <> " " <> toString y <> " " <> show xs
   show (ETypeAlias x t) = "type " <> show x <> " = " <> show t
   show (EVariableDeclare xs x t) = "declare " <> show xs <> " " <> toString x <> " " <> show t
