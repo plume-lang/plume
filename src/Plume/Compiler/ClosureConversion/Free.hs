@@ -48,7 +48,7 @@ instance Free Update where
 freeBody :: [ClosedStatement] -> S.Set Text
 freeBody body =
   fst $
-    foldl
+    foldl'
       ( \(acc, excluded) -> \case
           CSDeclaration n e ->
             (acc `S.union` free e S.\\ S.singleton n, excluded `S.union` S.singleton n)

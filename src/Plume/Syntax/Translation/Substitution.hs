@@ -103,7 +103,7 @@ substituteExt (name, expr) (AST.ExtDeclaration g ann e)
   | otherwise = AST.ExtDeclaration g ann e
 
 substituteMany :: [(Text, AST.Expression)] -> AST.Expression -> AST.Expression
-substituteMany xs e = foldl (flip substitute) e xs
+substituteMany xs e = foldl' (flip substitute) e xs
 
 substituteManyBlock
   :: [(Text, AST.Expression)] -> [AST.Expression] -> [AST.Expression]

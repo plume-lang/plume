@@ -54,4 +54,4 @@ deriveHasField name = do
     litT' = LitT . StrTyLit . nameBase
 
 createAppT :: Name -> [Type] -> Type
-createAppT = foldl AppT . ConT
+createAppT = foldl' AppT . ConT
