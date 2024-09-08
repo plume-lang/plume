@@ -38,6 +38,7 @@ module Plume.TypeChecker.Monad
     removeNewEntries,
     interpretError,
     tryOr,
+    applySubst,
   )
 where
 
@@ -55,6 +56,7 @@ import Plume.TypeChecker.Monad.Type as Monad
 import Plume.TypeChecker.TLIR qualified as Typed
 import System.IO.Pretty (ppFailure, printErrorFromString)
 import Prelude hiding (get, gets, local, modify, put)
+import qualified Data.Set as Set
 
 -- | Checker monad transformer, used to handle the type-checking process
 -- | with the ability to throw errors.
@@ -293,10 +295,32 @@ instantiate t = do
   (ty, qs, _) <- instantiateWithSub mempty t
   pure (ty, qs)
 
+applySubst :: (MonadChecker m) => Substitution -> PlumeType -> m PlumeType
+applySubst subst (TypeQuantified name) = case Map.lookup name subst of
+  Just t -> pure t
+  Nothing -> pure (TypeQuantified name)
+applySubst subst (TypeApp t ts) = do
+  t' <- applySubst subst t
+  ts' <- goMany subst ts
+  pure (TypeApp t' ts')
+  where
+    goMany :: (MonadChecker m) => Substitution -> [PlumeType] -> m [PlumeType]
+    goMany subst' (x : xs) = do
+      x' <- applySubst subst' x
+      xs' <- goMany subst' xs
+      pure (x' : xs')
+    goMany _ [] = pure []
+applySubst subst (TypeVar ref) = do
+  v <- readIORef ref
+  case v of
+    Link t -> applySubst subst t
+    Unbound _ _ -> pure (TypeVar ref)
+applySubst _ t = pure t
+
 -- | instantiation: replace schematic variables with fresh TVar
 instantiateWithSub :: (MonadChecker m) => Substitution -> PlumeScheme -> m (PlumeType, [PlumeQualifier], Substitution)
 instantiateWithSub s (Forall qvars (gens :=>: ty)) = do
-  sub <- Map.fromList <$> mapM (\x -> (x,) <$> fresh) qvars
+  sub <- Map.fromList <$> mapM (\x -> (x,) <$> fresh) (Set.toList qvars)
   let s' = Map.union sub s
   (gens', s1) <- goGens s' gens
   (res, s2) <- go s1 ty

@@ -6,6 +6,8 @@ import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Type qualified as Pre
 import Plume.TypeChecker.Monad
 import Plume.TypeChecker.Monad.Type qualified as Post
+import Plume.Syntax.Translation.Generics (concatMapM)
+import qualified Data.Set as Set
 
 -- | The `ConvertsTo` typeclass is used to convert a type `a` to a type `b`.
 -- | It is used to convert the types from the CST to the TLIR.
@@ -85,3 +87,13 @@ instance (a `ConvertsTo` b) => [a] `ConvertsTo` [b] where
 
 instance (a `ConvertsTo` b) => Annotation a `ConvertsTo` Annotation b where
   convert (Annotation n ty b) = Annotation n <$> convert ty <*> pure b
+
+instance Pre.PlumeScheme `ConvertsTo` Post.PlumeScheme where
+  convert (Pre.MkScheme gens ty) = do
+    gens' <- concatMapM convert gens
+    ty' <- convert ty
+
+    let qvs = getQVars gens'
+    let preds = removeQVars gens'
+
+    pure $ Post.Forall (Set.fromList qvs) (preds :=>: ty')

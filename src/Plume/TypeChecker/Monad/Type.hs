@@ -3,9 +3,10 @@
 
 module Plume.TypeChecker.Monad.Type where
 
-import GHC.IO
+import GHC.IO hiding (liftIO)
 import GHC.Show
 import Prelude hiding (show)
+import qualified Data.Set as Set
 
 type Level = Int
 
@@ -50,7 +51,7 @@ type PlumeQualified = Qualified PlumeType
 -- | quantified by a list of generic types.
 -- | It is used to check if some type vars escape their scope and to better
 -- | quantify the type of a scheme.
-data PlumeScheme = Forall [QuVar] PlumeQualified
+data PlumeScheme = Forall (Set QuVar) PlumeQualified
   deriving (Eq, Show)
 
 -- | A plume qualifier in its most basic form, it can be a generic type defined
@@ -58,7 +59,7 @@ data PlumeScheme = Forall [QuVar] PlumeQualified
 data PlumeQualifier
   = IsIn [PlumeType] Text
   | IsQVar QuVar
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 -- TYPE SYNONYMS SHORTCUTS
 
@@ -111,7 +112,7 @@ instance Show PlumeType where
   show (TypeVar ref) = do
     let v = unsafePerformIO $ readIORef ref
     case v of
-      Link t -> show t
+      Link t -> "#" <> show t
       Unbound q l -> toString q <> "-" <> show l -- <> " (may be a generic type)"
   show (TypeQuantified q) = toString q
   show (TypeApp (TypeId "cons") [x, _]) = "[" <> show x <> "]"
@@ -136,3 +137,28 @@ instance Ord (IORef TyVar) where
 
 deriving instance Ord TyVar
 deriving instance Ord PlumeType
+
+freeTy :: MonadIO m => PlumeType -> m (Set QuVar)
+freeTy (TypeVar ref) = do
+  v <- liftIO $ readIORef ref
+  case v of
+    Link t -> freeTy t
+    Unbound q _ -> pure $ Set.singleton q
+freeTy (TypeQuantified q) = pure $ Set.singleton q
+freeTy (TypeApp t ts) = do
+  t' <- freeTy t
+  ts' <- Set.unions <$> mapM freeTy ts
+  pure $ t' <> ts'
+freeTy _ = pure mempty
+
+freePs :: MonadIO m => [PlumeQualifier] -> m (Set QuVar)
+freePs = fmap Set.unions . mapM freeP
+  where
+    freeP (IsIn ts _) = Set.unions <$> mapM freeTy ts
+    freeP (IsQVar q) = pure $ Set.singleton q
+
+freeSch :: MonadIO m => PlumeScheme -> m (Set QuVar)
+freeSch (Forall qs (ps :=>: t)) = do
+  ps' <- freePs ps
+  t' <- freeTy t
+  pure $ (t' <> ps') Set.\\ qs
