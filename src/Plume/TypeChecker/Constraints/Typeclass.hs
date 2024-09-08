@@ -11,7 +11,6 @@ import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.TLIR qualified as Post
 import Plume.Syntax.Common.Annotation qualified as Cmm
 import Prelude hiding (gets)
-import Data.Tuple.Utils (thd3)
 import qualified Plume.TypeChecker.Monad as M
 
 findMatchingFunDep :: (MonadChecker m) => PlumeType -> m (Maybe (PlumeType, (Text, PlumeType)))
@@ -33,7 +32,7 @@ discharge ::
   PlumeQualifier ->
   m
     ( [PlumeQualifier],
-      [(PlumeQualifier, Post.Expression)],
+      Map PlumeQualifier Post.Expression,
       [Assumption PlumeType],
       [Post.Expression]
     )
@@ -76,7 +75,9 @@ discharge cenv p = do
       ps'' <- liftIO $ mapM (applyQual newSub) ps'
       p'' <- liftIO $ applyQual newSub p'
 
-      pure (ps'', mp <> [(p'', e)], as, pure e)
+      case Map.lookup p'' mp of
+        Just e' -> pure (ps'', mp, as, e' : ds)
+        Nothing -> pure (ps'', Map.insert p'' e mp, as, e : ds)
     Nothing -> do
       -- Checking for potential matching function dependencies
       case p' of
@@ -114,7 +115,7 @@ dischargeCallback ::
   PlumeQualifier ->
   m
     ( [PlumeQualifier],
-      [(PlumeQualifier, Post.Expression)],
+      Map PlumeQualifier Post.Expression,
       [Assumption PlumeType],
       [Post.Expression]
     )
@@ -125,7 +126,7 @@ dischargeCallback p' p = do
   let paramTy = getDictTypeForPred p'
   pure
     ( pure p,
-      List.singleton (p', Post.EVariable (Cmm.fromText param) (Identity paramTy)),
+      Map.singleton p' (Post.EVariable (Cmm.fromText param) (Identity paramTy)),
       pure $ param :>: paramTy,
       pure $ Post.EVariable (Cmm.fromText param) (Identity paramTy)
     )
@@ -158,7 +159,7 @@ unqualScheme :: PlumeScheme -> PlumeType
 unqualScheme (Forall _ t) = unqualType t
 
 normalizeType2 :: PlumeType -> PlumeType
-normalizeType2 = unqualScheme . normalize . (Forall [] . ([] :=>:))
+normalizeType2 = unqualScheme . normalize . (Forall mempty . ([] :=>:))
 
 normalize :: PlumeScheme -> PlumeScheme
 normalize (Forall qs t) = Forall qs $ normqual t
@@ -285,30 +286,30 @@ instantiateQual s (ps :=>: h) = do
 instantiateTyQual :: (MonadChecker m) => Substitution -> PlumeQualifier -> m (PlumeQualifier, Substitution)
 instantiateTyQual s (IsIn tys name) = do
   (tys', s') <- foldlM (\(ts, s') t -> do
-      (t', _, s'') <- instantiateWithSub s' (Forall [] $ [] :=>: t)
+      (t', _, s'') <- instantiateWithSub s' (Forall mempty $ [] :=>: t)
       return (ts <> [t'], s'')
     ) ([], s) tys
   pure (IsIn tys' name, s')
 instantiateTyQual s (IsQVar name) = pure (IsQVar name, s)
 
-instantiateClass :: (MonadChecker m) => Class -> m Class
-instantiateClass (MkClass qvars quals methods ded) = do
-  sub <- Map.fromList <$> mapM (\c -> (c,) <$> fresh) qvars
-  (quals', s) <- instantiateQual sub quals
-  methods' <- mapM (instantiateWithSub s) methods
+-- instantiateClass :: (MonadChecker m) => Class -> m Class
+-- instantiateClass (MkClass qvars quals methods ded) = do
+--   sub <- Map.fromList <$> mapM (\c -> (c,) <$> fresh) qvars
+--   (quals', s) <- instantiateQual sub quals
+--   methods' <- mapM (instantiateWithSub s) methods
 
-  s' <- liftIO $ composeSubs (map thd3 (Map.elems methods'))
+--   s' <- liftIO $ composeSubs (map thd3 (Map.elems methods'))
 
-  ded' <- case ded of
-    Just (x, y) -> liftIO $ Just <$> do
-      x' <- apply s' x
-      y' <- apply s' y
-      return (x', y')
-    Nothing -> pure Nothing
+--   ded' <- case ded of
+--     Just (x, y) -> liftIO $ Just <$> do
+--       x' <- apply s' x
+--       y' <- apply s' y
+--       return (x', y')
+--     Nothing -> pure Nothing
 
-  let methods'' = fmap (\(t, ps, _) -> Forall [] (ps :=>: t)) methods'
+--   let methods'' = fmap (\(t, ps, _) -> Forall mempty (ps :=>: t)) methods'
 
-  pure (MkClass qvars quals' methods'' ded')
+--   pure (MkClass qvars quals' methods'' ded')
 
 unifiyTyQualWith :: (MonadChecker m) => PlumeQualifier -> PlumeQualifier -> m ()
 unifiyTyQualWith (IsIn ty1 name1) (IsIn ty2 name2) | name1 == name2 = 
@@ -394,3 +395,37 @@ instance Semigroup PlumeType where
   TypeVar a <> TypeVar b | a == b = TypeVar a
   TypeQuantified a <> TypeQuantified b = TypeQuantified (a <> b)
   _ <> _ = error "Mismatched types"
+
+containsTypeVar :: MonadIO m => [PlumeType] -> m Bool
+containsTypeVar [] = pure False
+containsTypeVar (TypeVar tv : ts) = do
+  tv' <- readIORef tv
+  case tv' of
+    Link t -> containsTypeVar (t : ts)
+    Unbound _ _ -> pure True
+containsTypeVar (_ : ts) = containsTypeVar ts
+
+removeTypeVarPS :: [PlumeQualifier] -> IO [PlumeQualifier]
+removeTypeVarPS (IsIn qvs n:qs) = do
+  b <- containsTypeVar qvs
+
+  if b then
+    removeTypeVarPS qs
+  else
+    (IsIn qvs n:) <$> removeTypeVarPS qs
+removeTypeVarPS (q:qs) = (q:) <$> removeTypeVarPS qs
+removeTypeVarPS [] = pure []
+
+removeDuplicatesAssumps' :: [Assumption PlumeType] -> IO [Assumption PlumeType]
+removeDuplicatesAssumps' as' = do
+  as'' <- mapM (\(n :>: t') -> (n :>:) <$> compressPaths t') as'
+  let remainingAssumps' = List.nubBy (\(_ :>: t1) (_ :>: t2) -> t1 == t2) as''
+
+  pure remainingAssumps'
+
+removeDuplicatesPS :: [PlumeQualifier] -> IO [PlumeQualifier]
+removeDuplicatesPS qs = do
+  qs' <- mapM compressQual qs
+  let remainingPs' = List.nub qs'
+
+  pure remainingPs'

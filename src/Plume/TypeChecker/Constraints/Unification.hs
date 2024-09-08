@@ -21,6 +21,13 @@ doesQualUnifiesWith (IsIn t n) (IsIn t' n') | n == n' = do
   and <$> zipWithM doesUnifyWithH' t1 t2
 doesQualUnifiesWith _ _ = pure False
 
+doesQualUnifiesWithE :: PlumeQualifier -> PlumeQualifier -> IO Bool
+doesQualUnifiesWithE (IsIn t n) (IsIn t' n') | n == n' = do
+  t1 <- mapM compressPaths t
+  t2 <- mapM compressPaths t'
+  and <$> zipWithM doesUnifyWithH t1 t2
+doesQualUnifiesWithE _ _ = pure False
+
 unifyAndGetSub :: MonadChecker m => PlumeType -> PlumeType -> m Substitution
 unifyAndGetSub t t' = do
   t1 <- liftIO $ compressPaths t
