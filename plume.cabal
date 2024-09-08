@@ -102,8 +102,10 @@ library
     OverloadedRecordDot
     OverloadedStrings
     TemplateHaskell
+    StrictData
 
-  ghc-options:        -Wall -Wno-orphans
+  ghc-options:        -Wall -Wno-orphans -fwrite-ide-info -hiedir=.hie
+
   build-depends:
     , base
     , binary
