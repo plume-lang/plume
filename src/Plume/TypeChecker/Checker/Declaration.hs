@@ -3,7 +3,6 @@
 module Plume.TypeChecker.Checker.Declaration where
 
 import Data.List qualified as List
-import Data.Map qualified as Map
 import Plume.Syntax.Abstract qualified as Pre
 import Plume.Syntax.Common.Annotation
 import Plume.Syntax.Common.Type (getGenericName)
@@ -13,11 +12,11 @@ import Plume.TypeChecker.Constraints.Solver
 import Plume.TypeChecker.Constraints.Typeclass
 import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.Checker.Extension
-import Plume.TypeChecker.Monad.Free (substituteVar)
 import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (gets, local)
 import Plume.Compiler.Desugaring.Modules.Switch (fst4, snd4, thd4, fth4)
+import qualified Data.Set as Set
 
 synthDecl :: Bool -> Infer -> Infer
 synthDecl
@@ -28,6 +27,7 @@ synthDecl
     convertedTy :: PlumeType <- convert ty
 
     let qvars = getQVars convertedGenerics
+        _  = removeQVars convertedGenerics
 
     -- Mutable variables should not have generics as this is unsound
     when (isMut && not (null convertedGenerics)) $ do
@@ -56,7 +56,14 @@ synthDecl
     -- to the environment
     let convertedTy' = mut convertedTy
 
-    let scheme = Forall qvars $ convertedGenerics :=>: convertedTy'
+    scheme <- case convertedTy' of
+      TypeVar tv -> do
+        tv' <- readIORef tv
+        case tv' of
+          Link t -> pure $ Forall (Set.fromList qvars) $ convertedGenerics :=>: t
+          Unbound _ _ -> pure $ Forall mempty ([] :=>: convertedTy')
+      _ -> pure $ Forall (Set.fromList qvars) $ convertedGenerics :=>: convertedTy'
+
     insertEnv @"typeEnv" name.identifier scheme
 
     enterLevel
@@ -80,71 +87,35 @@ synthDecl
       return (h, ty', ps, scheme)
     else do
       cenv <- gets (extendEnv . environment)
+      ps' <- liftIO $ removeTypeVarPS ps >>= removeDuplicatesPS
+      _ps' <- removeDuplicatesPSs ps'
+      zs <- traverse (discharge cenv) (reverse _ps')
+    
+      let (ps'', m, as, _) = mconcat zs
 
-      -- Removing common superclasses between user-given extensions and found
-      -- extensions in the inferred expression.
-      (__ps, scs) <- do
-          p2 <- removeSuperclasses ps convertedGenerics
-          return (List.nub p2, List.nub convertedGenerics)
+      ps''' <- liftIO $ removeTypeVarPS ps'' >>= removeDuplicatesPS
+      let (tps :=>: t) = List.nub ps''' :=>: ty'
 
-      -- Getting all the needed qualifiers to qualify further the expression
-      res' <- traverse (discharge cenv) ps
-      let (_ps, m2, as, _) = List.unzip4 res'
-      let ps' = concatMap removeQVars _ps
-
-      _ps'' <- mapM (liftIO . compressQual) ps'
-      ps'' <- liftIO . mapM compressQual =<< removeSameQualifiers qvars _ps''
-
-      let ty''@(_ :=>: t) = List.nub ps'' :=>: ty'
-
-      -- Compressing types in the generated map
-      m' <- liftIO $ mapM (firstM compressQual) $ List.nub $ concat m2
-
-      -- Operating black magic to get the final assumptions
-      let names = getMapNames m'
-      let as' = keepAssumpWithName (concat as) names
-      (sub, as'') <- removeDuplicatesAssumps as'
-      (remainingSub, _) <- removeDuplicatesAssumps as''
-      as''' <- removeSuperclassAssumps as'' scs
-
-      -- Getting the final expressions
-      let finalExprs = map (second getAllElements) m'
-      let finalExprs' = concatMap (\(_, e) -> map (\case
-              Post.EVariable n t' -> (n, t')
-              _ -> error "Not a variable"
-            ) e) finalExprs
-
-      -- Getting the duplicates assumptions in order to remove and resolve
-      -- duplicatas.
-      let finalExprs'' = map (\(MkIdentifier n _, Identity t') -> (n, t')) finalExprs'
-      sub' <- unify finalExprs''
-      let sub'' = Map.toList sub' <> sub <> remainingSub
-
-      -- Running the expression reader because we're toplevel or there are 
-      -- used-given generics.
       pos <- fetchPosition
-      oldScs <- readIORef superclasses
-      writeIORef superclasses scs
       checkSub <- gets substitution
-      h' <- liftIO $ runReaderT h $ getExpr pos checkSub m'
-      writeIORef superclasses oldScs
+      h' <- liftIO $ runReaderT h $ getExpr pos checkSub m
 
-      -- Substituting the duplicated assumptions in the expression
-      let h'' = List.foldl substituteVar h' sub''
-      
-      -- Checking if there are some remaining assumptions in the scope.
-      unlessM (allIsSuperclass as''' scs) $ throw (UnresolvedTypeVariable as''')
-      
+      remainingAssumps <- removeTypeVars as
+
+      remainingAssumps' <- liftIO $ removeDuplicatesAssumps' remainingAssumps
+
       -- Generating new types and expressions based on assumptions
-      let args = map (\(n :>: t') -> fromText n :@: Identity t') as''
-      let tys' = map (\(_ :>: t') -> t') as''
+      let args = map (\(n :>: t') -> fromText n :@: Identity t') remainingAssumps'
+      let tys' = map (\(_ :>: t') -> t') remainingAssumps'
     
       cTy' <- liftIO $ compressPaths ty'
 
-      let clos = if null args then h'' else Post.EClosure args (Identity cTy') h'' False
+      let clos = if null args then h' else Post.EClosure args (Identity cTy') h' False
       let closTy = if null args then t else tys' :->: t
 
-      let scheme' = Forall qvars ty''
+      tps' <- liftIO $ removeTypeVarPS tps >>= removeDuplicatesPS
+
+      let scheme' = Forall (Set.fromList qvars) (tps' :=>: t)
 
       return (pure clos, closTy, [], scheme')
 

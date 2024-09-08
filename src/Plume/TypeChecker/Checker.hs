@@ -24,17 +24,12 @@ import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (gets, local, modify)
 import Data.List (unzip4)
+import qualified Data.Set as Set
 
 synthesize :: (MonadChecker m) => Pre.Expression -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression, Bool)
 
 -- | Some basic and primitive expressions
 synthesize (Pre.ELocated expr pos) = withPosition pos $ synthesize expr
-
-{-  
- -  x : (β ⇒ σ) ∈ Γ
- -  ---------------
- -  Γ ⊦ x : (β ⇒ σ)
- -}
 synthesize (Pre.EVariable name _) = do
   -- Checking if the variable is a value
   searchEnv @"typeEnv" name.identifier >>= \case
@@ -84,7 +79,7 @@ synthesize (Pre.EList xs) = do
   pure (TList tv, concat pss, Post.EList <$> sequence xs', or isAsync)
 synthesize (Pre.EVariableDeclare gens name ty) = do
   gens' <- concatMapM convert gens
-  let qvars = getQVars gens'
+  let qvars = Set.fromList $ getQVars gens'
   let quals = removeQVars gens'
   ty' <- convert ty
 
@@ -130,7 +125,7 @@ synthesizeToplevel e@(Pre.EDeclaration _ _ body _) = do
   let (ps', m, as, _) = mconcat zs
   (_, as') <- removeDuplicatesAssumps as
   -- ps'' <- removeDuplicatesQuals ps'
-  let t'' = Forall [] $ List.nub ps' :=>: ty
+  let t'' = Forall mempty $ List.nub ps' :=>: ty
 
   pos <- fetchPosition
   checkSub <- gets substitution
@@ -150,7 +145,7 @@ synthesizeToplevel e = do
   let (ps', m, as, _) = mconcat zs
   (_, as') <- removeDuplicatesAssumps as
   -- ps'' <- removeDuplicatesQuals ps'
-  let t'' = Forall [] $ List.nub ps' :=>: ty
+  let t'' = Forall mempty $ List.nub ps' :=>: ty
 
   pos <- fetchPosition
   checkSub <- gets substitution

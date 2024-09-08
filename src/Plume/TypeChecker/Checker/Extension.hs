@@ -16,7 +16,6 @@ import Plume.TypeChecker.Constraints.Solver
 import Plume.TypeChecker.Constraints.Typeclass
 import Plume.TypeChecker.Constraints.Unification
 import Plume.TypeChecker.Monad.Conversion
-import Plume.TypeChecker.Monad.Free (substituteVar)
 import Plume.TypeChecker.Monad.Type qualified as Post
 import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (gets, local)
@@ -56,6 +55,23 @@ unify (x : xs) = do
   let s' = mconcat s
   s'' <- unify xs
   pure $ s' <> s''
+
+combineAssumps :: [Assumption PlumeType] -> [Assumption PlumeType] -> [Assumption PlumeType]
+combineAssumps [] xs = xs
+combineAssumps xs [] = xs
+combineAssumps (x@(_ :>: t) : xs) ys = do
+  let found = findMatching t ys
+
+  case found of
+    Nothing -> x : combineAssumps xs ys
+    Just x' -> x : combineAssumps xs (filter (/= x') ys)
+
+  where
+    findMatching :: PlumeType -> [Assumption PlumeType] -> Maybe (Assumption PlumeType)
+    findMatching _ [] = Nothing
+    findMatching t1 (x'@(_ :>: t2) : xs')
+      | t1 == t2 = Just x'
+      | otherwise = findMatching t xs'
 
 getVarName :: Post.Expression -> Text
 getVarName (Post.EVariable n _) = n.identifier
@@ -101,6 +117,48 @@ isInstanceAlreadyDefined p = do
     Just (IsIn ty _, _) -> return (Just ty)
     _ -> return Nothing
 
+applyQualifier :: MonadChecker m => Substitution -> PlumeQualifier -> m PlumeQualifier
+applyQualifier subst (IsIn tys name) = do
+  tys' <- mapM (applySubst subst) tys
+  pure $ IsIn tys' name
+applyQualifier _ (IsQVar qv) = pure $ IsQVar qv
+
+applyQualified :: MonadChecker m => Substitution -> Qualified PlumeQualifier -> m (Qualified PlumeQualifier)
+applyQualified subst (ps :=>: t) = do
+  ps' <- mapM (applyQualifier subst) ps
+  t' <- applyQualifier subst t
+  pure $ ps' :=>: t'
+
+applyScheme :: MonadChecker m => Substitution -> PlumeScheme -> m PlumeScheme
+applyScheme subst (Forall qv (ps :=>: t)) = do
+  ps' <- mapM (applyQualifier subst) ps
+  t' <- applySubst subst t
+
+  let substQVS = Map.keys subst
+  let qv' = Set.difference qv (Set.fromList substQVS)
+
+  pure $ Forall qv' (ps' :=>: t')
+
+instantiateClass :: MonadChecker m => Class -> m Class
+instantiateClass (MkClass qvs pred' members _) = do
+  qvs' <- mapM (const fresh) qvs
+  let subst = Map.fromList $ zip qvs qvs'
+
+  pred'' <- applyQualified subst pred'
+  members' <- mapM (applyScheme subst) members
+
+  pure $ MkClass [] pred'' members' Nothing
+
+removeDuplicatesPSs :: MonadChecker m => [PlumeQualifier] -> m [PlumeQualifier]
+removeDuplicatesPSs [] = pure []
+removeDuplicatesPSs (p@(IsIn _ n) : xs) = do
+  findClass n >>= \case
+    MkClass _ (preds :=>: _) _ _ -> do
+      let preds' = Set.fromList ( preds <> xs)
+
+      (p:) <$> removeDuplicatesPSs (Set.toList preds')
+removeDuplicatesPSs (x : xs) = (x:) <$> removeDuplicatesPSs xs
+
 synthExt :: Infer -> Infer
 synthExt
   infer
@@ -123,27 +181,33 @@ synthExt
       Just ty' -> throw $ AlreadyDefinedInstance tcName.identifier ty'
       _ -> throw $ CompilerError "Instance already defined"
 
+    tys' <- mapM convert tcTy
+
+    let inst = IsIn tys' tcName.identifier
+    
     -- Pre-generating an instance dictionary only based on types
-    cls@(MkClass _ _ meths ded) <- findClass tcName.identifier
+    cls@(MkClass _ _ meths ded) <- findClass tcName.identifier >>= instantiateClass
+
+    case cls of
+      MkClass _ (_ :=>: inst') _ _ -> unifiyTyQualWith inst inst'
 
     fdSub <- case cls of
       MkClass qs' quals methods' _ -> do
         case quals of
           _  :=>: t -> do
-
             b <- liftIO $ doesQualUnifiesWith t instH
             unless b $ throw $ CompilerError "Instance does not match the class"
 
-        let finalMethods = fmap (\(Forall qs (quals' :=>: ty')) -> Forall (qs <> qs') $ (gens <> quals') :=>: ty') methods'
+        let finalMethods = fmap (\(Forall qs (quals' :=>: ty')) -> Forall (qs <> Set.fromList qs') $ (gens <> quals') :=>: ty') methods'
 
         let quals' = case quals of xs :=>: t -> (xs <> gens) :=>: t
-
-        let preInst = MkInstance qvars quals' mempty finalMethods
+        
+        let preInst :: Instance Post.Expression PlumeQualifier = MkInstance qvars quals' mempty finalMethods
 
         let qs'' = TypeQuantified <$> qs'
         sub <- liftIO . composeSubs =<< zipWithM unifyAndGetSub qs'' ty
 
-        addClassInstance (instH, void preInst)
+        addClassInstance (inst, void preInst)
 
         pure sub
 
@@ -165,9 +229,8 @@ synthExt
         }
       _ -> pure ()
 
-    let schs = Map.map (\(Forall qs (quals :=>: ty')) -> Forall (qs <> qvars) ((quals <> gens) :=>: ty')) meths
-
-    assocs <- assocSchemes (Map.toList schs) methods
+    -- let meths' = Map.map (\(Forall qs (quals :=>: ty')) -> Forall qs ((inst:quals) :=>: ty')) meths
+    assocs <- assocSchemes (Map.toList meths) methods
 
     -- Typechecking the instance methods
     exprs <- traverse (uncurry $ extMemberToDeclaration infer) assocs
@@ -181,93 +244,58 @@ synthExt
     -- Would compile to: show<[a]> = \show<a> -> methods..
     res'' <- traverse (discharge cenv) gens
     let (_, m1, ass, _) = unzip4 res''
-    m1' <- liftIO . mapM (firstM compressQual) . List.nub $ concat m1
+    let m1' = Map.unions m1
     let ass' = concat ass
-    let args' = map (\(n :>: t') -> Cmm.fromText n :@: Identity t') ass'
-    let tys'' = map (\(_ :>: t') -> t') ass'
+    ass'' <- removeTypeVars ass'
+    
+    let args' = map (\(n :>: t') -> Cmm.fromText n :@: Identity t') ass''
+    let tys'' = map (\(_ :>: t') -> t') ass''
 
     res' <- forM exprs $ \(ty', ps, h, name) -> do
-      -- Generating the right local method constraints instances, for instance
-      -- if `test` method in `test<a>` class is of the form:
-      --   test :: show<a> => a -> int
-      -- then the show<a> constraint should be transformed into a dictionary
-      -- lambda argument `show<a>`, giving a method:
-      --   test :: show<a> -> a -> int
-      --
-      -- Instance superclases should not interfere with method-local instances
-      -- to avoid duplicate instances.
+      ps' <- liftIO $ removeTypeVarPS ps >>= removeDuplicatesPS
+      _ps' <- (List.\\ gens) <$> removeDuplicatesPSs ps'
+      zs <- traverse (discharge cenv) _ps'
+      
+      let (ps'', m, as, _) = mconcat zs
 
-      -- Removing common superclasses between user-given extensions and found
-      -- extensions in the inferred expression.
-      (__ps, scs) <- case Map.lookup name schs of
-        Just (Forall _ (ps2 :=>: _)) -> do
-          p1 <- removeSuperclasses ps ps2
-          p2 <- removeSuperclasses ps gens
-
-          return (List.nub $ p1 <> p2, List.nub $ ps2 <> gens)
-        Nothing -> pure ([], [])
-
-      -- Getting all the needed qualifiers to qualify further the expression
-      res' <- traverse (discharge cenv) ps
-      let (_ps, m2, as, _) = unzip4 res'
-      let ps' = concatMap removeQVars _ps
+      ps''' <- liftIO $ removeTypeVarPS ps'' >>= removeDuplicatesPS
 
       -- ps'' <- removeDuplicatesQuals ps'
-      let ty''@(_ :=>: t) = List.nub ps' :=>: ty'
+      let t''@(_ :=>: t) = List.nub ps''' :=>: ty'
 
-      -- Compressing types in the generated map
-      m' <- liftIO $ mapM (firstM compressQual) $ List.nub $ concat m2
-      let fstM1' = map fst m1'
-      let m'' = filter ((`isQualNotDefined` fstM1') . fst) m'
-      let finalM = m'' <> m1'
-
-      -- Operating black magic to get the final assumptions
-      let names = getMapNames m''
-      let as' = keepAssumpWithName (concat as) names
-      (sub, as'') <- removeDuplicatesAssumps as'
-      (remainingSub, _) <- removeDuplicatesAssumps (as'' <> ass')
-      as''' <- removeSuperclassAssumps as'' scs
-
-      -- Getting the final expressions
-      let finalExprs = map (second getAllElements) finalM
-      let finalExprs' = concatMap (\(_, e) -> map (\case
-              Post.EVariable n t' -> (n, t')
-              _ -> error "Not a variable"
-            ) e) finalExprs
-
-      -- Getting the duplicates assumptions in order to remove and resolve
-      -- duplicatas.
-      let finalExprs'' = map (\(i, Identity t') -> (i.identifier, t')) finalExprs'
-      sub3 <- unify finalExprs''
-      let sub4 = Map.toList sub3 <> sub <> remainingSub
-
-      -- Running the expression reader because we're toplevel or there are 
-      -- used-given generics.
       pos <- fetchPosition
-      oldScs <- readIORef superclasses
-      writeIORef superclasses scs
-
       checkSub <- gets substitution
 
-      h' <- liftIO $ runReaderT h $ getExpr pos checkSub finalM
-      writeIORef superclasses oldScs
+      h' <- liftIO $ runReaderT h $ getExpr pos checkSub (m1' <> m)
+    
+      let removeDuplicate :: [PlumeType] -> [Assumption PlumeType] -> [Assumption PlumeType]
+          removeDuplicate xs (a@(_ :>: t'):xs') 
+            | t' `elem` xs = removeDuplicate xs xs'
+            | otherwise = a : removeDuplicate xs xs'
+          removeDuplicate _ [] = []
 
-      -- Substituting the duplicated assumptions in the expression
-      let h'' = List.foldl substituteVar h' sub4
+      let tmpAssumps = map getDictTypeForPred gens
+          newAssumps = removeDuplicate tmpAssumps as
 
-      -- Checking if there are some remaining assumptions in the scope.
-      unlessM (allIsSuperclass as''' scs) $ throw (UnresolvedTypeVariable as''')
+      as'' <- removeTypeVars newAssumps
+
+      unless (null as'') $ do
+        throw (UnresolvedTypeVariable as'')
+
+      remainingAssumps <- removeTypeVars as
+
+      remainingAssumps' <- liftIO $ removeDuplicatesAssumps' remainingAssumps
 
       -- Generating new types and expressions based on assumptions
-      let args = map (\(n :>: t') -> Cmm.fromText n :@: Identity t') as'''
-      let tys' = map (\(_ :>: t') -> t') as'''
+      let args = map (\(n :>: t') -> Cmm.fromText n :@: Identity t') remainingAssumps'
+      let tys''' = map (\(_ :>: t') -> t') remainingAssumps'
 
       cTy' <- liftIO $ compressPaths ty'
 
-      let clos = if null args then h'' else Post.EClosure args (Identity cTy') h'' False
-      let closTy = if null args then t else tys' :->: t
+      let clos = if null args then h' else Post.EClosure args (Identity cTy') h' False
+      let closTy = if null args then t else tys''' :->: t
 
-      return ((Map.singleton name (Forall qvars ty''), closTy), Map.singleton name clos)
+      return ((Map.singleton name (Forall (Set.fromList qvars) t''), closTy), Map.singleton name clos)
 
     let (quals, exprs') = unzip res'
     let (funTys, _) = unzip quals
@@ -293,8 +321,8 @@ synthExt
       throw $ UnknownExtensionMethods tcName.identifier unknown
 
     -- Creating the new instance to insert it in the extend environment
-    let inst = MkInstance qvars pred' dict dictFunTys
-    let cls'' = (instH, void inst)
+    let inst' = MkInstance qvars pred' dict dictFunTys
+    let cls'' = (instH, void inst')
     addClassInstance cls''
 
     -- Generating the instance dictionary by sorting the methods by name
@@ -316,10 +344,10 @@ synthExt
     pure (TUnit, [], pure (Post.EDeclaration [] (Annotation (Cmm.fromText name) (Identity funTy) False) dictE Nothing), False)
 synthExt _ _ = throw $ CompilerError "Only type extensions are supported"
 
-getExpr :: CST.Position -> M.Substitution -> [(PlumeQualifier, Post.Expression)] -> PlumeQualifier -> Post.Expression
+getExpr :: CST.Position -> M.Substitution -> Map PlumeQualifier Post.Expression -> PlumeQualifier -> Post.Expression
 getExpr pos sub xs p = do
   let p' = unsafePerformIO (applyQual sub =<< compressQual p)
-  case List.lookup p' xs of
+  case Map.lookup p' xs of
     Just x -> x
     Nothing -> unsafePerformIO $ do
       interpretError (pos, CompilerError $ "getExpr: " <> show p' <> " not found in " <> show xs)
@@ -355,7 +383,10 @@ extMemberToDeclaration infer sch (Pre.ExtDeclaration gens (Annotation name ty _)
   ty' `unifiesWith` bTy
 
   mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) gens
-  pure (bTy, ps', b, name.identifier)
+
+  ps'' <- removeTypeVarsQ ps'
+
+  pure (bTy, ps'', b, name.identifier)
 
 -- | Checking if an interface is a included in a list of interfaces
 isSuperClass :: MonadIO m => PlumeQualifier -> [PlumeQualifier] -> m Bool
@@ -379,3 +410,31 @@ allIsSuperclass (_ :>: TypeApp (TypeId tc) ty : xs) ps = do
       if b then allIsSuperclass xs ps else pure False
     _ -> allIsSuperclass xs ps
 allIsSuperclass (_ : xs) ps = allIsSuperclass xs ps
+
+removeTypeVars :: MonadIO m => [Assumption PlumeType] -> m [Assumption PlumeType]
+removeTypeVars [] = pure []
+removeTypeVars ((x' :>: TypeApp _ [TypeVar tv]) : xs) = do
+  v <- liftIO $ readIORef tv
+  case v of
+    Link t -> removeTypeVars ((x' :>: t) : xs)
+    _ -> removeTypeVars xs
+removeTypeVars (x : xs) = (x:) <$> removeTypeVars xs
+
+removeTypeVarsQ :: MonadIO m => [PlumeQualifier] -> m [PlumeQualifier]
+removeTypeVarsQ [] = pure []
+removeTypeVarsQ (IsIn ts n : xs) = do
+  b <- anyM containTV ts
+
+  if b then removeTypeVarsQ xs else (IsIn ts n :) <$> removeTypeVarsQ xs
+  where
+    containTV :: MonadIO m => PlumeType -> m Bool
+    containTV (TypeVar tv) = do
+      v <- liftIO $ readIORef tv
+      case v of
+        Link t -> containTV t
+        _ -> pure True
+    containTV (TypeApp t ts') = do
+      b <- containTV t
+      if b then anyM containTV ts' else pure False
+    containTV _ = pure False
+removeTypeVarsQ (x : xs) = (x:) <$> removeTypeVarsQ xs

@@ -158,7 +158,7 @@ synthPattern (Pre.PVariable name _) = do
       return
         ( ty
         , Post.PVariable name (Identity ty)
-        , Map.singleton name (Forall [] $ [] :=>: ty)
+        , Map.singleton name (Forall mempty $ [] :=>: ty)
         )
 synthPattern (Pre.PLiteral l) = do
   let (ty, l') = typeOfLiteral l
@@ -190,7 +190,7 @@ synthPattern (Pre.PSlice n _) = do
   return
     ( TList tv
     , Post.PVariable n (Identity $ TList tv)
-    , Map.singleton n (Forall [] $ [] :=>: TList tv)
+    , Map.singleton n (Forall mempty $ [] :=>: TList tv)
     )
 synthPattern _ = throw $ CompilerError "Invalid pattern"
 

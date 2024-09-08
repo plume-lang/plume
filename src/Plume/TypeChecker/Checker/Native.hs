@@ -6,6 +6,7 @@ import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (gets)
+import qualified Data.Set as Set
 
 synthNative :: Infer
 synthNative (Pre.ENativeFunction fp name generics ty st isStd) = do
@@ -16,7 +17,7 @@ synthNative (Pre.ENativeFunction fp name generics ty st isStd) = do
 
   gens :: [QuVar] <- convert generics
   convertedTy <- convert ty
-  let scheme = Forall gens $ [] :=>: convertedTy
+  let scheme = Forall (Set.fromList gens) $ [] :=>: convertedTy
 
   insertEnvWith @"typeEnv" (<>) $ Map.singleton name scheme
   pos <- fetchPosition

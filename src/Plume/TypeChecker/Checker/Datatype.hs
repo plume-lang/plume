@@ -8,6 +8,7 @@ import Plume.Syntax.Concrete.Expression (TypeConstructor (..))
 import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
+import qualified Data.Set as Set
 
 -- | Metadata for the data types
 {-# NOINLINE datatypes #-}
@@ -22,7 +23,7 @@ datatypes =
       )
 
 boolean :: Map Text PlumeScheme
-boolean = M.fromList [("true", Forall [] $ [] :=>: TBool), ("false", Forall [] $ [] :=>: TBool)]
+boolean = M.fromList [("true", Forall mempty $ [] :=>: TBool), ("false", Forall mempty $ [] :=>: TBool)]
 
 tA :: PlumeType
 tA = TypeQuantified "A"
@@ -30,8 +31,8 @@ tA = TypeQuantified "A"
 list :: Map Text PlumeScheme
 list =
   M.fromList
-    [ ("nil", Forall ["A"] $ [] :=>: TList tA),
-      ("cons", Forall ["A"] $ [] :=>: ([tA, TList tA] :->: TList tA))
+    [ ("nil", Forall (Set.singleton "A") $ [] :=>: TList tA),
+      ("cons", Forall (Set.singleton "A") $ [] :=>: ([tA, TList tA] :->: TList tA))
     ]
 
 synthDataType :: Infer
@@ -73,7 +74,7 @@ synthCons ::
   TypeConstructor Pre.PlumeType ->
   m (TypeConstructor PlumeType, Map Text PlumeScheme)
 synthCons qvars (_, header) (TVariable name) = do
-  let scheme = Forall qvars $ [] :=>: header
+  let scheme = Forall (Set.fromList qvars) $ [] :=>: header
   insertEnv @"datatypeEnv" name scheme
 
   let dataType = M.singleton name scheme
@@ -82,7 +83,7 @@ synthCons qvars (_, header) (TVariable name) = do
 synthCons qvars (_, header) (TConstructor name args) = do
   args' <- mapM convert args
   let ty = args' :->: header
-  let scheme = Forall qvars $ [] :=>: ty
+  let scheme = Forall (Set.fromList qvars) $ [] :=>: ty
   insertEnv @"datatypeEnv" name scheme
 
   let dataType = M.singleton name scheme

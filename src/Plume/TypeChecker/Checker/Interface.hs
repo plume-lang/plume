@@ -8,6 +8,7 @@ import Plume.Syntax.Translation.Generics (concatMapM)
 import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
+import qualified Data.Set as Set
 
 synthInterface :: Infer -> Infer
 synthInterface _ (Pre.EInterface (Annotation name tys _) generics methods deduction) = do
@@ -24,13 +25,13 @@ synthInterface _ (Pre.EInterface (Annotation name tys _) generics methods deduct
 
   let inst = IsIn tys' name.identifier
   methods' <- mapM convertMethod methods
-  let methods'' = fmap (\(n, Forall qv (ps :=>: t)) -> (n, Forall (qv <> qvars) $ (inst : ps) :=>: t)) methods'
+  let methods'' = fmap (\(n, Forall qv (ps :=>: t)) -> (n, Forall (qv <> Set.fromList qvars) $ (inst : ps) :=>: t)) methods'
 
   mapM_ (uncurry $ insertEnv @"typeEnv") methods''
 
   let pred' = gens :=>: inst
 
-  let methodsBis = map (\(n, Forall qv t) -> (n, Forall (qv <> qvars) t)) methods'
+  let methodsBis = map (\(n, Forall qv t) -> (n, Forall (qv <> Set.fromList qvars) t)) methods'
 
   let cls = MkClass qvars pred' (Map.fromList methodsBis) deduction''
 
@@ -67,7 +68,7 @@ convertMethod (Annotation name (Pre.MkScheme gens ty) _) = do
 
   let qvars = getQVars gens'
   ty' <- convert ty
-  pure (name.identifier, Forall qvars $ gens' :=>: ty')
+  pure (name.identifier, Forall (Set.fromList qvars) $ gens' :=>: ty')
 
 buildInterface :: (MonadChecker m) => Text -> [Pre.PlumeType] -> m PlumeType
 buildInterface name [] = pure (TypeId name)

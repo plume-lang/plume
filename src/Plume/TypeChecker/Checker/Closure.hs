@@ -54,7 +54,7 @@ synthClosure _ _ = throw $ CompilerError "Only closures are supported"
 -- | arguments.
 createEnvFromAnnotations :: [Annotation PlumeType] -> Map Text PlumeScheme
 createEnvFromAnnotations xs =
-  Map.fromList $ map (\(Annotation n ty _) -> (n.identifier, Forall [] ([] :=>: ty))) xs
+  Map.fromList $ map (\(Annotation n ty _) -> (n.identifier, Forall mempty ([] :=>: ty))) xs
 
 createAsyncType :: PlumeType -> PlumeType 
 createAsyncType (TAsync t) = TAsync t
