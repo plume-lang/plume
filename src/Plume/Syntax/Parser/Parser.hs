@@ -530,16 +530,18 @@ sFunction = do
   void $ L.reserved "fn"
   name <- L.identifier <|> L.parens L.operator
   generics <- P.option [] $ L.angles $ Typ.parseGeneric `P.sepBy` L.comma
-  args <- L.parens $ mutArg `P.sepBy` L.comma
-  retTy <- P.optional $ L.symbol ":" *> Typ.tType
+  args <- L.parens $ mutArg' `P.sepBy` L.comma
+  retTy <- L.symbol ":" *> Typ.tType
   body <- L.symbol "=>" *> parseExpression <|> eBlock
 
-  let cl = CST.EClosure args retTy body False
+  let cl = CST.EClosure (map (fmap Just) args) (Just retTy) body False
+
+  let funTy = map (.annotationValue) args Typ.:->: retTy
 
   return $
     CST.EDeclaration
       generics
-      (Cmm.fromText name Cmm.:@: Nothing)
+      (Cmm.fromText name Cmm.:@: Just funTy)
       cl
       Nothing
 
@@ -901,7 +903,7 @@ parseToplevel =
       , tRequire
       , tType
       , tCustomOperator
-      , P.try tExtension
+      , tExtension
       , tMacro
       , pure <$> parseStatement
       ]
