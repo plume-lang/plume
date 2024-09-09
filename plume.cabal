@@ -158,6 +158,25 @@ test-suite plume-test
   hs-source-dirs:   test
   default-language: GHC2021
   ghc-options:      -Wall
+
+  other-modules:
+    Internal.Parser
+
+  default-extensions:
+    DataKinds
+    OverloadedRecordDot
+    OverloadedStrings
+    TemplateHaskell
+    StrictData
+
   build-depends:
     , base
     , plume
+    , hspec
+    , hspec-megaparsec
+    , relude
+
+  mixins:
+    base hiding (Prelude),
+    relude (Relude as Prelude),
+    relude
