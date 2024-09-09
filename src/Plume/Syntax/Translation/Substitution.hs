@@ -1,6 +1,5 @@
 module Plume.Syntax.Translation.Substitution where
 
-import Data.Foldable
 import Data.Set qualified as S
 import Plume.Syntax.Abstract qualified as AST
 import Plume.Syntax.Common qualified as AST hiding (Pattern)
