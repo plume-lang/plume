@@ -21,7 +21,7 @@ options = MkOptions
     <> metavar "EXT_TYPE"
     <> help "The type of the output file (native, or js)"
     <> showDefault
-    <> value "native"
+    <> value "js"
     )
   <*> optional (strOption
     ( long "output"
