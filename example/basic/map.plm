@@ -1,0 +1,9 @@
+m: Map<str, int> = [("a", 1), ("b", 2), ("c", 3)]
+
+println(m)
+
+m = m.insert("d", 4)
+
+println(m)
+
+println(m.lookup("a"))
