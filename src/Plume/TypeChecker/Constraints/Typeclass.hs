@@ -54,7 +54,7 @@ discharge cenv p = do
       -- Removing already deduced superclasses, e.g. boolean_algebra A is a
       -- superclass of equality A, so if both are presents, we can remove 
       -- boolean_algebra qualifier.
-      let ps = List.nub $ removeQVars _ps'
+      let ps = removeQVars _ps'
       _ps'' <- removeSuperclassesQuals ps
 
       -- Recursively discharging environment in order to get smaller pieces of
@@ -76,8 +76,8 @@ discharge cenv p = do
       p'' <- liftIO $ applyQual newSub p'
 
       case Map.lookup p'' mp of
-        Just e' -> pure (ps'', mp, as, e' : ds)
-        Nothing -> pure (ps'', Map.insert p'' e mp, as, e : ds)
+        Just e' -> pure (ps'', mp, as, [e'])
+        Nothing -> pure (ps'', Map.insert p'' e mp, as, [e])
     Nothing -> do
       -- Checking for potential matching function dependencies
       case p' of
