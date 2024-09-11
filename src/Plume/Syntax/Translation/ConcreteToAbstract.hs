@@ -166,7 +166,15 @@ concreteToAbstract (CST.ENativeFunction fp n gens t libTy _) = do
         | otherwise = 
             (Nothing, fromString $ basePath </> toString fp -<.> sharedLibExt libTy)
 
-  newPath <- case sc of
+  let isPathPrefix :: FilePath -> FilePath -> Bool
+      isPathPrefix p1 p2 = normalise p1 `List.isPrefixOf` normalise p2
+
+  pMod <- liftIO $ readIORef modulePath
+  sc' <- case pMod of
+    Just p | (p </> "modules") `isPathPrefix` toString path -> return (Just "module")
+    _ -> return sc
+
+  newPath <- case sc' of
     Just "standard" -> do 
       p <- liftIO $ readIORef stdPath
       case p of
@@ -183,7 +191,7 @@ concreteToAbstract (CST.ENativeFunction fp n gens t libTy _) = do
         Nothing -> return path
     _ -> return path
 
-  transRet . Right $ AST.ENativeFunction newPath n gens t' libTy (sc <|> ty)
+  transRet . Right $ AST.ENativeFunction newPath n gens t' libTy (sc' <|> ty)
 concreteToAbstract (CST.EList es) = do
   -- Lists can be composed of spread elements, so we need to flatten
   -- the list of expressions into a single expression.
