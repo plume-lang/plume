@@ -175,23 +175,23 @@ eIf = do
 
   pure $ CST.EConditionBranch cond thenBlock elseBlock
 
-eIfThenMacro :: P.Parser CST.Expression
-eIfThenMacro = do
-  void $ L.reserved "#if"
-  cond <- parseExpression
+-- eIfThenMacro :: P.Parser CST.Expression
+-- eIfThenMacro = do
+--   void $ L.reserved "#if"
+--   cond <- parseExpression
 
-  CST.EMacroIf cond <$> eBlockMacro
-  where eBlockMacro = CST.EBlock . concat <$> L.braces (P.many parseToplevel)
+--   CST.EMacroIf cond <$> eBlockMacro
+--   where eBlockMacro = CST.EBlock . concat <$> L.braces (P.many parseToplevel)
 
-eIfThenElseMacro :: P.Parser CST.Expression
-eIfThenElseMacro = do
-  void $ L.reserved "#if"
-  cond <- parseExpression
-  thenBlock <- eBlockMacro
-  void $ L.reserved "#else"
+-- eIfThenElseMacro :: P.Parser CST.Expression
+-- eIfThenElseMacro = do
+--   void $ L.reserved "#if"
+--   cond <- parseExpression
+--   thenBlock <- eBlockMacro
+--   void $ L.reserved "#else"
 
-  CST.EMacroIfElse cond thenBlock <$> eBlockMacro
-  where eBlockMacro = CST.EBlock . concat <$> L.braces (P.many parseToplevel)
+--   CST.EMacroIfElse cond thenBlock <$> eBlockMacro
+--   where eBlockMacro = CST.EBlock . concat <$> L.braces (P.many parseToplevel)
 
 -- | Parses a switch expression
 -- | A switch expression is a conditional expression that may have multiple
@@ -234,38 +234,6 @@ eAwait :: P.Parser CST.Expression
 eAwait = do
   void $ L.reserved "await"
   CST.EAwait <$> parseExpression
-
--- | Parses a macro expression
--- | A macro expression is a special kind of expression that is used to
--- | reference a macro variable or a macro function.
--- | Both are prefixed by the `#` symbol.
--- |
--- | SYNTAX:
--- |  - #variable
--- |  - #function(arg1, arg2, ...)
--- | where `variable` and `function` are identifiers and `arg1`, `arg2`, ...
--- | are expressions.
-eMacroExpr :: P.Parser CST.Expression
-eMacroExpr =
-  P.choice
-    [ parseMacroCall
-    , parseMacroVar
-    ]
- where
-  parseMacroVar :: P.Parser CST.Expression
-  parseMacroVar = do
-    name <- P.char '#' *> L.identifier
-    return $ CST.EMacroVariable name
-
-  parseMacroCall :: P.Parser CST.Expression
-  parseMacroCall = do
-    name <- P.try $ P.char '#' *> L.identifier <* L.symbol "("
-    args <- parseExpression `P.sepBy` L.comma
-    void $ L.symbol ")"
-
-    let var = CST.EMacroVariable name
-
-    return $ CST.EApplication var args
 
 -- | Parses a closure expression
 -- | A closure expression is a function-like expression that is not
@@ -378,13 +346,13 @@ parseTerm :: P.Parser CST.Expression
 parseTerm =
   P.choice
     [ Lit.parseLiteral
-    , P.try eIfThenElseMacro
-    , eIfThenMacro
+    -- , P.try eIfThenElseMacro
+    -- , eIfThenMacro
     , eIf
     , eAwait
     , eSwitch
     , eList
-    , eMacroExpr
+    -- , eMacroExpr
     , P.try eClosureAsyncCase
     , P.try eClosureAsync
     , P.try eCaseClosure
@@ -816,37 +784,6 @@ tType = do
       void $ L.symbol "="
       CST.ETypeAlias (Cmm.Annotation (Cmm.fromText name) gens False) <$> Typ.tType
 
--- | Parses a macro
--- | A macro is a statement that is used to define a macro variable or a
--- | macro function.
--- |
--- | SYNTAX:
--- |  - macro name = expr
--- |  - macro name = block
--- |  - macro name(args) => expr
--- |  - macro name(args) { block }
--- | where `name` is an identifier, `args` are a list of identifiers, `expr` is
--- | an expression and `block` is a block of expressions.
-tMacro :: P.Parser [CST.Expression]
-tMacro = do
-  void $ L.reserved "macro"
-  name <- L.identifier
-  (args, body, isFun) <- P.choice [macroFun, macroVar]
-  let body' = if isFun then CST.EClosure args Nothing body False else body
-  return
-    [CST.EDeclaration [] (Cmm.MkIdentifier name True Cmm.:@: Nothing) body' Nothing]
- where
-  macroFun = do
-    args <- L.parens $ L.identifier `P.sepBy` L.comma
-    body <- L.symbol "=>" *> parseExpression <|> eBlock
-
-    let args' = map (\n -> Cmm.Annotation (Cmm.fromText n) Nothing False) args
-
-    return (args', body, True)
-  macroVar = do
-    body <- L.symbol "=" *> parseExpression
-    return ([], body, False)
-
 -- | Parses a variable declaration
 -- | A variable declaration is a statement that is used to declare a variable type
 -- | It is generally used to permit forward declarations
@@ -904,7 +841,6 @@ parseToplevel =
       , tType
       , tCustomOperator
       , tExtension
-      , tMacro
       , pure <$> parseStatement
       ]
 
