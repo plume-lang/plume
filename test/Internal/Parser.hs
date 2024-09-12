@@ -337,3 +337,214 @@ testParser = do
 
       r4 <- parseTest' eSwitch "switch 1 { case 1 => 1 case 2 => 2 case ? => 3 4 }"
       r4 `shouldSatisfy` isLeft
+
+    it "should parse correctly a list" $ do
+      r1 <- parseTest' eList "[1, 2, 3]"
+      r1 `shouldSatisfy` isRight
+
+      r2 <- parseTest' eList "[1, 2, 3, 4]"
+      r2 `shouldSatisfy` isRight
+
+      r3 <- parseTest' eList "[1, 2, 3, 4, 5]"
+      r3 `shouldSatisfy` isRight
+
+      r4 <- parseTest' eList "[1, 2, 3, 4, 5, 6]"
+      r4 `shouldSatisfy` isRight
+
+      r5 <- parseTest' eList "[[1, 2, 3], 4, 5, [6, 7, 8]]"
+      r5 `shouldSatisfy` isRight
+
+    it "should not parse an invalid list" $ do
+      r1 <- parseTest' eList "[1, 2, 3"
+      r1 `shouldSatisfy` isLeft
+
+      r2 <- parseTest' eList "1, 2, 3]"
+      r2 `shouldSatisfy` isLeft
+
+      r3 <- parseTest' eList "[1, 2, 3"
+      r3 `shouldSatisfy` isLeft
+
+      r4 <- parseTest' eList "[1, 2, 3, 4"
+      r4 `shouldSatisfy` isLeft
+
+      r5 <- parseTest' eList "1, 2, 3, 4]"
+      r5 `shouldSatisfy` isLeft
+
+      r6 <- parseTest' eList "[1, 2, 3, ]"
+      r6 `shouldSatisfy` isLeft
+
+      r7 <- parseTest' eList "[, 1, 2, 3, 4]"
+      r7 `shouldSatisfy` isLeft
+
+    it "should parse correctly await expressions" $ do
+      r1 <- parseTest' eAwait "await 1"
+      r1 `shouldSatisfy` isRight
+
+      r2 <- parseTest' eAwait "await print('c')"
+      r2 `shouldSatisfy` isRight
+
+      r3 <- parseTest' eAwait "await print('c') + 1"
+      r3 `shouldSatisfy` isRight
+
+      r4 <- parseTest' eAwait "await print('c') + await print('c')"
+      r4 `shouldSatisfy` isRight
+    
+    it "should parse correctly closure expressions" $ do
+      r1 <- parseTest' eClosure "fn (x, y) => x"
+      r1 `shouldSatisfy` isRight
+
+      r2 <- parseTest' eClosure "fn (mut x, y) => x"
+      r2 `shouldSatisfy` isRight
+
+      r3 <- parseTest' eClosure "fn (mut x: int, y: float) => y"
+      r3 `shouldSatisfy` isRight
+
+      r4 <- parseTest' eClosure "fn(x, y : int): str => v"
+      r4 `shouldSatisfy` isRight
+
+      r5 <- parseTest' eClosure "fn(x, y, z, a, b, c) : bool => x"
+      r5 `shouldSatisfy` isRight
+
+    it "should not parse closure expressions" $ do
+      r1 <- parseTest' eClosure "fn (x, y) =>"
+      r1 `shouldSatisfy` isLeft
+
+      r2 <- parseTest' eClosure "fn (mut x, y) =>"
+      r2 `shouldSatisfy` isLeft
+
+      r3 <- parseTest' eClosure "fn (mut x: int, y float) => v"
+      r3 `shouldSatisfy` isLeft
+
+      r4 <- parseTest' eClosure "fn(x, y => v"
+      r4 `shouldSatisfy` isLeft
+
+      r5 <- parseTest' eClosure "fn(x, y, z, a, b, c) : bool =>"
+      r5 `shouldSatisfy` isLeft
+
+    it "should parse correctly closure case expressions" $ do
+      r1 <- parseTest' eCaseClosure "fn case (x, y) => x"
+      r1 `shouldSatisfy` isRight
+
+      r2 <- parseTest' eCaseClosure "fn case Some(x) => x"
+      r2 `shouldSatisfy` isRight
+
+      r3 <- parseTest' eCaseClosure "fn case None => 0"
+      r3 `shouldSatisfy` isRight
+    
+    it "should not parse closure case expressions" $ do
+      r1 <- parseTest' eCaseClosure "fn case (x, y) =>"
+      r1 `shouldSatisfy` isLeft
+
+      r2 <- parseTest' eCaseClosure "fn case Some(x =>"
+      r2 `shouldSatisfy` isLeft
+
+      r3 <- parseTest' eCaseClosure "fn case None =>"
+      r3 `shouldSatisfy` isLeft
+    
+    it "should parse correctly async closure expressions" $ do
+      r1 <- parseTest' eClosureAsync "async fn (x, y) => x"
+      r1 `shouldSatisfy` isRight
+
+      r2 <- parseTest' eClosureAsync "async fn (mut x, y) => x"
+      r2 `shouldSatisfy` isRight
+
+      r3 <- parseTest' eClosureAsync "async fn (mut x: int, y: float) => y"
+      r3 `shouldSatisfy` isRight
+
+      r4 <- parseTest' eClosureAsync "async fn(x, y : int): str => v"
+      r4 `shouldSatisfy` isRight
+
+      r5 <- parseTest' eClosureAsync "async fn(x, y, z, a, b, c) : bool => x"
+      r5 `shouldSatisfy` isRight
+
+    it "should not parse async closure expressions" $ do
+      r1 <- parseTest' eClosureAsync "async fn (x, y) =>"
+      r1 `shouldSatisfy` isLeft
+
+      r2 <- parseTest' eClosureAsync "async fn (mut x, y) =>"
+      r2 `shouldSatisfy` isLeft
+
+      r3 <- parseTest' eClosureAsync "async fn (mut x: int, y float) => v"
+      r3 `shouldSatisfy` isLeft
+
+      r4 <- parseTest' eClosureAsync "async fn(x, y => v"
+      r4 `shouldSatisfy` isLeft
+
+      r5 <- parseTest' eClosureAsync "async fn(x, y, z, a, b, c) : bool =>"
+      r5 `shouldSatisfy` isLeft
+    
+    it "should parse correctly async case closure expressions" $ do
+      r1 <- parseTest' eClosureAsyncCase "async fn case (x, y) => x"
+      r1 `shouldSatisfy` isRight
+
+      r2 <- parseTest' eClosureAsyncCase "async fn case Some(x) => x"
+      r2 `shouldSatisfy` isRight
+
+      r3 <- parseTest' eClosureAsyncCase "async fn case None => 0"
+      r3 `shouldSatisfy` isRight
+    
+    it "should not parse async case closure expressions" $ do
+      r1 <- parseTest' eClosureAsyncCase "async fn case (x, y) =>"
+      r1 `shouldSatisfy` isLeft
+
+      r2 <- parseTest' eClosureAsyncCase "async fn case Some(x =>"
+      r2 `shouldSatisfy` isLeft
+
+      r3 <- parseTest' eClosureAsyncCase "async fn case None =>"
+      r3 `shouldSatisfy` isLeft
+    
+    it "should parse correctly a tuple" $ do
+      r1 <- parseTest' eTuple "(1, 2)"
+      r1 `shouldSatisfy` isRight
+
+      r2 <- parseTest' eTuple "(1, 2, 3)"
+      r2 `shouldSatisfy` isRight
+
+      r3 <- parseTest' eTuple "(1, 2, 3, 4)"
+      r3 `shouldSatisfy` isRight
+
+      r4 <- parseTest' eTuple "(1, 2, 3, 4, 5)"
+      r4 `shouldSatisfy` isRight
+
+      r5 <- parseTest' eTuple "(1, 2, 3, 4, 5, 6)"
+      r5 `shouldSatisfy` isRight
+
+      r6 <- parseTest' eTuple "(1, 2, 3, 4, 5, 6, 7)"
+      r6 `shouldSatisfy` isRight
+
+      r7 <- parseTest' eTuple "(1, 2, 3, 4, 5, 6, 7, 8)"
+      r7 `shouldSatisfy` isRight
+
+      r8 <- parseTest' eTuple "(1, 2, 3, 4, 5, 6, 7, 8, 9)"
+      r8 `shouldSatisfy` isRight
+
+      r9 <- parseTest' eTuple "(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)"
+      r9 `shouldSatisfy` isRight
+
+      r10 <- parseTest' eTuple "(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)"
+      r10 `shouldSatisfy` isRight
+
+      r11 <- parseTest' eTuple "(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)"
+      r11 `shouldSatisfy` isRight
+    
+    it "should not parse an invalid tuple" $ do
+      r1 <- parseTest' eTuple "(1, 2"
+      r1 `shouldSatisfy` isLeft
+
+      r2 <- parseTest' eTuple "1, 2)"
+      r2 `shouldSatisfy` isLeft
+
+      r3 <- parseTest' eTuple "(1, 2"
+      r3 `shouldSatisfy` isLeft
+
+      r4 <- parseTest' eTuple "(1, 2, 3"
+      r4 `shouldSatisfy` isLeft
+
+      r5 <- parseTest' eTuple "1, 2, 3)"
+      r5 `shouldSatisfy` isLeft
+
+      r6 <- parseTest' eTuple "(1, 2, 3, )"
+      r6 `shouldSatisfy` isLeft
+
+      r7 <- parseTest' eTuple "(, 1, 2, 3)"
+      r7 `shouldSatisfy` isLeft
