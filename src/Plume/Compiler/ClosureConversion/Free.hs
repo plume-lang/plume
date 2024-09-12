@@ -2,7 +2,6 @@
 
 module Plume.Compiler.ClosureConversion.Free where
 
-import Data.Foldable
 import Data.Set qualified as S
 import Plume.Compiler.ClosureConversion.Syntax
 import Control.Monad.Exception (compilerError)

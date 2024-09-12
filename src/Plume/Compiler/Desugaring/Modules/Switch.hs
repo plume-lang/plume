@@ -83,7 +83,7 @@ desugarSwitch info@(isTop, shouldReturn, isExpr, _) (fExpr, fStmt) (Pre.CESwitch
   let stmts' = concat $ concat stmts
 
   t <- concat <$> sequenceMapM fStmt decl
-  let finalDecl = L.foldl (\acc (x', stmts'') -> acc <> stmts'' <> maybeToList x') [] t
+  let finalDecl = L.foldl' (\acc (x', stmts'') -> acc <> stmts'' <> maybeToList x') [] t
 
   if isExpr || isTop
     then do
