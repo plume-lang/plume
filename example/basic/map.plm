@@ -7,3 +7,5 @@ m = m.insert("d", 4)
 println(m)
 
 println(m.lookup("a"))
+
+println(m.remove("b"))
