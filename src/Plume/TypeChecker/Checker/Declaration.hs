@@ -89,6 +89,7 @@ synthDecl
       cenv <- gets (extendEnv . environment)
       ps' <- liftIO $ removeTypeVarPS ps >>= removeDuplicatesPS
       _ps' <- removeDuplicatesPSs ps'
+      
       zs <- traverse (discharge cenv) (reverse _ps')
     
       let (ps'', m, as, _) = mconcat zs

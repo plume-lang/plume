@@ -149,14 +149,31 @@ instantiateClass (MkClass qvs pred' members _) = do
 
   pure $ MkClass [] pred'' members' Nothing
 
+findInstance :: MonadChecker m => PlumeQualifier -> m (Maybe (Instance Post.Expression ()))
+findInstance p = do
+  p' <- liftIO $ compressQual p
+  MkExtendEnv instances <- gets (extendEnv . environment)
+
+  found <- findM instances $ \case
+    (p'', _) -> do
+      p''' <- liftIO $ compressQual p''
+      doesMatchQual p''' p'
+
+  case found of
+    Just (_, inst) -> return (Just inst)
+    _ -> return Nothing
+
+
 removeDuplicatesPSs :: MonadChecker m => [PlumeQualifier] -> m [PlumeQualifier]
 removeDuplicatesPSs [] = pure []
-removeDuplicatesPSs (p@(IsIn _ n) : xs) = do
-  findClass n >>= \case
-    MkClass _ (preds :=>: _) _ _ -> do
-      let preds' = Set.fromList ( preds <> xs)
+removeDuplicatesPSs (p@(IsIn _ _) : xs) = do
+  findInstance p >>= \case
+    Just (MkInstance _ (preds :=>: _) _ _) -> do
+      mapM_ (liftIO . compressQual) preds
+      let preds' = Set.fromList (filter (`notElem` preds) xs)
 
       (p:) <$> removeDuplicatesPSs (Set.toList preds')
+    _ -> (p:) <$> removeDuplicatesPSs xs
 removeDuplicatesPSs (x : xs) = (x:) <$> removeDuplicatesPSs xs
 
 synthExt :: Infer -> Infer
@@ -253,7 +270,7 @@ synthExt
 
     res' <- forM exprs $ \(ty', ps, h, name) -> do
       ps' <- liftIO $ removeTypeVarPS ps >>= removeDuplicatesPS
-      _ps' <- (List.\\ gens) <$> removeDuplicatesPSs ps'
+      _ps' <- List.nub . (List.\\ gens) <$> removeDuplicatesPSs ps'
       zs <- traverse (discharge cenv) _ps'
       
       let (ps'', m, as, _) = mconcat zs
