@@ -379,6 +379,7 @@ decompose t@(TypeId name) | isNotPrimitiveType t = do
         return $ ConstructorSpace key args (map TypeSpace args)
       ) (Map.toList t')
     Nothing -> throw $ UnboundVariable name
+decompose (TMut t) = decompose t
 decompose t@(TypeApp (TypeId name) _) = do
   m <- readIORef datatypes
   case Map.lookup name m of
