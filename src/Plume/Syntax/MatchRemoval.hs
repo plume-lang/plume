@@ -3,11 +3,11 @@ module Plume.Syntax.MatchRemoval where
 import Plume.Syntax.Abstract as AST
 
 manageLetMatches :: [AST.Expression] -> [AST.Expression]
-manageLetMatches (AST.ELetMatch p e : es) = [AST.ESwitch e [(p, AST.EBlock $ manageLetMatches es)]]
+manageLetMatches (AST.ELetMatch p e : es) = [AST.ESwitch (manageLetMatch e) [(p, AST.EBlock $ manageLetMatches es)]]
 manageLetMatches (AST.EBlock xs : es) = AST.EBlock (manageLetMatches xs) : manageLetMatches es
 manageLetMatches (AST.ETypeExtension xs x t ys : es) = AST.ETypeExtension xs x t (manageLetMatchesE ys) : manageLetMatches es
 manageLetMatches (AST.ELocated e p : es) = AST.ELocated <$> manageLetMatches (e : es) <*> pure p
-manageLetMatches (AST.ESwitch x xs : es) = AST.ESwitch x (map (second manageLetMatch) xs) : manageLetMatches es
+manageLetMatches (AST.ESwitch x xs : es) = AST.ESwitch (manageLetMatch x) (map (second manageLetMatch) xs) : manageLetMatches es
 manageLetMatches (AST.EReturn x : es) = AST.EReturn (manageLetMatch x) : manageLetMatches es
 manageLetMatches (AST.EConditionBranch x y z : es) = AST.EConditionBranch (manageLetMatch x) (manageLetMatch y) (fmap manageLetMatch z) : manageLetMatches es
 manageLetMatches (AST.EWhile x y : es) = AST.EWhile (manageLetMatch x) (manageLetMatch y) : manageLetMatches es
@@ -32,10 +32,11 @@ manageLetMatches (e : es) = e : manageLetMatches es
 manageLetMatches [] = []
 
 manageLetMatchesE :: [AST.ExtensionMember] -> [AST.ExtensionMember]
-manageLetMatchesE (AST.ExtDeclaration xs x (AST.EBlock ys) : es) = AST.ExtDeclaration xs x (AST.EBlock (manageLetMatches ys)) : manageLetMatchesE es
-manageLetMatchesE (AST.ExtDeclaration xs x y : es) = AST.ExtDeclaration xs x y : manageLetMatchesE es
+manageLetMatchesE (AST.ExtDeclaration xs x y : es) = AST.ExtDeclaration xs x (manageLetMatch y) : manageLetMatchesE es
 manageLetMatchesE [] = []
 
 manageLetMatch :: AST.Expression -> AST.Expression
 manageLetMatch (AST.EBlock xs) = AST.EBlock $ manageLetMatches xs
-manageLetMatch e = e
+manageLetMatch e = case manageLetMatches [e] of
+  [x] -> x
+  _ -> error "manageLetMatch: impossible"
