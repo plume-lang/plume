@@ -483,6 +483,14 @@ sDeclaration = do
 
   return $ CST.EDeclaration [] name value body
 
+sMatchDeclaration :: P.Parser CST.Expression
+sMatchDeclaration = do
+  void $ L.reserved "case"
+  pat <- Pat.parsePattern
+  void $ L.symbol "="
+  
+  CST.ELetMatch pat <$> parseExpression
+
 -- | Parses a function declaration
 -- | A function declaration is a statement that is used to declare a function.
 -- | It is a syntactic sugar for a declaration with a closure expression.
@@ -554,6 +562,7 @@ parseStatement =
     P.choice
       [ sMutDeclaration
       , sDeclaration
+      , sMatchDeclaration
       , P.try sAsyncFunction
       , sFunction
       , sReturn

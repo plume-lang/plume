@@ -280,6 +280,13 @@ checkForUndefined m (HLIR.EInstanceDeclare _ name _) = do
     throwError ("Class " <> toString name <> " is not defined", pos)
 
   pure m
+checkForUndefined m (HLIR.ELetMatch p e) = do
+  let vars = getVariables p
+  old <- readIORef M.moduleState
+  modifyIORef' M.moduleState $ \s -> s { M.boundArgs = s.boundArgs <> vars }
+  void $ checkForUndefined m e
+  modifyIORef' M.moduleState $ \s -> s { M.boundArgs = old.boundArgs }
+  pure m { M.variables = Set.union (Set.fromList (map (, False) vars)) (M.variables m) }
 checkForUndefined _ _ = compilerError "Unsupported expression"
 
 toExpr :: HLIR.ExtensionMember -> HLIR.Expression
