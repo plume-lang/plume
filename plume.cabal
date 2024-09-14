@@ -41,6 +41,7 @@ library
     Plume.Compiler.TypeErasure.Syntax
     Plume.Syntax.Abstract
     Plume.Syntax.Blocks
+    Plume.Syntax.MatchRemoval
     Plume.Syntax.Common
     Plume.Syntax.Common.Annotation
     Plume.Syntax.Common.Internal.Pretty
