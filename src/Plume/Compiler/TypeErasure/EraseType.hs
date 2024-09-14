@@ -124,6 +124,7 @@ eraseType (Pre.EMutUpdate (Annotation name _ _) e Nothing : xs) = do
   e' <- eraseExpr e
   modifyIORef' program (<> [Post.UPMutUpdate name.identifier e'])
   eraseType xs
+eraseType (Pre.EInstanceDeclare {} : xs) = eraseType xs
 -- eraseType (Pre.EEmpty : xs) = eraseType xs
 eraseType (x : xs) = do
   x' <- eraseStatement x
