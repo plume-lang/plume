@@ -134,8 +134,8 @@ parseGeneric = do
     parseCls :: Parser PlumeInterface
     parseCls = do
       choice [
-          parseLonelyClass,
-          parseCls'
+          try parseCls',
+          parseLonelyClass
         ]
 
     parseLonelyClass :: Parser PlumeInterface
