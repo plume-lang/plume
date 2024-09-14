@@ -22,6 +22,7 @@ import Plume.Compiler.Bytecode.Label hiding (labelPool)
 import Plume.TypeChecker.Checker
 -- import Plume.Syntax.Memory
 import Plume.Syntax.Blocks
+import Plume.Syntax.MatchRemoval
 import System.Directory
 import System.FilePath
 import System.IO.Pretty
@@ -92,8 +93,9 @@ main = setEncoding $ do
 
   runConcreteToAbstract env dir paths' file `with` \ast -> do
     let ast' = concatMap (removeUselessBlocks (False, True)) ast
+    let ast'' = manageLetMatches ast'
     ppBuilding "Typechecking..."
-    runSynthesize ast' `with` \tlir -> do
+    runSynthesize ast'' `with` \tlir -> do
       ppBuilding "Compiling and optimizing..."
       erased <- erase tlir
       runClosureConversion erased `with` \closed -> do
