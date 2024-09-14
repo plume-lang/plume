@@ -320,10 +320,30 @@ closeProgram (Pre.UPMutUpdate n e) = do
   (stmts, e') <- closeExpression e
   pure $ stmts ++ [Post.CPMutUpdate (Post.UVariable n) e']
 
+analyseProgram 
+  :: (MonadClosure m) => Pre.UntypedProgram -> m ()
+analyseProgram (Pre.UPADTFunction name args _) = do
+  modifyIORef' reserved (M.insert name (length args))
+analyseProgram (Pre.UPDeclare name arity) = do
+  modifyIORef' reserved (M.insert name arity)
+analyseProgram (Pre.UPFunction name args _ _) = do
+  modifyIORef' reserved (M.insert name (length args))
+  modifyIORef' locals (<> S.fromList args)
+analyseProgram (Pre.UPNativeFunction _ name arity _) = do
+  modifyIORef' reserved (M.insert name arity)
+analyseProgram (Pre.UPStatement _) = pure ()
+analyseProgram (Pre.UPDeclaration n _) = do
+  modifyIORef' reserved (M.insert n (-1))
+analyseProgram (Pre.UPMutDeclaration n _) = do
+  modifyIORef' reserved (M.insert n (-1))
+analyseProgram (Pre.UPMutUpdate n _) = do
+  modifyIORef' reserved (M.insert n (-1))
+  
+
 runClosureConversion
   :: (MonadIO m)
   => [Pre.UntypedProgram]
   -> m (Either Text [Post.ClosedProgram])
 runClosureConversion e = do
   writeIORef closedCounter 0
-  (concat <$>) <$> runExceptT (traverse closeProgram e)
+  (concat <$>) <$> runExceptT (traverse_ analyseProgram e >> traverse closeProgram e)
