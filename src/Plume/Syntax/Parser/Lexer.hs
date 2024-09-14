@@ -124,6 +124,7 @@ reservedWords =
     , "interface"
     , "await"
     , "pub"
+    , "with"
     , -- Primitive types
       "int"
     , "str"
@@ -246,7 +247,7 @@ isIdentCharStart cs = isAlpha (Text.head cs) || Text.head cs == '_'
 -- | is useful for parsing record selections.
 nonLexedID :: Parser Text
 nonLexedID = do
-  r <- takeWhile1P Nothing isIdentChar
+  r <- Text.intercalate "::" <$> (takeWhile1P Nothing isIdentChar `sepBy1` string "::")
   -- Guarding parsed result and failing when reserved word is parsed
   -- (such as reserved keyword)
   if r `Set.member` reservedWords
@@ -262,7 +263,7 @@ nonLexedID = do
 -- | An identifier cannot be a reserved keyword
 identifier :: Parser Text
 identifier = lexeme $ do
-  cs <- takeWhile1P Nothing isIdentChar
+  cs <- Text.intercalate "::" <$> (takeWhile1P Nothing isIdentChar `sepBy1` string "::")
   if cs `Set.member` reservedWords
     then fail $ "The identifier " ++ show cs ++ " is a reserved word"
     else
