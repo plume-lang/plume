@@ -150,7 +150,7 @@ createInstNames :: [PlumeType] -> Text
 createInstNames = List.foldl' (\acc x -> acc <> "_" <> createInstName x) ""
 
 getQuals :: ExtendEnv -> [([QuVar], Qualified PlumeQualifier)]
-getQuals (MkExtendEnv env) = map (\(a, MkInstance qs quals _ _) -> (qs, a <$ quals)) env
+getQuals (MkExtendEnv env) = map (\(a, MkInstance qs quals _ _ _) -> (qs, a <$ quals)) env
 
 unqualType :: Qualified PlumeType -> PlumeType
 unqualType (_ :=>: zs) = zs

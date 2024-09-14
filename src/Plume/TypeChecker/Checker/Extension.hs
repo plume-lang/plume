@@ -114,7 +114,7 @@ isInstanceAlreadyDefined p = do
       doesMatchQual p''' p'
 
   case found of
-    Just (IsIn ty _, _) -> return (Just ty)
+    Just (IsIn ty _, MkInstance _ _ _ _ b) | not b -> return (Just ty)
     _ -> return Nothing
 
 applyQualifier :: MonadChecker m => Substitution -> PlumeQualifier -> m PlumeQualifier
@@ -168,7 +168,7 @@ removeDuplicatesPSs :: MonadChecker m => [PlumeQualifier] -> m [PlumeQualifier]
 removeDuplicatesPSs [] = pure []
 removeDuplicatesPSs (p@(IsIn _ _) : xs) = do
   findInstance p >>= \case
-    Just (MkInstance _ (preds :=>: _) _ _) -> do
+    Just (MkInstance _ (preds :=>: _) _ _ _) -> do
       mapM_ (liftIO . compressQual) preds
       let preds' = Set.fromList (filter (`notElem` preds) xs)
 
@@ -197,16 +197,12 @@ synthExt
     when (isJust possibleInst) $ case possibleInst of
       Just ty' -> throw $ AlreadyDefinedInstance tcName.identifier ty'
       _ -> throw $ CompilerError "Instance already defined"
-
-    tys' <- mapM convert tcTy
-
-    let inst = IsIn tys' tcName.identifier
     
     -- Pre-generating an instance dictionary only based on types
     cls@(MkClass _ _ meths ded) <- findClass tcName.identifier >>= instantiateClass
 
     case cls of
-      MkClass _ (_ :=>: inst') _ _ -> unifiyTyQualWith inst inst'
+      MkClass _ (_ :=>: inst') _ _ -> unifiyTyQualWith instH inst'
 
     fdSub <- case cls of
       MkClass qs' quals methods' _ -> do
@@ -219,12 +215,12 @@ synthExt
 
         let quals' = case quals of xs :=>: t -> (xs <> gens) :=>: t
         
-        let preInst :: Instance Post.Expression PlumeQualifier = MkInstance qvars quals' mempty finalMethods
+        let preInst :: Instance Post.Expression PlumeQualifier = MkInstance qvars quals' mempty finalMethods False
 
         let qs'' = TypeQuantified <$> qs'
         sub <- liftIO . composeSubs =<< zipWithM unifyAndGetSub qs'' ty
 
-        addClassInstance (inst, void preInst)
+        addClassInstance (instH, void preInst)
 
         pure sub
 
@@ -338,7 +334,7 @@ synthExt
       throw $ UnknownExtensionMethods tcName.identifier unknown
 
     -- Creating the new instance to insert it in the extend environment
-    let inst' = MkInstance qvars pred' dict dictFunTys
+    let inst' = MkInstance qvars pred' dict dictFunTys False
     let cls'' = (instH, void inst')
     addClassInstance cls''
 

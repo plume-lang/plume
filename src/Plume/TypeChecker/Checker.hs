@@ -86,6 +86,39 @@ synthesize (Pre.EVariableDeclare gens name ty) = do
   insertEnv @"typeEnv" name (Forall qvars (quals :=>: ty'))
 
   pure (ty', [], pure (Post.EVariableDeclare gens name (Identity ty')), False)
+synthesize (Pre.EInstanceDeclare generics name tys) = do
+  -- Dealing with pre-types and building the qualified qualifiers
+  -- for the typeclass instance (used to indicate the instance form and its
+  -- superclasses)
+  gens' :: [PlumeQualifier] <- concatMapM convert generics
+
+  let gens = removeQVars gens'
+  let qvars = getQVars gens'
+
+  ty <- mapM convert tys
+  let instH = IsIn ty name
+
+  cls <- findClass name >>= instantiateClass
+
+  case cls of
+    MkClass _ (_ :=>: inst') _ _ -> unifiyTyQualWith instH inst'
+
+  case cls of
+    MkClass qs' quals methods' _ -> do
+      case quals of
+        _  :=>: t -> do
+          b <- liftIO $ doesQualUnifiesWith t instH
+          unless b $ throw $ CompilerError "Instance does not match the class"
+
+      let finalMethods = fmap (\(Forall qs (quals' :=>: ty')) -> Forall (qs <> Set.fromList qs') $ (gens <> quals') :=>: ty') methods'
+
+      let quals' = case quals of xs :=>: t -> (xs <> gens) :=>: t
+      
+      let preInst :: Instance Post.Expression PlumeQualifier = MkInstance qvars quals' mempty finalMethods True
+
+      addClassInstance (instH, void preInst)
+
+      pure (TUnit, [], pure (Post.EInstanceDeclare generics name ty), False)
 -- \| Calling synthesis modules
 synthesize app@(Pre.EApplication {}) = synthApp synthesize app
 synthesize clos@(Pre.EClosure {}) = synthClosure synthesize clos
