@@ -140,14 +140,20 @@ applyScheme subst (Forall qv (ps :=>: t)) = do
   pure $ Forall qv' (ps' :=>: t')
 
 instantiateClass :: MonadChecker m => Class -> m Class
-instantiateClass (MkClass qvs pred' members _) = do
+instantiateClass (MkClass qvs pred' members funDeps) = do
   qvs' <- mapM (const fresh) qvs
   let subst = Map.fromList $ zip qvs qvs'
 
   pred'' <- applyQualified subst pred'
   members' <- mapM (applyScheme subst) members
 
-  pure $ MkClass [] pred'' members' Nothing
+  funDeps' <- mapM (\((i1, t1), (i2, t2)) -> do
+    t1' <- applySubst subst t1
+    t2' <- applySubst subst t2
+    pure ((i1, t1'), (i2, t2'))
+    ) funDeps
+
+  pure $ MkClass [] pred'' members' funDeps'
 
 findInstance :: MonadChecker m => PlumeQualifier -> m (Maybe (Instance Post.Expression ()))
 findInstance p = do
@@ -163,6 +169,11 @@ findInstance p = do
     Just (_, inst) -> return (Just inst)
     _ -> return Nothing
 
+updateFunDeps :: Map PlumeType (Map Text PlumeType) -> PlumeType -> Text -> PlumeType -> Map PlumeType (Map Text PlumeType)
+updateFunDeps funDeps ty name ty' = do
+  case Map.lookup ty funDeps of
+    Just m -> Map.insert ty (Map.insert name ty' m) funDeps
+    Nothing -> Map.insert ty (Map.singleton name ty') funDeps
 
 removeDuplicatesPSs :: MonadChecker m => [PlumeQualifier] -> m [PlumeQualifier]
 removeDuplicatesPSs [] = pure []
@@ -199,25 +210,28 @@ synthExt
       _ -> throw $ CompilerError "Instance already defined"
     
     -- Pre-generating an instance dictionary only based on types
-    cls@(MkClass _ _ meths ded) <- findClass tcName.identifier >>= instantiateClass
+    cls@(MkClass _ _ meths _) <- findClass tcName.identifier >>= instantiateClass
+    MkClass _ _ _ ded <- findClass tcName.identifier
 
     case cls of
       MkClass _ (_ :=>: inst') _ _ -> unifiyTyQualWith instH inst'
 
     fdSub <- case cls of
-      MkClass qs' quals methods' _ -> do
+      MkClass remainingQS quals methods' _ -> do
         case quals of
           _  :=>: t -> do
             b <- liftIO $ doesQualUnifiesWith t instH
             unless b $ throw $ CompilerError "Instance does not match the class"
 
-        let finalMethods = fmap (\(Forall qs (quals' :=>: ty')) -> Forall (qs <> Set.fromList qs') $ (gens <> quals') :=>: ty') methods'
+        let finalMethods = fmap (\(Forall qs (quals' :=>: ty')) -> Forall (qs <> Set.fromList remainingQS) $ (gens <> quals') :=>: ty') methods'
 
         let quals' = case quals of xs :=>: t -> (xs <> gens) :=>: t
         
         let preInst :: Instance Post.Expression PlumeQualifier = MkInstance qvars quals' mempty finalMethods False
 
+        MkClass qs' _ _ _ <- findClass tcName.identifier
         let qs'' = TypeQuantified <$> qs'
+        
         sub <- liftIO . composeSubs =<< zipWithM unifyAndGetSub qs'' ty
 
         addClassInstance (instH, void preInst)
@@ -226,7 +240,7 @@ synthExt
 
     -- Getting deduction type correspondance
     let (ded', dedTy') = case ded of
-          Just (TypeQuantified ded'', TypeQuantified dedTy'') -> 
+          Just ((_, TypeQuantified ded''), (_, TypeQuantified dedTy'')) -> 
             (Map.lookup ded'' fdSub, Map.lookup dedTy'' fdSub)
           _ -> 
             (Nothing, Nothing)
@@ -237,7 +251,7 @@ synthExt
 
         M.modify $ \s -> s {
           environment = s.environment {
-            funDeps = Map.insert ded'' (tcName.identifier, dedTy'') s.environment.funDeps
+            funDeps = updateFunDeps s.environment.funDeps ded'' tcName.identifier dedTy''
           }
         }
       _ -> pure ()
@@ -435,10 +449,10 @@ removeTypeVars (x : xs) = (x:) <$> removeTypeVars xs
 
 removeTypeVarsQ :: MonadIO m => [PlumeQualifier] -> m [PlumeQualifier]
 removeTypeVarsQ [] = pure []
-removeTypeVarsQ (IsIn ts n : xs) = do
-  b <- anyM containTV ts
+removeTypeVarsQ (IsIn (t':ts) n : xs) = do
+  b <- containTV t'
 
-  if b then removeTypeVarsQ xs else (IsIn ts n :) <$> removeTypeVarsQ xs
+  if b then removeTypeVarsQ xs else (IsIn (t':ts) n :) <$> removeTypeVarsQ xs
   where
     containTV :: MonadIO m => PlumeType -> m Bool
     containTV (TypeVar tv) = do

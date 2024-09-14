@@ -34,7 +34,7 @@ data Environment = MkEnvironment
   , genericsEnv :: Map Text PlumeType
   , extendEnv :: ExtendEnv
   , classEnv :: ClassEnv
-  , funDeps :: Map PlumeType (Text, PlumeType)
+  , funDeps :: Map PlumeType (Map Text PlumeType)
   }
   deriving (Eq)
 
@@ -52,7 +52,7 @@ data Class = MkClass
     [QuVar] 
     (Qualified PlumeQualifier) 
     (Map Text PlumeScheme)
-    (Maybe (PlumeType, PlumeType))
+    (Maybe ((Int, PlumeType), (Int, PlumeType)))
   deriving (Eq, Show)
 
 -- | Extension environment

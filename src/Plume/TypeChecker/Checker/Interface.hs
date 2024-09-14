@@ -10,6 +10,12 @@ import Plume.TypeChecker.Monad.Conversion
 import Plume.TypeChecker.TLIR qualified as Post
 import qualified Data.Set as Set
 
+getIndex :: [PlumeQualifier] -> PlumeType -> Int -> Int
+getIndex (IsIn tys _ : xs) ty i = if ty `elem` tys then i else getIndex xs ty (i + 1)
+getIndex (IsQVar qv : xs) (TypeQuantified qv') i = if qv == qv' then i else getIndex xs (TypeQuantified qv') (i + 1)
+getIndex (_ : xs) t i = getIndex xs t (i + 1)
+getIndex [] _ _ = -1
+
 synthInterface :: Infer -> Infer
 synthInterface _ (Pre.EInterface (Annotation name tys _) generics methods deduction) = do
   gens' :: [PlumeQualifier] <- concatMapM convert generics
@@ -21,7 +27,9 @@ synthInterface _ (Pre.EInterface (Annotation name tys _) generics methods deduct
     Just (ded, ty) -> Just <$> ((,) <$> convert ded <*> convert ty)
     Nothing -> pure Nothing
 
-  let deduction'' = fmap (bimap TypeQuantified TypeQuantified) deduction'
+  let deduction'' = case fmap (bimap TypeQuantified TypeQuantified) deduction' of
+        Just (ded, ty) -> Just ((getIndex gens' ded 0, ded), (getIndex gens' ty 0, ty))
+        Nothing -> Nothing
 
   let inst = IsIn tys' name.identifier
   methods' <- mapM convertMethod methods

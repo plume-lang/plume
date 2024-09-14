@@ -13,14 +13,21 @@ import Plume.Syntax.Common.Annotation qualified as Cmm
 import Prelude hiding (gets)
 import qualified Plume.TypeChecker.Monad as M
 
-findMatchingFunDep :: (MonadChecker m) => PlumeType -> m (Maybe (PlumeType, (Text, PlumeType)))
-findMatchingFunDep t1 = do
+findMatchingFunDep :: (MonadChecker m) => PlumeType -> Text -> m (Maybe (PlumeType, PlumeType))
+findMatchingFunDep t1 n = do
   funDeps <- gets (funDeps . environment)
   t1' <- liftIO $ compressPaths t1
 
-  findM (Map.toList funDeps) $ \(t2, _) -> do
+  res <- findM (Map.toList funDeps) $ \(t2, m) -> do
     t2' <- liftIO $ compressPaths t2
-    liftIO $ doesUnifyWith' t1' t2'
+    b1 <- liftIO $ doesUnifyWith' t1' t2' 
+    return (b1 && isJust (Map.lookup n m))
+
+  case res of
+    Just (t2, m) -> do
+      t2' <- liftIO $ compressPaths t2
+      return $ (t2',) <$> Map.lookup n m
+    Nothing -> pure Nothing
 
 -- | Discharging operation is a step that decompose a qualified type into smaller
 -- | extensions. This also generates the new dictionaries if no extensions is
@@ -81,31 +88,39 @@ discharge cenv p = do
     Nothing -> do
       -- Checking for potential matching function dependencies
       case p' of
-        IsIn xs'@(x':y:_) n -> do
-          matching <- findMatchingFunDep x'
-          
-          case matching of
-            Just (ty, (n', y')) | n == n' -> do
-              -- First we resolve general extension type with the given type
-              s1 <- unifyAndGetSub x' ty
-              -- Then we resolve inner type with the given type
-              s2 <- unifyAndGetSub y y'
+        IsIn xs' n -> do
+          MkClass _ _ _ ded <- findClass n
 
-              -- We compose to get the final substitution for th given type
-              -- This is used to apply the general substitution to the inner 
-              -- type.
-              s'' <- liftIO $ compose s1 s2
+          case ded of
+            Just ((i1, _), (i2, _)) -> do
+              let x' = xs' List.!! i1
+              let y = xs' List.!! i2
 
-              xs'' <- liftIO $ mapM (apply s'') xs'
+              matching <- findMatchingFunDep x' n
+              
+              case matching of
+                Just (ty, y') -> do
+                  -- First we resolve general extension type with the given type
+                  s1 <- unifyAndGetSub x' ty
+                  -- Then we resolve inner type with the given type
+                  s2 <- unifyAndGetSub y y'
 
-              -- Saving locally the new substitution
-              M.modify $ \st -> st {substitution = s'' <> st.substitution}
+                  -- We compose to get the final substitution for th given type
+                  -- This is used to apply the general substitution to the inner 
+                  -- type.
+                  s'' <- liftIO $ compose s1 s2
 
-              -- Recursively discharging environment in order to get smaller pieces of
-              -- qualifiers for the new type
-              if null s'' 
-                then dischargeCallback p' p
-                else discharge cenv (IsIn xs'' n)
+                  xs'' <- liftIO $ mapM (apply s'') xs'
+
+                  -- Saving locally the new substitution
+                  M.modify $ \st -> st {substitution = s'' <> st.substitution}
+
+                  -- Recursively discharging environment in order to get smaller pieces of
+                  -- qualifiers for the new type
+                  if null s'' 
+                    then dischargeCallback p' p
+                    else discharge cenv (IsIn xs'' n)
+                _ -> dischargeCallback p' p
             _ -> dischargeCallback p' p
         _ -> dischargeCallback p' p
 
@@ -406,13 +421,13 @@ containsTypeVar (TypeVar tv : ts) = do
 containsTypeVar (_ : ts) = containsTypeVar ts
 
 removeTypeVarPS :: [PlumeQualifier] -> IO [PlumeQualifier]
-removeTypeVarPS (IsIn qvs n:qs) = do
-  b <- containsTypeVar qvs
+removeTypeVarPS (IsIn (q:qvs) n:qs) = do
+  b <- containsTypeVar [q]
 
   if b then
     removeTypeVarPS qs
   else
-    (IsIn qvs n:) <$> removeTypeVarPS qs
+    (IsIn (q:qvs) n:) <$> removeTypeVarPS qs
 removeTypeVarPS (q:qs) = (q:) <$> removeTypeVarPS qs
 removeTypeVarPS [] = pure []
 
