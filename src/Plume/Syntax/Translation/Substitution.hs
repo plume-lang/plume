@@ -91,6 +91,7 @@ substitute _ (AST.ETypeAlias ann t) = AST.ETypeAlias ann t
 substitute (name, expr) (AST.EAwait e) = AST.EAwait (substitute (name, expr) e)
 substitute (name, expr) (AST.EWhile e1 e2) =
   AST.EWhile (substitute (name, expr) e1) (substitute (name, expr) e2)
+substitute _ (AST.EInstanceDeclare g n t) = AST.EInstanceDeclare g n t
 
 substituteExt
   :: (Text, AST.Expression)

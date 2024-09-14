@@ -223,6 +223,9 @@ concreteToAbstract (CST.EWhile e1 e2) = do
   e1' <- shouldBeAlone <$> concreteToAbstract e1
   e2' <- shouldBeAlone <$> concreteToAbstract e2
   transRet $ AST.EWhile <$> e1' <*> e2'
+concreteToAbstract (CST.EInstanceDeclare gens n t) = do
+  t' <- mapM transformType t
+  bireturn . Single $ AST.EInstanceDeclare gens n t'
 concreteToAbstract _ = throwError' (CompilerError "Unsupported expression")
 
 transformSch :: MonadIO m => Common.PlumeScheme -> m Common.PlumeScheme

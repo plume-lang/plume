@@ -811,6 +811,21 @@ tDeclare = do
       ty <- L.symbol ":" *> Typ.tType
       return [CST.EVariableDeclare [] name (Just ty)]
 
+-- | Parses an extension forward declaration
+-- | An extension forward declaration is a statement that is used to declare a
+-- | type extension without defining it.
+-- |
+-- | SYNTAX:
+-- |  - declare extend<generics> (name: ty)
+tDeclareExtension :: P.Parser [CST.Expression]
+tDeclareExtension = do
+  void $ L.reserved "declare"
+  void $ L.reserved "extend"
+  gens <- P.option [] $ L.angles (Typ.parseGeneric `P.sepBy` L.comma)
+  tcName <- L.identifier
+  tcTy <- L.angles (Typ.tType `P.sepBy1` L.comma)
+  return [CST.EInstanceDeclare gens tcName tcTy]
+
 -- | Parses a public toplevel expression
 -- | A public toplevel expression is a toplevel expression that is exported
 -- | from the module.
@@ -835,6 +850,7 @@ parseToplevel =
     P.choice
       [ tNative
       , tPublic
+      , P.try tDeclareExtension
       , tDeclare
       , tInterface
       , tRequire

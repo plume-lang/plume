@@ -100,6 +100,7 @@ data Expression t f
   | ENativeFunction Text Text [Text] t LibraryType IsStandard
   | ETypeAlias (Annotation [Text]) t
   | EVariableDeclare [PlumeGeneric] Text (f t)
+  | EInstanceDeclare [PlumeGeneric] Text [t]
   | EAwait (Expression t f)
   | EInstanceVariable Identifier (f t)
   | EInstanceAccess (Expression t f) Int
@@ -190,6 +191,7 @@ instance (Show t, Show (f t)) => Show (Expression t f) where
   show (EInstanceDict x t xs) = "dict " <> toString x <> " " <> show t <> " " <> show xs
   show (EWhile x y) = "while " <> show x <> " " <> show y
   show (ELocated x _) = show x
+  show (EInstanceDeclare xs x ys) = "declare instance " <> show xs <> " " <> toString x <> " " <> show ys
 
 instance (Show t, Show (f t)) => Show (ExtensionMember t f) where
   show (ExtDeclaration xs x y) = "declare " <> show xs <> " " <> show x <> " " <> show y

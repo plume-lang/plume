@@ -20,6 +20,7 @@ import Data.Maybe (fromJust)
 import System.IO.Pretty
 import Control.Monad.Except
 import Text.Megaparsec.Pos
+import Control.Monad.Exception (compilerError)
 
 fromEither :: a -> Either b a -> a
 fromEither _ (Right a) = a
@@ -273,7 +274,13 @@ checkForUndefined m (HLIR.EAwait e) = checkForUndefined m e
 checkForUndefined m (HLIR.EWhile e1 e2) = do
   m' <- checkForUndefined m e1
   checkForUndefined m' e2
-checkForUndefined _ _ = error "Unsupported expression"
+checkForUndefined m (HLIR.EInstanceDeclare _ name _) = do
+  unless (isClassDefined 0 name m) $ do
+    pos <- M.fetchPosition
+    throwError ("Class " <> toString name <> " is not defined", pos)
+
+  pure m
+checkForUndefined _ _ = compilerError "Unsupported expression"
 
 toExpr :: HLIR.ExtensionMember -> HLIR.Expression
 toExpr (HLIR.ExtDeclaration gens annot e) = HLIR.EDeclaration gens annot e Nothing
