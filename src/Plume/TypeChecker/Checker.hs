@@ -177,13 +177,37 @@ synthesize (Pre.EDirectExtension generics ann extMembers) = do
       -> Cmm.Annotation PlumeType
       -> Pre.ExtensionMember 
       -> m (Text, PlumeType, Placeholder Post.Expression, [PlumeQualifier], [QuVar])
-    synthesizeExtMember _ _ (Pre.ExtDeclaration generics' extAnn expr) = do
+    synthesizeExtMember _ ann' (Pre.ExtDeclaration generics' extAnn expr) = do
       g :: [PlumeQualifier] <- concatMapM convert generics'
       let qvs = getQVars g
       ty' <- convert extAnn.annotationValue
 
+      let ty'' = case ty' of
+            (args :->: ret) -> (ann'.annotationValue : args) :->: ret
+            TypeVar _ -> ty'
+            _ -> [ann'.annotationValue] :->: ty'
+
+      modify $ \env -> env { 
+        environment = env.environment {
+          directExtensions =
+            Map.insert 
+              ann'.annotationValue
+              (
+                Set.fromList mempty, 
+                Map.singleton extAnn.annotationName.identifier (Forall mempty ([] :=>: ty''))
+              ) 
+              env.environment.directExtensions
+          }
+        }
+
       (bTy, ps', b, _) <- local id $ synthesize expr
-      ty' `unifiesWith` bTy
+
+      let bTy' = case bTy of
+            (args :->: ret) -> (ann'.annotationValue : args) :->: ret
+            TypeVar _ -> bTy
+            _ -> [ann'.annotationValue] :->: bTy
+
+      ty' `unifiesWith` bTy'
 
       mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) generics'
 
