@@ -28,6 +28,7 @@ import System.FilePath
 import System.IO.Pretty
 import CLI
 import Prelude hiding (putStrLn, readFile)
+import Plume.Syntax.ArgumentDeducer (deduceArgument)
 #if defined(mingw32_HOST_OS)
 import System.IO (hPutStrLn, hSetEncoding, stdout, utf8)
 import System.Win32.Console (getConsoleOutputCP, setConsoleOutputCP)
@@ -92,10 +93,11 @@ main = setEncoding $ do
   void $ checkModule (env, mod') file
 
   runConcreteToAbstract env dir paths' file `with` \ast -> do
-    let ast' = concatMap (removeUselessBlocks (False, True)) ast
-    let ast'' = manageLetMatches ast'
+    let ast' = map deduceArgument ast
+    let ast'' = concatMap (removeUselessBlocks (False, True)) ast'
+    let ast''' = manageLetMatches ast''
     ppBuilding "Typechecking..."
-    runSynthesize ast'' `with` \tlir -> do
+    runSynthesize ast''' `with` \tlir -> do
       ppBuilding "Compiling and optimizing..."
       erased <- erase tlir
       runClosureConversion erased `with` \closed -> do
