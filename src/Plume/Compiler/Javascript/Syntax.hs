@@ -98,6 +98,7 @@ instance Show Expression where
     LString s -> "\"" <> encodeUnicode16 (toString s) <> "\""
     LBool b -> if b then "true" else "false"
     LChar c -> "'" <> encodeUnicode16 [c] <> "'"
+    LRegex r -> "/" <> toString r <> "/"
   show (JSIdentifier n) = varify $ toString n
   show (JSBinary o e1 e2) = "(" <> show e1 <> " " <> toString o <> " " <> show e2 <> ")"
   show (JSUnary o e) = "(" <> toString o <> show e <> ")"

@@ -12,4 +12,5 @@ data Literal
   | LString Text
   | LChar Char
   | LFloat Double
+  | LRegex Text
   deriving (Eq, Show, Ord)

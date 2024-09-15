@@ -21,11 +21,19 @@ parseLiteral :: Parser Expression
 parseLiteral =
   choice
     [ ELiteral <$> parseChar
+    , ELiteral . LRegex <$> parseRegex
     , parseStringWithInterpolation
     , ELiteral <$> try parseFloat
     , ELiteral <$> parseBool
     , ELiteral <$> parseInteger
     ]
+
+parseRegex :: Parser Text
+parseRegex = lexeme $ do
+  void $ char '/'
+  res <- takeWhileP Nothing (/= '/')
+  void $ char '/'
+  pure res
 
 parseStringWithInterpolation :: Parser Expression
 parseStringWithInterpolation = lexeme $ do

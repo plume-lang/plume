@@ -200,6 +200,7 @@ typeOfLiteral (LFloat f) = (TFloat, LFloat f)
 typeOfLiteral (LBool b) = (TBool, LBool b)
 typeOfLiteral (LString s) = (TString, LString s)
 typeOfLiteral (LChar c) = (TChar, LChar c)
+typeOfLiteral (LRegex r) = (TypeId "regex", LRegex r)
 
 -- | Function that maps monadic actions over a list and then unzips the result
 -- | into three separate lists.
@@ -647,6 +648,7 @@ showLiteral (LFloat f) = show f
 showLiteral (LBool b) = if b then "true" else "false"
 showLiteral (LString s) = show s
 showLiteral (LChar c) = show c
+showLiteral (LRegex r) = "/" ++ toString r ++ "/"
 
 showCtorSp :: [Space] -> String
 showCtorSp [x] = showSpace x
