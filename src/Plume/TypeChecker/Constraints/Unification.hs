@@ -156,6 +156,7 @@ doesOccurQ q (TypeApp t ts) = do
   b <- doesOccurQ q t
   b' <- or <$> traverse (doesOccurQ q) ts
   pure (b || b')
+doesOccurQ q (TypeQuantified q') = pure (q == q')
 doesOccurQ _ _ = pure False
 
 -- | Creating a constraint from a type constraint

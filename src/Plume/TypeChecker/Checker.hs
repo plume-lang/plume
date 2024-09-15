@@ -25,6 +25,8 @@ import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (gets, local, modify)
 import Data.List (unzip4)
 import qualified Data.Set as Set
+import qualified Plume.Syntax.Abstract as Cmm
+import qualified Data.Map as Map
 
 synthesize :: (MonadChecker m) => Pre.Expression -> m (PlumeType, [PlumeQualifier], Placeholder Post.Expression, Bool)
 
@@ -86,6 +88,108 @@ synthesize (Pre.EVariableDeclare gens name ty) = do
   insertEnv @"typeEnv" name (Forall qvars (quals :=>: ty'))
 
   pure (ty', [], pure (Post.EVariableDeclare gens name (Identity ty')), False)
+synthesize (Pre.EDirectExtension generics ann extMembers) = do
+  gens' :: [PlumeQualifier] <- concatMapM convert generics
+  let _ps = removeQVars gens'
+  let qvars = getQVars gens'
+
+  ty' :: PlumeType <- convert ann.annotationValue
+
+  extMembers' <- local (\env -> env { 
+    environment = env.environment {
+      typeEnv = Map.insert ann.annotationName.identifier (Forall (Set.fromList qvars) (_ps :=>: ty')) env.environment.typeEnv
+    }
+   }) $ mapM 
+        (synthesizeExtMember _ps (Cmm.Annotation ann.annotationName ty' ann.isMutable)) 
+        extMembers
+
+  cenv <- gets (extendEnv . environment)
+
+  methods <- mapM (\(name, ty'', h, ps, qvs) -> do
+    ps' <- liftIO $ removeTypeVarPS ps >>= removeDuplicatesPS
+    _ps' <- List.nub <$> removeDuplicatesPSs ps'
+    zs <- traverse (discharge cenv) _ps'
+    
+    let (ps'', m, as, _) = mconcat zs
+
+    ps''' <- liftIO $ removeTypeVarPS ps'' >>= removeDuplicatesPS
+
+    -- ps'' <- removeDuplicatesQuals ps'
+    let (_ :=>: t) = List.nub ps''' :=>: ty''
+
+    pos <- fetchPosition
+    checkSub <- gets substitution
+
+    h' <- liftIO $ runReaderT h $ getExpr pos checkSub m
+
+    let h'' = case h' of
+          Post.EClosure args (Identity ty) h''' _ -> do
+            let newArg = Cmm.Annotation ann.annotationName (Identity ty') False
+            Post.EClosure (newArg:args) (Identity ty) h''' False
+          _ -> h'
+
+    remainingAssumps <- removeTypeVars as
+
+    remainingAssumps' <- liftIO $ removeDuplicatesAssumps' remainingAssumps
+
+    -- Generating new types and expressions based on assumptions
+    let args = map (\(n :>: t') -> Cmm.fromText n Cmm.:@: Identity t') remainingAssumps'
+    let tys''' = map (\(_ :>: t') -> t') remainingAssumps'
+
+    cTy' <- liftIO $ compressPaths ty''
+
+    let t' = case t of
+          (args' :->: ret) -> (ty' : args') :->: ret
+          _ -> t
+
+    let clos = if null args then h'' else Post.EClosure args (Identity cTy') h'' False
+    let closTy = if null args then t' else tys''' :->: t'
+
+    pure (name, Forall (Set.fromList (qvars <> qvs)) (List.nub ps''' :=>: t'), clos, closTy)
+    ) extMembers'
+  
+  finalExprs <- mapM (\(name, _, e, ty) -> do
+      let finalName = name <> "_" <> createInstName ty'
+
+      pure $ Post.EDeclaration [] (Cmm.Annotation (Cmm.fromText finalName) (Identity ty) False) e Nothing 
+    ) methods
+  
+  modify $ \env -> env { 
+    environment = env.environment {
+      directExtensions =
+        Map.insert 
+          ty' 
+          (
+            Set.fromList qvars, 
+            Map.fromList $ map (\(name, sch, _, _) -> (name, sch)) methods
+          ) 
+          env.environment.directExtensions
+    }
+  }
+
+  mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) generics
+
+  pure (TUnit, [], pure (Post.ESpreadable finalExprs), False)
+  where
+    synthesizeExtMember 
+      :: (MonadChecker m)
+      => [PlumeQualifier]
+      -> Cmm.Annotation PlumeType
+      -> Pre.ExtensionMember 
+      -> m (Text, PlumeType, Placeholder Post.Expression, [PlumeQualifier], [QuVar])
+    synthesizeExtMember _ _ (Pre.ExtDeclaration generics' extAnn expr) = do
+      g :: [PlumeQualifier] <- concatMapM convert generics'
+      let qvs = getQVars g
+      ty' <- convert extAnn.annotationValue
+
+      (bTy, ps', b, _) <- local id $ synthesize expr
+      ty' `unifiesWith` bTy
+
+      mapM_ (deleteEnv @"genericsEnv" . Cmm.getGenericName) generics'
+
+      ps'' <- removeTypeVarsQ ps'
+
+      pure (extAnn.annotationName.identifier, bTy, b, ps'', qvs)
 synthesize (Pre.EInstanceDeclare generics name tys) = do
   -- Dealing with pre-types and building the qualified qualifiers
   -- for the typeclass instance (used to indicate the instance form and its

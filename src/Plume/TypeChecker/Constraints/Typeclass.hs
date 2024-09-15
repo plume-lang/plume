@@ -114,7 +114,6 @@ discharge cenv p = do
 
                   -- Saving locally the new substitution
                   M.modify $ \st -> st {substitution = s'' <> st.substitution}
-
                   -- Recursively discharging environment in order to get smaller pieces of
                   -- qualifiers for the new type
                   if null s'' 

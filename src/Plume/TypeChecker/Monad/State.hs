@@ -35,6 +35,7 @@ data Environment = MkEnvironment
   , extendEnv :: ExtendEnv
   , classEnv :: ClassEnv
   , funDeps :: Map PlumeType (Map Text PlumeType)
+  , directExtensions :: Map PlumeType (Set QuVar, Map Text PlumeScheme)
   }
   deriving (Eq)
 
@@ -95,6 +96,7 @@ emptyState =
         mempty 
         (MkExtendEnv mempty) 
         (MkClassEnv mempty)
+        mempty
         mempty
     , returnType = Nothing
     , positions = []

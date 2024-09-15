@@ -1,13 +1,53 @@
 module Plume.TypeChecker.Checker.Application where
 
 import Plume.Syntax.Abstract qualified as Pre
+import Plume.Syntax.Common.Annotation qualified as Cmm
 import Plume.TypeChecker.Checker.Monad
 import Plume.TypeChecker.Checker.Switch (mapAndUnzip4M)
 import Plume.TypeChecker.Constraints.Solver (unifiesWith)
 import Plume.TypeChecker.TLIR qualified as Post
-import Prelude hiding (local, modify)
+import Prelude hiding (local, modify, gets)
+import qualified Data.Map as Map
+import Plume.TypeChecker.Constraints.Typeclass (createInstName, findM)
+import Plume.TypeChecker.Constraints.Unification (compressPaths, doesUnifyWithH)
+
+findMatchingDirect :: MonadIO m => PlumeType -> Map PlumeType (Set QuVar, Map Text PlumeScheme) -> m (Maybe (PlumeType, (Set QuVar, Map Text PlumeScheme)))
+findMatchingDirect t directExts = do
+  t' <- liftIO $ compressPaths t
+  let m' = Map.toList directExts
+  
+  findM m' (\(t'', _) -> liftIO $ t'' `doesUnifyWithH` t')
+
 
 synthApp :: Infer -> Infer
+synthApp infer (Pre.EApplication (Pre.ELocated f _) xs) = synthApp infer (Pre.EApplication f xs)
+synthApp infer (Pre.EApplication (Pre.EVariable n _) (x:xs)) = do
+  (tX, psX, x', _) <- infer x
+
+  tX' <- liftIO $ compressPaths tX
+
+  directExts <- gets (directExtensions . environment)
+  (t, ps, f, _) <- do
+    res <- findMatchingDirect tX' directExts
+    
+    case res of
+      Just (ty, (_, schs)) -> case Map.lookup (Cmm.identifier n) schs of
+        Just sch -> do
+          (t, ps) <- instantiate sch
+
+          let finalName = Cmm.identifier n <> "_" <> createInstName ty
+
+          pure (t, ps, pure (Post.EVariable (Cmm.fromText finalName) (Identity t)), False)
+        Nothing -> infer (Pre.EVariable n Nothing)
+      Nothing -> infer (Pre.EVariable n Nothing) 
+
+  (ts, pss, xs', _) <- mapAndUnzip4M infer xs
+
+  ret <- fresh
+
+  t `unifiesWith` (tX':ts) :->: ret
+
+  pure (ret, ps <> psX <> concat pss, Post.EApplication <$> f <*> sequence (x' : xs'), False)
 synthApp infer (Pre.EApplication f xs) = local id $ do
   -- Type checking the function and its arguments
   (t, ps, f'', _) <- infer f
