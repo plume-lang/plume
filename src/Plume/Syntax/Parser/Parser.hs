@@ -151,7 +151,7 @@ eBlock =
 -- |  - it should not be followed by a colon or an equal sign (avoid 
 -- |    declaration conflicts)
 eVariable :: P.Parser CST.Expression
-eVariable = CST.EVariable . Cmm.fromText <$> L.lexeme (L.nonLexedID <* isNotDecl) <*> pure Nothing
+eVariable = CST.EVariable . Cmm.fromText <$> L.lexeme ((L.nonLexedID <|> P.string "?") <* isNotDecl) <*> pure Nothing
   where
     isNotDecl :: P.Parser ()
     isNotDecl = P.notFollowedBy (L.lexeme $ P.oneOf (":=" :: String))
