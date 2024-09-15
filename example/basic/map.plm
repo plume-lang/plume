@@ -9,3 +9,9 @@ println(m)
 println(m.lookup("a"))
 
 println(m.remove("b"))
+
+m2: Map<str, int> = [("a", 2), ("b", 3), ("c", 4)]
+
+println(m.combine(m2, fn (x, y) => x + y).has_key("e"))
+
+println(m2.invert())
