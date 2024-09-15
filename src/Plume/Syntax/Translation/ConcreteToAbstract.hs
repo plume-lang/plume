@@ -229,6 +229,10 @@ concreteToAbstract (CST.EInstanceDeclare gens n t) = do
 concreteToAbstract (CST.ELetMatch p e) = do
   e' <- shouldBeAlone <$> concreteToAbstract e
   transRet $ AST.ELetMatch p <$> e'
+concreteToAbstract (CST.EDirectExtension g t ems) = do
+  ems' <-
+    fmap flat . sequence <$> mapM concreteToAbstractExtensionMember ems
+  transRet $ AST.EDirectExtension g t <$> ems'
 concreteToAbstract _ = throwError' (CompilerError "Unsupported expression")
 
 transformSch :: MonadIO m => Common.PlumeScheme -> m Common.PlumeScheme

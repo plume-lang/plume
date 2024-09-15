@@ -765,6 +765,16 @@ tExtension = do
   members <- L.braces (P.many eExtensionMember)
   return [CST.ETypeExtension gens tc Nothing members]
 
+tDirectExtension :: P.Parser [CST.Expression]
+tDirectExtension = do
+  void $ L.reserved "extend"
+  gens <- P.option [] $ L.angles (Typ.parseGeneric `P.sepBy` L.comma)
+
+  ty <- L.parens $ Cmm.Annotation . Cmm.fromText <$> L.identifier <*> (L.colon *> Typ.tType) <*> pure False
+
+  members <- L.braces (P.many eExtensionMember)
+  return [CST.EDirectExtension gens ty members]
+
 -- | Parses a type declaration
 -- | A type declaration is a statement that is used to declare a new
 -- | user defined type.
@@ -865,6 +875,7 @@ parseToplevel =
       , tRequire
       , tType
       , tCustomOperator
+      , P.try tDirectExtension
       , tExtension
       , pure <$> parseStatement
       ]

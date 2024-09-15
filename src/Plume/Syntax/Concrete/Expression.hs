@@ -107,6 +107,7 @@ data Expression t f
   | EInstanceDict Text (f t) [Expression t f]
   | EWhile (Expression t f) (Expression t f)
   | ELetMatch (Pattern t f) (Expression t f)
+  | EDirectExtension [PlumeGeneric] (Annotation t) [ExtensionMember t f]
 
 -- | A type constructor is a type that is used to construct a type.
 -- | It may be either a type-constructor function or a type-constructor
@@ -194,6 +195,7 @@ instance (Show t, Show (f t)) => Show (Expression t f) where
   show (ELocated x _) = show x
   show (EInstanceDeclare xs x ys) = "declare instance " <> show xs <> " " <> toString x <> " " <> show ys
   show (ELetMatch p e) = show p <> " = " <> show e
+  show (EDirectExtension xs t ys) = "extend " <> show xs <> " " <> show t <> " " <> show ys
 
 instance (Show t, Show (f t)) => Show (ExtensionMember t f) where
   show (ExtDeclaration xs x y) = "declare " <> show xs <> " " <> show x <> " " <> show y

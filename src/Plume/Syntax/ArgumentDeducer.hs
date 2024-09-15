@@ -6,18 +6,19 @@ import qualified Data.List as List
 
 deduceArgument :: AST.Expression -> AST.Expression
 deduceArgument (AST.EApplication x xs) | containsDeducable xs = do
+  let xs' = map deduceArgument xs
   let count = sum $ map countDeducable xs
   let args :: [Text] = ["?" <> show i | i <- [1..count]]
   
   let (x', rest) = substitute x args
-  let (xs', _) = List.foldl' (\(acc, ys) e -> do
+  let (xs'', _) = List.foldl' (\(acc, ys) e -> do
         let (e', ys') = substitute e ys
         (acc <> [e'], ys')
-        ) ([], rest) xs
+        ) ([], rest) xs'
 
   let annotatedArgs = map (\a -> AST.Annotation (AST.MkIdentifier a False) Nothing False) args
 
-  AST.EClosure annotatedArgs Nothing (AST.EApplication x' xs') False
+  AST.EClosure annotatedArgs Nothing (AST.EApplication x' xs'') False
 deduceArgument (AST.EBlock xs) = AST.EBlock $ map deduceArgument xs
 deduceArgument (AST.EList xs) = AST.EList $ map deduceArgument xs
 deduceArgument (AST.EApplication x xs) = AST.EApplication (deduceArgument x) (map deduceArgument xs)
@@ -46,12 +47,15 @@ deduceArgument (AST.EClosure x y z a) = AST.EClosure x y (deduceArgument z) a
 deduceArgument (AST.EDeclaration x y z zs) = AST.EDeclaration x y (deduceArgument z) (fmap deduceArgument zs)
 deduceArgument (AST.EInstanceDeclare x xs ys) = AST.EInstanceDeclare x xs ys
 deduceArgument (AST.ELetMatch p e) = AST.ELetMatch p (deduceArgument e)
+deduceArgument (AST.EDirectExtension xs t ys) = AST.EDirectExtension xs t (map deduceArgumentE ys)
+  where 
+    deduceArgumentE (AST.ExtDeclaration xs' x' y) = AST.ExtDeclaration xs' x' (deduceArgument y)
 
 substitute :: AST.Expression -> [Text] -> (AST.Expression, [Text])
 substitute (AST.EVariable "?" _) (x:xs) = (AST.EVariable (AST.MkIdentifier x False) Nothing, xs)
 substitute (AST.EBlock xs) ys = (AST.EBlock $ map (fst . flip substitute ys) xs, ys)
 substitute (AST.EList xs) ys = (AST.EList $ map (fst . flip substitute ys) xs, ys)
-substitute (AST.EApplication x xs) ys = (AST.EApplication (fst $ substitute x ys) (map (fst . flip substitute ys) xs), ys)
+substitute (AST.EApplication x xs) ys = (AST.EApplication x xs, ys)
 substitute (AST.ELiteral l) ys = (AST.ELiteral l, ys)
 substitute (AST.EVariable e t) ys = (AST.EVariable e t, ys)
 substitute (AST.EInstanceAccess x i) ys = (AST.EInstanceAccess (fst $ substitute x ys) i, ys)
@@ -86,12 +90,15 @@ substitute (AST.EClosure x y z a) ys = (AST.EClosure x y (fst $ substitute z ys)
 substitute (AST.EDeclaration x y z zs) ys = (AST.EDeclaration x y (fst $ substitute z ys) (fmap (fst . flip substitute ys) zs), ys)
 substitute (AST.EInstanceDeclare x xs ys) ys' = (AST.EInstanceDeclare x xs ys, ys')
 substitute (AST.ELetMatch p e) ys = (AST.ELetMatch p (fst $ substitute e ys), ys)
+substitute (AST.EDirectExtension xs t ys) ys' = (AST.EDirectExtension xs t (map (fst . flip substituteE ys') ys), ys')
+  where 
+    substituteE (AST.ExtDeclaration xs' x' y) ys'' = (AST.ExtDeclaration xs' x' (fst $ substitute y ys''), ys'')
 
 countDeducable :: AST.Expression -> Int
 countDeducable (AST.EVariable "?" _) = 1
-countDeducable (AST.EBlock xs) = sum $ map countDeducable xs
-countDeducable (AST.EList xs) = sum $ map countDeducable xs
-countDeducable (AST.EApplication x xs) = countDeducable x + sum (map countDeducable xs)
+countDeducable (AST.EBlock _) = 0
+countDeducable (AST.EList _) = 0
+countDeducable (AST.EApplication _ _) = 0
 countDeducable (AST.ELiteral _) = 0
 countDeducable (AST.EVariable _ _) = 0
 countDeducable (AST.EInstanceAccess x _) = countDeducable x
@@ -117,6 +124,9 @@ countDeducable (AST.EClosure _ _ x _) = countDeducable x
 countDeducable (AST.EDeclaration _ _ x xs) = countDeducable x + maybe 0 countDeducable xs
 countDeducable (AST.EInstanceDeclare {}) = 0
 countDeducable (AST.ELetMatch _ e) = countDeducable e
+countDeducable (AST.EDirectExtension _ _ xs) = sum $ map countDeducableE xs
+  where 
+    countDeducableE (AST.ExtDeclaration _ _ x) = countDeducable x
 
 containsDeducable :: [AST.Expression] -> Bool
 containsDeducable (AST.EVariable "?" _ : _) = True

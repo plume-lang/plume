@@ -287,6 +287,12 @@ checkForUndefined m (HLIR.ELetMatch p e) = do
   void $ checkForUndefined m e
   modifyIORef' M.moduleState $ \s -> s { M.boundArgs = old.boundArgs }
   pure m { M.variables = Set.union (Set.fromList (map (, False) vars)) (M.variables m) }
+checkForUndefined m (HLIR.EDirectExtension _ ann exts) = do
+  let (var, _) = interpretAnnot ann
+
+  let exts' = map toExpr exts
+  
+  foldlM checkForUndefined (m { M.variables = Set.insert (var, False) m.variables }) exts'
 checkForUndefined _ _ = compilerError "Unsupported expression"
 
 toExpr :: HLIR.ExtensionMember -> HLIR.Expression
