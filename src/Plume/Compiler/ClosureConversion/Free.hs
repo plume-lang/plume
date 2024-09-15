@@ -51,6 +51,8 @@ freeBody body =
       ( \(acc, excluded) -> \case
           CSDeclaration n e ->
             (acc `S.union` free e S.\\ S.singleton n, excluded `S.union` S.singleton n)
+          CSMutDeclaration n e ->
+            (acc `S.union` free e S.\\ S.singleton n, excluded `S.union` S.singleton n)
           x ->
             (acc `S.union` free x S.\\ excluded, excluded)
       )
