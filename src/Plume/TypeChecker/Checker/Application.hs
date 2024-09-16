@@ -21,18 +21,26 @@ findMatchingDirect t directExts = do
 
 synthApp :: Infer -> Infer
 synthApp infer (Pre.EApplication (Pre.ELocated f _) xs) = synthApp infer (Pre.EApplication f xs)
-synthApp infer (Pre.EApplication (Pre.EVariable n _) (x:xs)) = do
+synthApp infer (Pre.EApplication f@(Pre.EVariable n _) (x:xs)) = do
   (tX, psX, x', _) <- infer x
 
   tX' <- liftIO $ compressPaths tX
 
   directExts <- gets (directExtensions . environment)
-  (t, ps, f, _) <- do
+  (t, ps, f', _) <- do
     res <- findMatchingDirect tX' directExts
     
     case res of
       Just (ty, (_, schs)) -> case Map.lookup (Cmm.identifier n) schs of
         Just sch -> do
+          case tX' of
+            TypeVar tv -> do
+              tvr <- readIORef tv
+              case tvr of
+                Link _ -> pure ()
+                _ -> throw $ CompilerError "Typechecker couldn't infer the type of the variable"
+            _ -> pure ()
+
           (t, ps) <- instantiate sch
 
           let finalName = Cmm.identifier n <> "_" <> createInstName ty
@@ -44,10 +52,22 @@ synthApp infer (Pre.EApplication (Pre.EVariable n _) (x:xs)) = do
   (ts, pss, xs', _) <- mapAndUnzip4M infer xs
 
   ret <- fresh
-
   t `unifiesWith` (tX':ts) :->: ret
 
-  pure (ret, ps <> psX <> concat pss, Post.EApplication <$> f <*> sequence (x' : xs'), False)
+  let call = Post.EApplication <$> f' <*> sequence (x':xs')
+  b <- isAsyncType ret
+  
+  (modifier, ty) <- if b
+    then do
+      tvar <- fresh
+      TAsync tvar `unifiesWith` ret
+      
+      pure (await tvar <$> call, tvar)
+    else pure (call, ret)
+
+  when (isAsyncCall f || b) $ modify (\s -> s {isAsynchronous = True})
+
+  pure (ty, ps <> psX <> concat pss, modifier, False)
 synthApp infer (Pre.EApplication f xs) = local id $ do
   -- Type checking the function and its arguments
   (t, ps, f'', _) <- infer f
