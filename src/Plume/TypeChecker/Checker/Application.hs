@@ -9,15 +9,43 @@ import Plume.TypeChecker.TLIR qualified as Post
 import Prelude hiding (local, modify, gets)
 import qualified Data.Map as Map
 import Plume.TypeChecker.Constraints.Typeclass (createInstName, findM)
-import Plume.TypeChecker.Constraints.Unification (compressPaths, doesUnifyWithH)
+import Plume.TypeChecker.Constraints.Unification (compressPaths)
 
 findMatchingDirect :: MonadIO m => PlumeType -> Map PlumeType (Set QuVar, Map Text PlumeScheme) -> m (Maybe (PlumeType, (Set QuVar, Map Text PlumeScheme)))
 findMatchingDirect t directExts = do
   t' <- liftIO $ compressPaths t
   let m' = Map.toList directExts
   
-  findM m' (\(t'', _) -> liftIO $ t'' `doesUnifyWithH` t')
+  findM m' (\(t'', _) -> t'' `doesUnifyWith'` t')
 
+doesUnifyWith' :: MonadIO m => PlumeType -> PlumeType -> m Bool
+doesUnifyWith' t t' = do
+  t1 <- liftIO $ compressPaths t
+  t2 <- liftIO $ compressPaths t'
+
+  go t1 t2
+  where 
+    go t1 t2 | t1 == t2 = pure True
+    go (TypeId "variable") (TypeId "list") = pure True
+    go (TypeId "list") (TypeId "variable") = pure True
+    go (TypeVar tv) t1' = do
+      tvr <- liftIO $ readIORef tv
+      case tvr of
+        Link t2' -> go t2' t1'
+        _ -> pure False
+    go t1' (TypeVar tv) = do
+      tvr <- liftIO $ readIORef tv
+      case tvr of
+        Link t2' -> go t1' t2'
+        _ -> pure False
+    go (TypeApp t1' ts) (TypeApp t2' ts') = do
+      b <- go t1' t2'
+      if b
+        then and <$> zipWithM go ts ts'
+        else pure False
+    go (TypeQuantified _) _ = pure True
+    go _ (TypeQuantified _) = pure True
+    go _ _ = pure False
 
 synthApp :: Infer -> Infer
 synthApp infer (Pre.EApplication (Pre.ELocated f _) xs) = synthApp infer (Pre.EApplication f xs)
@@ -29,7 +57,7 @@ synthApp infer (Pre.EApplication f@(Pre.EVariable n _) (x:xs)) = do
   directExts <- gets (directExtensions . environment)
   (t, ps, f', _) <- do
     res <- findMatchingDirect tX' directExts
-    
+
     case res of
       Just (ty, (_, schs)) -> case Map.lookup (Cmm.identifier n) schs of
         Just sch -> do
