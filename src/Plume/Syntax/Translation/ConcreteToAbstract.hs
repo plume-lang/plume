@@ -233,6 +233,9 @@ concreteToAbstract (CST.EDirectExtension g t ems) = do
   ems' <-
     fmap flat . sequence <$> mapM concreteToAbstractExtensionMember ems
   transRet $ AST.EDirectExtension g t <$> ems'
+concreteToAbstract (CST.EMonadicBind n e) = do
+  e' <- shouldBeAlone <$> concreteToAbstract e
+  transRet $ AST.EMonadicBind n <$> e'
 concreteToAbstract _ = throwError' (CompilerError "Unsupported expression")
 
 transformSch :: MonadIO m => Common.PlumeScheme -> m Common.PlumeScheme

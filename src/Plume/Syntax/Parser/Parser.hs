@@ -326,6 +326,12 @@ eClosureAsyncCase = do
 
   return cl
 
+eMonadicBind :: P.Parser CST.Expression
+eMonadicBind = do
+  var <- L.identifier
+  void $ L.symbol "<-"
+  
+  CST.EMonadicBind (Cmm.fromText var) <$> parseExpression
 
 -- | Parses a tuple expression
 -- | A tuple expression is a collection of expressions that are separated by
@@ -345,7 +351,8 @@ eTuple = buildTuple <$> L.parens (parseExpression `P.sepBy1` L.comma)
 parseTerm :: P.Parser CST.Expression
 parseTerm =
   P.choice
-    [ Lit.parseLiteral
+    [ P.try eMonadicBind
+    , Lit.parseLiteral
     -- , P.try eIfThenElseMacro
     -- , eIfThenMacro
     , eIf

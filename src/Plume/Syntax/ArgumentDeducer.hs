@@ -50,6 +50,7 @@ deduceArgument (AST.ELetMatch p e) = AST.ELetMatch p (deduceArgument e)
 deduceArgument (AST.EDirectExtension xs t ys) = AST.EDirectExtension xs t (map deduceArgumentE ys)
   where 
     deduceArgumentE (AST.ExtDeclaration xs' x' y) = AST.ExtDeclaration xs' x' (deduceArgument y)
+deduceArgument (AST.EMonadicBind x e) = AST.EMonadicBind x (deduceArgument e)
 
 substitute :: AST.Expression -> [Text] -> (AST.Expression, [Text])
 substitute (AST.EVariable "?" _) (x:xs) = (AST.EVariable (AST.MkIdentifier x False) Nothing, xs)
@@ -93,6 +94,7 @@ substitute (AST.ELetMatch p e) ys = (AST.ELetMatch p (fst $ substitute e ys), ys
 substitute (AST.EDirectExtension xs t ys) ys' = (AST.EDirectExtension xs t (map (fst . flip substituteE ys') ys), ys')
   where 
     substituteE (AST.ExtDeclaration xs' x' y) ys'' = (AST.ExtDeclaration xs' x' (fst $ substitute y ys''), ys'')
+substitute (AST.EMonadicBind x e) ys = (AST.EMonadicBind x (fst $ substitute e ys), ys)
 
 countDeducable :: AST.Expression -> Int
 countDeducable (AST.EVariable "?" _) = 1
@@ -127,6 +129,7 @@ countDeducable (AST.ELetMatch _ e) = countDeducable e
 countDeducable (AST.EDirectExtension _ _ xs) = sum $ map countDeducableE xs
   where 
     countDeducableE (AST.ExtDeclaration _ _ x) = countDeducable x
+countDeducable (AST.EMonadicBind _ e) = countDeducable e
 
 containsDeducable :: [AST.Expression] -> Bool
 containsDeducable (AST.EVariable "?" _ : _) = True

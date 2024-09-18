@@ -287,6 +287,10 @@ checkForUndefined m (HLIR.ELetMatch p e) = do
   void $ checkForUndefined m e
   modifyIORef' M.moduleState $ \s -> s { M.boundArgs = old.boundArgs }
   pure m { M.variables = Set.union (Set.fromList (map (, False) vars)) (M.variables m) }
+checkForUndefined m (HLIR.EMonadicBind var e) = do
+  let (n, _) = interpretIdentifier var
+  void $ checkForUndefined m e
+  pure m { M.variables = Set.insert (n, False) (M.variables m) }
 checkForUndefined m (HLIR.EDirectExtension _ ann exts) = do
   let (var, _) = interpretAnnot ann
 
