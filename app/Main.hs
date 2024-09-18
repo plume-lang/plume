@@ -94,8 +94,10 @@ main = setEncoding $ do
 
   runConcreteToAbstract env dir paths' file `with` \ast -> do
     let ast' = map deduceArgument ast
-    let ast'' = concatMap (removeUselessBlocks (False, True)) ast'
-    let ast''' = manageLetMatches ast''
+    let ast'' = manageLetMatches ast'
+    let ast''' = concatMap (removeUselessBlocks (False, True)) ast''
+
+    -- mapM_ print ast'''
     ppBuilding "Typechecking..."
     runSynthesize ast''' `with` \tlir -> do
       ppBuilding "Compiling and optimizing..."
